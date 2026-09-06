@@ -34,6 +34,8 @@ import com.zivett.app.core.push.PendingPushOpen
 import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZType
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
 /// One bottom-bar tab: its route object, label, icon, and an optional
@@ -76,12 +78,17 @@ fun RoleShell(
     // the area's endpoint, then open it. Cold launches park the ref
     // before any shell exists; warm taps flip the same state.
     val pending = PendingPushOpen.ref
+    val pushScope = rememberCoroutineScope()
     LaunchedEffect(pending) {
         val ref = pending ?: return@LaunchedEffect
         if (pushArea == null) return@LaunchedEffect
         PendingPushOpen.take()
-        val id = ref.toIntOrNull() ?: runCatching { environment.client.send(JobRefEndpoints.job(pushArea, ref)).job.id }.getOrNull() ?: return@LaunchedEffect
-        onPushJob(nav, id)
+        // Consuming the ref re-keys this effect to null, which cancels it —
+        // so the lookup runs on the shell's own scope, not the effect's.
+        pushScope.launch {
+            val id = ref.toIntOrNull() ?: runCatching { environment.client.send(JobRefEndpoints.job(pushArea, ref)).job.id }.getOrNull() ?: return@launch
+            onPushJob(nav, id)
+        }
     }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalNav provides nav) {

@@ -49,12 +49,12 @@ verification), pending company, business, and new business.
 - [x] StripeBridge (PaymentSheet setup mode + `handleNextActionForPayment`), StripeHost in MainActivity, `zivett://stripe-redirect` return
 
 ## Needs a manual step
-- [!] **Firebase**: create the Firebase project, register `com.zivett.app`, put `google-services.json` in `app/` (gitignored). Until then push registration is silent by design.
-- [!] **Backend push env**: `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT` (JSON or `file://storage/app/private/fcm-service-account.json`) in the local `.env` and in Forge. Without them Android tokens log instead of send.
+- [x] **Firebase**: project `zivett-android`, app `com.zivett.app`, `google-services.json` in `app/` (gitignored) — done 2026-09-06; the emulator registers a token and receives pushes.
+- [~] **Backend push env**: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` set locally (key at `storage/app/private/fcm-service-account.json`, gitignored) and verified end to end 2026-09-06, tap routing included. Still to do: the same two values in Forge.
 - [!] **App Links**: `ANDROID_APP_FINGERPRINTS` on the backend (debug keystore SHA-256 locally; Play App Signing certificate in production), then confirm `https://zivett.com/.well-known/assetlinks.json` and re-verify with `adb shell pm verify-app-links --re-verify com.zivett.app`.
-- [!] **Device-only verification**: push delivery, live location while en route, camera capture, and the Stripe 3DS challenge were only exercised as far as the emulator allows. Run each once on a physical phone.
+- [!] **Device-only verification**: live location while en route, camera capture, and the Stripe 3DS challenge were only exercised as far as the emulator allows. Run each once on a physical phone. (Push delivery + tap routing are verified on the emulator, warm and cold.)
 - [!] **Release signing / Play listing**: no upload keystore, versionCode scheme, or Play console entry yet. R8 is off for release until keep rules are checked.
-- [!] **Git**: this repo was built from an empty Android Studio template and has no git history yet. `git init` and a first commit are up to you.
+- [x] **Git**: initialised 2026-09-06, remote `github.com/agm1984/zivett-android`.
 
 ## Known divergences (intentional)
 - Material 3 controls instead of iOS look-alikes (NavigationBar tabs, ModalBottomSheet, ExposedDropdownMenu, Snackbar pill toasts, system pickers). Screen content and copy match iOS.
