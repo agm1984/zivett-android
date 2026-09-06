@@ -86,7 +86,11 @@ fun RoleShell(
         // Consuming the ref re-keys this effect to null, which cancels it —
         // so the lookup runs on the shell's own scope, not the effect's.
         pushScope.launch {
-            val id = ref.toIntOrNull() ?: runCatching { environment.client.send(JobRefEndpoints.job(pushArea, ref)).job.id }.getOrNull() ?: return@launch
+            android.util.Log.d(com.zivett.app.core.push.PushRouting.LOG_TAG, "shell resolving ref=$ref area=$pushArea")
+            val id = ref.toIntOrNull() ?: runCatching { environment.client.send(JobRefEndpoints.job(pushArea, ref)).job.id }
+                .onFailure { android.util.Log.w(com.zivett.app.core.push.PushRouting.LOG_TAG, "lookup failed for $ref: $it") }
+                .getOrNull() ?: return@launch
+            android.util.Log.d(com.zivett.app.core.push.PushRouting.LOG_TAG, "opening job id=$id")
             onPushJob(nav, id)
         }
     }

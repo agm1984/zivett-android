@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 /// `route_name` + `route_params` the bell rows do (see `App\Support\Push`),
 /// so a tap resolves through the same path a bell tap does.
 object PushRouting {
+    const val LOG_TAG = "ZivettPush"
     const val EXTRA_ROUTE_NAME = "route_name"
     const val EXTRA_ROUTE_ID = "route_id"
 

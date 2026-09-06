@@ -24,9 +24,11 @@ class ZivettMessagingService : FirebaseMessagingService() {
         val title = data["title"] ?: message.notification?.title ?: "ZiVETT"
         val body = data["body"] ?: message.notification?.body ?: ""
 
+        val ref = PushRouting.jobRef(data)
+        android.util.Log.d(PushRouting.LOG_TAG, "received keys=${data.keys} route=${data["route_name"]} ref=$ref id=${message.messageId}")
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            PushRouting.jobRef(data)?.let { ref ->
+            ref?.let { ref ->
                 putExtra(PushRouting.EXTRA_ROUTE_NAME, data["route_name"])
                 putExtra(PushRouting.EXTRA_ROUTE_ID, ref)
             }

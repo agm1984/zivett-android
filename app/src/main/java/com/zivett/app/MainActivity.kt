@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent ?: return
 
+        android.util.Log.d(PushRouting.LOG_TAG, "handleIntent extras=${intent.extras?.keySet()} route_id=${intent.getStringExtra(PushRouting.EXTRA_ROUTE_ID)}")
         intent.getStringExtra(PushRouting.EXTRA_ROUTE_ID)?.let { ref ->
             PendingPushOpen.store(ref)
             intent.removeExtra(PushRouting.EXTRA_ROUTE_ID)
