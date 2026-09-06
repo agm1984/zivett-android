@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash-era window: the brand charcoal so the first frame matches
+         the Compose splash instead of flashing white. -->
+    <style name="Theme.Zivett" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/zivett_navy_deep</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
