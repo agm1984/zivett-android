@@ -21,6 +21,24 @@ val localProperties = Properties().apply {
 }
 val lanHost: String = localProperties.getProperty("lan.host") ?: "Adams-MacBook-Pro.local"
 
+// Release signing: the Play *upload* key (Play App Signing holds the
+// real app-signing key). Read from local.properties, falling back to
+// ZIVETT_UPLOAD_* environment variables for CI. See README "Shipping".
+fun uploadSetting(property: String, env: String): String? =
+    localProperties.getProperty(property) ?: System.getenv(env)
+val uploadStoreFile = uploadSetting("upload.store.file", "ZIVETT_UPLOAD_STORE_FILE")
+
+// versionCode = yyyyMMdd × 10 + build number (0-9, `-PbuildNumber=N`
+// for a second upload the same day). Monotonic without bookkeeping; a
+// `-PversionCode=N` override wins outright. providers.exec is a tracked
+// configuration-cache input, so the date is re-read every build.
+val buildDate: Provider<String> = providers.exec {
+    commandLine("date", "+%Y%m%d")
+}.standardOutput.asText.map { it.trim() }
+val buildNumber = (project.findProperty("buildNumber") as String?)?.toInt() ?: 0
+val computedVersionCode: Int = (project.findProperty("versionCode") as String?)?.toInt()
+    ?: (buildDate.get().toInt() * 10 + buildNumber)
+
 android {
     namespace = "com.zivett.app"
     compileSdk {
@@ -31,13 +49,24 @@ android {
         applicationId = "com.zivett.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        versionCode = computedVersionCode
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // The Mac's Bonjour name, for a physical phone (Debug only reads it).
         buildConfigField("String", "LAN_HOST", "\"$lanHost\"")
+    }
+
+    signingConfigs {
+        if (uploadStoreFile != null) {
+            create("upload") {
+                storeFile = file(uploadStoreFile)
+                storePassword = uploadSetting("upload.store.password", "ZIVETT_UPLOAD_STORE_PASSWORD")
+                keyAlias = uploadSetting("upload.key.alias", "ZIVETT_UPLOAD_KEY_ALIAS")
+                keyPassword = uploadSetting("upload.key.password", "ZIVETT_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -49,9 +78,16 @@ android {
         release {
             buildConfigField("String", "API_BASE_URL", "\"https://zivett.com\"")
             buildConfigField("boolean", "BACKEND_SWITCHER", "false")
+            // R8 shrink + obfuscate; keep rules in src/main/keepRules/*.keep.
+            // Verified against production and a signed-in local pass
+            // (see PARITY.md "Release signing").
             optimization {
-                enable = false
+                enable = true
             }
+            // Unsigned when no upload key is configured (CI without
+            // secrets, a fresh checkout): assembleRelease still works,
+            // the artefact just is not installable until signed.
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
     compileOptions {

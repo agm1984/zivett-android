@@ -250,12 +250,57 @@ use, so there is no Google Maps key to manage.
 
 ## Shipping
 
-Not set up yet. Before the first Play upload: pick a `versionCode`
-scheme, create the upload keystore (or opt into Play App Signing), add
-its SHA-256 fingerprint to `ANDROID_APP_FINGERPRINTS` on the backend, and
-turn `optimization.enable` back on for release in `app/build.gradle.kts`
-once the R8 keep rules for kotlinx.serialization and Stripe have been
-checked.
+Release builds are shrunk and obfuscated by R8 (`optimization.enable`
+in `app/build.gradle.kts`; extra keep rules live in
+`app/src/main/keepRules/*.keep`, currently just the line-number
+attributes so crash stacks retrace). The libraries' own consumer rules
+cover kotlinx.serialization, Stripe, OkHttp, Coil, osmdroid and
+Firebase; the shrunk build was walked through login, home, jobs,
+messages, account, invoices, the pay sheet and the Stripe PaymentSheet
+launch on 2026-09-06. Upload `app/build/outputs/mapping/release/mapping.txt`
+to Play Console with each release so stack traces are readable.
+
+### Signing
+
+The app is signed with a Play *upload* key; Play App Signing holds the
+real app-signing key and re-signs the AAB on their side. The upload
+keystore is read from `local.properties` (gitignored), with
+`ZIVETT_UPLOAD_*` environment variables as the CI fallback:
+
+```
+upload.store.file=/Users/you/.android/zivett-upload.jks
+upload.store.password=…
+upload.key.alias=zivett-upload
+upload.key.password=…
+```
+
+The keystore itself lives outside the repo at
+`~/.android/zivett-upload.jks` (PKCS12, RSA 2048, valid to 2054). Back it
+up somewhere safe: if it is lost, Play can reset the upload key, but
+that is a support ticket, not a rebuild. With no upload key configured
+the release build still assembles, just unsigned.
+
+### Version code
+
+`versionCode` is `yyyyMMdd × 10 + build number`, computed at build time
+(today's first build is `2026090600`), so it is monotonic without
+bookkeeping. A second upload the same day passes `-PbuildNumber=1`
+(up to 9); `-PversionCode=N` overrides outright. `versionName` is set by
+hand.
+
+### Building for Play
+
+```sh
+./gradlew :app:bundleRelease        # app/build/outputs/bundle/release/app-release.aab
+./gradlew :app:assembleRelease      # signed APK, for sideload checks
+```
+
+Then, in order: upload the AAB to an internal-testing track, copy the
+**app signing** certificate SHA-256 from Play Console → Setup → App
+signing, append it to `ANDROID_APP_FINGERPRINTS` on the backend
+(comma-separated after the debug one) and run `config:cache`, and
+re-verify App Links on a device with
+`adb shell pm verify-app-links --re-verify com.zivett.app`.
 
 ## Where else to look
 

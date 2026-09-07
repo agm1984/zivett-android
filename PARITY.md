@@ -50,10 +50,10 @@ verification), pending company, business, and new business.
 
 ## Needs a manual step
 - [x] **Firebase**: project `zivett-android`, app `com.zivett.app`, `google-services.json` in `app/` (gitignored) — done 2026-09-06; the emulator registers a token and receives pushes.
-- [~] **Backend push env**: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` set locally (key at `storage/app/private/fcm-service-account.json`, gitignored) and verified end to end 2026-09-06, tap routing included. Still to do: the same two values in Forge.
-- [!] **App Links**: `ANDROID_APP_FINGERPRINTS` on the backend (debug keystore SHA-256 locally; Play App Signing certificate in production), then confirm `https://zivett.com/.well-known/assetlinks.json` and re-verify with `adb shell pm verify-app-links --re-verify com.zivett.app`.
+- [x] **Backend push env**: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` set locally (key at `storage/app/private/fcm-service-account.json`, gitignored) and verified end to end 2026-09-06, tap routing included. The same two values are set in Forge for production (confirmed 2026-09-06).
+- [~] **App Links**: `ANDROID_APP_FINGERPRINTS` is set on production with the debug keystore's SHA-256 (2026-09-06) and `https://zivett.com/.well-known/assetlinks.json` serves it; `https://zivett.com/r/*` opens the app on the emulator. Still to do: append the Play App Signing certificate fingerprint once the Play listing exists (comma-separated, then `config:cache`).
 - [!] **Device-only verification**: live location while en route, camera capture, and the Stripe 3DS challenge were only exercised as far as the emulator allows. Run each once on a physical phone. (Push delivery + tap routing are verified on the emulator, warm and cold.)
-- [!] **Release signing / Play listing**: no upload keystore, versionCode scheme, or Play console entry yet. R8 is off for release until keep rules are checked.
+- [~] **Release signing**: done 2026-09-06 — upload keystore at `~/.android/zivett-upload.jks` (wired through `local.properties`, env-var fallback for CI), date-based `versionCode`, R8 on for release with line-number keep rules, backup rules made explicit (nothing leaves the device). The shrunk build was walked as customer (home, jobs, messages, account, invoices, pay sheet) and company-new (setup, subscription, PaymentSheet launch) against local Sail, and a production login round-trip. `bundleRelease` produces a signed AAB. Still to do: the Play Console entry itself (listing, data safety, content rating, internal-testing upload), then the App Links fingerprint above.
 - [x] **Git**: initialised 2026-09-06, remote `github.com/agm1984/zivett-android`.
 
 ## Known divergences (intentional)

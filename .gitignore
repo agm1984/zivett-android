@@ -17,3 +17,7 @@ local.properties
 # Firebase config (per-project, see README "Push notifications")
 /app/google-services.json
 .kotlin/
+
+# Signing keys never belong in git (the upload key lives in ~/.android, see README "Shipping")
+*.jks
+*.keystore
