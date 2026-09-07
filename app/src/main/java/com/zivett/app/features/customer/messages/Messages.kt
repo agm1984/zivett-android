@@ -22,6 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +53,7 @@ import com.zivett.app.app.ConversationRoute
 import com.zivett.app.app.JobDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.Loadable
+import com.zivett.app.core.models.ConversationParticipant
 import com.zivett.app.core.models.ConversationSummary
 import com.zivett.app.core.models.CustomerEndpoints
 import com.zivett.app.core.models.JobArea
@@ -70,9 +76,12 @@ import com.zivett.app.design.ZTextAction
 import com.zivett.app.design.ZTextTone
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZToastBox
+import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
 import com.zivett.app.features.company.Dates
+import com.zivett.app.features.customer.jobs.JobDetailModel
+import com.zivett.app.features.customer.jobs.ReportProblemSheet
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -141,6 +150,9 @@ class ConversationModel(val jobId: Int, private val client: ApiClient, val area:
     var draft by mutableStateOf("")
     var sending by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
+    /// The other side of the thread — who can be blocked, who already is.
+    var participants by mutableStateOf<List<ConversationParticipant>>(emptyList())
+        private set
     /// The realtime channel key (`conversation.{id}`) — known after the
     /// first load; threads are keyed by conversation id, not job id.
     var conversationId by mutableStateOf<Int?>(null)
@@ -152,16 +164,22 @@ class ConversationModel(val jobId: Int, private val client: ApiClient, val area:
         state = state.reloaded {
             val conversation = client.send(area.conversation(jobId)).conversation
             conversationId = conversation.id
+            participants = conversation.participants
             conversation.messages
         }
     }
 
+    val blockable: List<ConversationParticipant> get() = participants.filter { !it.blocked }
+    val blocked: List<ConversationParticipant> get() = participants.filter { it.blocked }
+
     /// A pushed message on this thread. Deduped by id — our own sends
     /// echo back (the app sends no socket-id for exclusion), and the
-    /// poll fallback may have raced us.
+    /// poll fallback may have raced us. The socket is not filtered
+    /// server-side, so a blocked sender's message is dropped here.
     fun receive(event: String, payload: String) {
         if (event != RealtimeEvents.messageSent) return
         val message = RealtimeEvents.message(payload, currentUserId) ?: return
+        if (blocked.any { it.id == message.senderId }) return
         val messages = state.value ?: return
         if (messages.any { it.id == message.id }) return
         state = Loadable.Loaded(messages + message)
@@ -186,11 +204,45 @@ class ConversationModel(val jobId: Int, private val client: ApiClient, val area:
             sending = false
         }
     }
+
+    /// Block someone on the other side: their messages disappear from
+    /// this thread (and every other read) until unblocked. The thread
+    /// reloads so the server's filtered view is what's shown.
+    suspend fun block(participant: ConversationParticipant) {
+        sending = true
+        error = null
+        try {
+            participants = client.send(area.blockUser(jobId, participant.id)).participants
+            load()
+        } catch (apiError: ApiError) {
+            error = apiError.first("user_id") ?: apiError.userMessage
+        } catch (e: Exception) {
+            error = e.userMessage
+        } finally {
+            sending = false
+        }
+    }
+
+    suspend fun unblock(participant: ConversationParticipant) {
+        sending = true
+        error = null
+        try {
+            participants = client.send(area.unblockUser(jobId, participant.id)).participants
+            load()
+        } catch (apiError: ApiError) {
+            error = apiError.userMessage
+        } catch (e: Exception) {
+            error = e.userMessage
+        } finally {
+            sending = false
+        }
+    }
 }
 
 /// One thread. Live over the conversation's private channel (same
 /// Reverb feed as the web); the 15s poll runs only while the socket is
-/// down.
+/// down. The overflow menu carries the store-policy pair: block
+/// (private, hides the person) and report a problem (reaches support).
 @Composable
 fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: Boolean, area: JobArea, showJobLink: Boolean, onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
@@ -199,6 +251,9 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
     val colors = ZTheme.colors
     val model = remember(jobId) { ConversationModel(jobId, environment.client, area).also { it.currentUserId = environment.session.user?.id } }
     val listState = rememberLazyListState()
+    var menu by remember { mutableStateOf(false) }
+    var blocking by remember { mutableStateOf<ConversationParticipant?>(null) }
+    var reporting by remember { mutableStateOf(false) }
 
     LaunchedEffect(model) {
         model.load()
@@ -218,6 +273,16 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
     Column(modifier = Modifier.fillMaxSize().background(colors.cream)) {
         ZTopBar(title, onBack = onBack, subtitle = subtitle, actions = {
             if (showJobLink) ZTextAction("View job") { nav.navigate(JobDetailRoute(jobId, if (area.kind == JobArea.Kind.BUSINESS) Areas.BUSINESS else Areas.CUSTOMER)) }
+            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Conversation options", tint = colors.inkMuted) }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                for (participant in model.blockable) {
+                    DropdownMenuItem(text = { Text("Block ${participant.name}", color = colors.danger) }, onClick = { menu = false; blocking = participant })
+                }
+                for (participant in model.blocked) {
+                    DropdownMenuItem(text = { Text("Unblock ${participant.name}") }, onClick = { menu = false; scope.launch { model.unblock(participant) } })
+                }
+                DropdownMenuItem(text = { Text("Report a problem") }, onClick = { menu = false; reporting = true })
+            }
         })
         ZToastBox(model.error, { model.error = null }, modifier = Modifier.weight(1f)) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -228,6 +293,16 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
                             items(state.loaded, key = { it.id }) { MessageBubble(it) }
                         }
                         else -> Column(modifier = Modifier.padding(ZSpacing.md)) { ZLoadable(state, retry = { scope.launch { model.load() } }) {} }
+                    }
+                }
+                for (participant in model.blocked) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(colors.tone(ZTone.NEUTRAL).second).padding(horizontal = ZSpacing.md, vertical = ZSpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm),
+                    ) {
+                        ZCaption("You blocked ${participant.name}. Their messages are hidden and they can't message you.", modifier = Modifier.weight(1f))
+                        ZTextAction("Unblock") { scope.launch { model.unblock(participant) } }
                     }
                 }
                 if (readOnly) {
@@ -252,6 +327,20 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
                 }
             }
         }
+    }
+
+    blocking?.let { participant ->
+        AlertDialog(
+            onDismissRequest = { blocking = null },
+            title = { Text("Block ${participant.name}?") },
+            text = { Text("You won't see their messages and they won't be able to message you. You can unblock them here any time. To reach our support team, use Report a problem.") },
+            confirmButton = { TextButton(onClick = { blocking = null; scope.launch { model.block(participant) } }) { Text("Block", color = colors.danger) } },
+            dismissButton = { TextButton(onClick = { blocking = null }) { Text("Cancel") } },
+        )
+    }
+    if (reporting) {
+        val detail = remember(jobId) { JobDetailModel(jobId, environment.client, area) }
+        ReportProblemSheet(detail, onDismiss = { reporting = false })
     }
 }
 

@@ -22,6 +22,10 @@ class JobArea(
     val deletePhoto: (Int) -> ApiRequest<Unit>,
     val conversation: (Int) -> ApiRequest<ConversationResponse>,
     val sendMessage: (Int, String) -> ApiRequest<MessageResponse>,
+    /// (job id, user id) — block / unblock someone on the other side of
+    /// the thread. The store-policy control, next to `report`.
+    val blockUser: (Int, Int) -> ApiRequest<BlockResponse>,
+    val unblockUser: (Int, Int) -> ApiRequest<BlockResponse>,
     val location: (Int) -> ApiRequest<JobLocation>,
     val invoiceDetail: (Int) -> ApiRequest<InvoiceResponse>,
     val payInvoice: (Int, String?, Int) -> ApiRequest<InvoiceResponse>,
@@ -56,6 +60,8 @@ class JobArea(
             deletePhoto = { CustomerEndpoints.deletePhoto(it) },
             conversation = { CustomerEndpoints.conversation(it) },
             sendMessage = { job, body -> CustomerEndpoints.sendMessage(job, body) },
+            blockUser = { job, user -> CustomerEndpoints.blockUser(job, user) },
+            unblockUser = { job, user -> CustomerEndpoints.unblockUser(job, user) },
             location = { CustomerEndpoints.location(it) },
             invoiceDetail = { CustomerEndpoints.invoice(it) },
             payInvoice = { invoice, coupon, tip -> CustomerEndpoints.pay(invoice, coupon, tip) },
@@ -77,14 +83,16 @@ class JobArea(
             deletePhoto = { BusinessEndpoints.deletePhoto(it) },
             conversation = { BusinessEndpoints.conversation(it) },
             sendMessage = { job, body -> BusinessEndpoints.sendMessage(job, body) },
+            blockUser = { job, user -> BusinessEndpoints.blockUser(job, user) },
+            unblockUser = { job, user -> BusinessEndpoints.unblockUser(job, user) },
             location = { BusinessEndpoints.location(it) },
             invoiceDetail = { BusinessEndpoints.invoice(it) },
             payInvoice = { invoice, coupon, tip -> BusinessEndpoints.pay(invoice, coupon, tip) },
             warranties = { BusinessEndpoints.warranties() },
         )
 
-        /// A minimal area for the company's job thread (only conversation +
-        /// location are ever used from here).
+        /// A minimal area for the company's job thread (only conversation,
+        /// block/report, and location are ever used from here).
         val companyThread = JobArea(
             kind = Kind.COMPANY,
             job = { CompanyEndpoints.job(it) },
@@ -101,6 +109,8 @@ class JobArea(
             deletePhoto = { CompanyEndpoints.deletePhoto(it) },
             conversation = { CompanyEndpoints.conversation(it) },
             sendMessage = { job, body -> CompanyEndpoints.sendMessage(job, body) },
+            blockUser = { job, user -> CompanyEndpoints.blockUser(job, user) },
+            unblockUser = { job, user -> CompanyEndpoints.unblockUser(job, user) },
             location = { CompanyEndpoints.location(it) },
             invoiceDetail = { CompanyEndpoints.invoice(it) },
             payInvoice = customer.payInvoice,

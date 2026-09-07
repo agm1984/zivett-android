@@ -387,7 +387,18 @@ data class ConversationSummary(
 
 /// `GET /api/customer/jobs/{job}/conversation`.
 @Serializable
-data class Conversation(val id: Int, val messages: List<Message> = emptyList())
+data class Conversation(
+    val id: Int,
+    val messages: List<Message> = emptyList(),
+    /// The other side of the thread as this viewer sees it — who they
+    /// can block, and who they already have. Absent on older servers.
+    val participants: List<ConversationParticipant> = emptyList(),
+)
+
+/// One person on the other side of a thread (`participants` on the
+/// conversation and block/unblock responses).
+@Serializable
+data class ConversationParticipant(val id: Int, val name: String, val blocked: Boolean = false)
 
 @Serializable
 data class Message(
@@ -574,6 +585,7 @@ data class BookingOptions(
 @Serializable data class AddressesResponse(val addresses: List<CustomerAddress> = emptyList())
 @Serializable data class AddressResponse(val address: CustomerAddress)
 @Serializable data class MessageResponse(val message: Message)
+@Serializable data class BlockResponse(val participants: List<ConversationParticipant> = emptyList())
 
 @Suppress("unused")
 private val keepJsonPrimitiveImport: JsonPrimitive? = null

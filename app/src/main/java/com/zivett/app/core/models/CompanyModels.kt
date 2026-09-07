@@ -345,6 +345,8 @@ object CompanyEndpoints {
     fun report(jobId: Int, kind: String, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/company/jobs/$jobId/report", mapOf("kind" to kind, "body" to body))
     fun conversation(jobId: Int) = ApiRequest.get<ConversationResponse>("api/company/jobs/$jobId/conversation")
     fun sendMessage(jobId: Int, body: String) = ApiRequest.post<MessageResponse, Map<String, String>>("api/company/jobs/$jobId/conversation/messages", mapOf("body" to body))
+    fun blockUser(jobId: Int, userId: Int) = ApiRequest.post<BlockResponse, Map<String, Int>>("api/company/jobs/$jobId/conversation/block", mapOf("user_id" to userId))
+    fun unblockUser(jobId: Int, userId: Int) = ApiRequest.delete<BlockResponse>("api/company/jobs/$jobId/conversation/block/$userId")
     fun location(jobId: Int) = ApiRequest.get<JobLocation>("api/company/jobs/$jobId/location")
     /// `kind` is `before` or `after` (evidence photos).
     fun uploadPhotos(jobId: Int, kind: String, photos: List<ByteArray>): ApiRequest<PhotosResponse> {

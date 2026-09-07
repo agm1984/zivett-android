@@ -170,6 +170,8 @@ object BusinessEndpoints {
     fun report(jobId: Int, kind: String, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/business/requests/$jobId/report", mapOf("kind" to kind, "body" to body))
     fun conversation(jobId: Int) = ApiRequest.get<ConversationResponse>("api/business/requests/$jobId/conversation")
     fun sendMessage(jobId: Int, body: String) = ApiRequest.post<MessageResponse, Map<String, String>>("api/business/requests/$jobId/conversation/messages", mapOf("body" to body))
+    fun blockUser(jobId: Int, userId: Int) = ApiRequest.post<BlockResponse, Map<String, Int>>("api/business/requests/$jobId/conversation/block", mapOf("user_id" to userId))
+    fun unblockUser(jobId: Int, userId: Int) = ApiRequest.delete<BlockResponse>("api/business/requests/$jobId/conversation/block/$userId")
     fun location(jobId: Int) = ApiRequest.get<JobLocation>("api/business/requests/$jobId/location")
     fun uploadPhotos(jobId: Int, photos: List<ByteArray>): ApiRequest<PhotosResponse> {
         val form = MultipartForm()

@@ -74,6 +74,8 @@ object CustomerEndpoints {
     fun conversations() = ApiRequest.get<ConversationsResponse>("api/customer/conversations")
     fun conversation(jobId: Int) = ApiRequest.get<ConversationResponse>("api/customer/jobs/$jobId/conversation")
     fun sendMessage(jobId: Int, body: String) = ApiRequest.post<MessageResponse, Map<String, String>>("api/customer/jobs/$jobId/conversation/messages", mapOf("body" to body))
+    fun blockUser(jobId: Int, userId: Int) = ApiRequest.post<BlockResponse, Map<String, Int>>("api/customer/jobs/$jobId/conversation/block", mapOf("user_id" to userId))
+    fun unblockUser(jobId: Int, userId: Int) = ApiRequest.delete<BlockResponse>("api/customer/jobs/$jobId/conversation/block/$userId")
 
     // Account
     fun profile() = ApiRequest.get<CustomerProfile>("api/customer/profile")
