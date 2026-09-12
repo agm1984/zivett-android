@@ -44,6 +44,7 @@ import com.zivett.app.app.LoginRoute
 import com.zivett.app.app.SignupRoute
 import com.zivett.app.app.Tagline
 import com.zivett.app.app.WelcomeRoute
+import com.zivett.app.design.LightStatusBarIcons
 import com.zivett.app.design.BrandMark
 import com.zivett.app.design.BrandWordmark
 import com.zivett.app.design.ZBackLink
@@ -106,6 +107,7 @@ fun NavHostController.backToHome() {
 @Composable
 fun WelcomeScreen(nav: NavHostController) {
     val colors = ZTheme.colors
+    LightStatusBarIcons()
     Column(modifier = Modifier.fillMaxSize()) {
         // The brand panel is fixed-dark in both appearances, like the
         // splash and the web's charcoal hero.

@@ -2,11 +2,15 @@ package com.zivett.app.features.customer.account
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
+import com.zivett.app.R
 import com.zivett.app.app.Areas
 import com.zivett.app.app.InvoiceDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
@@ -85,7 +91,6 @@ import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZTitle
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
-import com.zivett.app.design.BrandWordmark
 import com.zivett.app.features.company.Dates
 import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.InvoiceBreakdown
@@ -196,7 +201,7 @@ fun InvoiceDetailScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
                             Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
                                 // ZiVETT issues the document; the pro appears by name + logo only below.
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    BrandWordmark()
+                                    Image(painterResource(R.drawable.zivett_wordmark), contentDescription = "ZiVETT", modifier = Modifier.height(20.dp), contentScale = ContentScale.Fit, alignment = Alignment.CenterStart)
                                     ZCaption("Bookings, payments & support · zivett.com", tone = ZTextTone.SOFT)
                                 }
                                 detail.company?.let { company ->
@@ -418,7 +423,7 @@ object InvoicePdf {
     fun render(context: Context, invoice: Invoice): File? = runCatching {
         val document = PdfDocument()
         val page = document.startPage(PdfDocument.PageInfo.Builder(612, 792, 1).create())
-        draw(page.canvas, invoice)
+        draw(context, page.canvas, invoice)
         document.finishPage(page)
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
         val name = (invoice.number ?: "invoice").replace("/", "-")
@@ -428,10 +433,9 @@ object InvoicePdf {
         file
     }.getOrNull()
 
-    private fun draw(canvas: Canvas, invoice: Invoice) {
+    private fun draw(context: Context, canvas: Canvas, invoice: Invoice) {
         val ink = AndroidColor.parseColor("#16181D")
         val muted = AndroidColor.parseColor("#8A8578")
-        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = 22f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = 11f }
         val strong = Paint(body).apply { typeface = Typeface.DEFAULT_BOLD }
         val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = muted; textSize = 9f }
@@ -441,7 +445,11 @@ object InvoicePdf {
         }
         val left = 36f; val right = 576f
         var y = 60f
-        canvas.drawText("ZiVETT", left, y, title)
+        // The gold wordmark, 22pt tall on the text baseline (iOS InvoicePDF draws it at the same height).
+        val wordmark = BitmapFactory.decodeResource(context.resources, R.drawable.zivett_wordmark)
+        val wordmarkHeight = 22f
+        canvas.drawBitmap(wordmark, null, RectF(left, y - wordmarkHeight, left + wordmarkHeight * wordmark.width / wordmark.height, y), Paint(Paint.FILTER_BITMAP_FLAG))
+        wordmark.recycle()
         canvas.drawText(if (invoice.isPaid) "PAID" else "DUE", right, y, stamp)
         y += 14f
         canvas.drawText("Bookings, payments & support · zivett.com", left, y, small)

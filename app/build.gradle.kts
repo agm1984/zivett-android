@@ -1,3 +1,5 @@
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.Properties
 
 plugins {
@@ -28,16 +30,19 @@ fun uploadSetting(property: String, env: String): String? =
     localProperties.getProperty(property) ?: System.getenv(env)
 val uploadStoreFile = uploadSetting("upload.store.file", "ZIVETT_UPLOAD_STORE_FILE")
 
-// versionCode = yyyyMMdd × 10 + build number (0-9, `-PbuildNumber=N`
-// for a second upload the same day). Monotonic without bookkeeping; a
-// `-PversionCode=N` override wins outright. providers.exec is a tracked
-// configuration-cache input, so the date is re-read every build.
+// versionCode = days since 2026-01-01 × 10 + build number (0-9,
+// `-PbuildNumber=N` for a second upload the same day). Monotonic without
+// bookkeeping and small enough that Play never complains (a raw yyyyMMdd
+// code is rejected as "significantly higher than your previous version
+// code"). A `-PversionCode=N` override wins outright. providers.exec is a
+// tracked configuration-cache input, so the date is re-read every build.
 val buildDate: Provider<String> = providers.exec {
-    commandLine("date", "+%Y%m%d")
+    commandLine("date", "+%Y-%m-%d")
 }.standardOutput.asText.map { it.trim() }
 val buildNumber = (project.findProperty("buildNumber") as String?)?.toInt() ?: 0
+val versionEpoch: LocalDate = LocalDate.of(2026, 1, 1)
 val computedVersionCode: Int = (project.findProperty("versionCode") as String?)?.toInt()
-    ?: (buildDate.get().toInt() * 10 + buildNumber)
+    ?: (ChronoUnit.DAYS.between(versionEpoch, LocalDate.parse(buildDate.get())).toInt() * 10 + buildNumber)
 
 android {
     namespace = "com.zivett.app"

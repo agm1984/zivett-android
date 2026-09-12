@@ -53,8 +53,51 @@ verification), pending company, business, and new business.
 - [x] **Backend push env**: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` set locally (key at `storage/app/private/fcm-service-account.json`, gitignored) and verified end to end 2026-09-06, tap routing included. The same two values are set in Forge for production (confirmed 2026-09-06).
 - [~] **App Links**: `ANDROID_APP_FINGERPRINTS` is set on production with the debug keystore's SHA-256 (2026-09-06) and `https://zivett.com/.well-known/assetlinks.json` serves it; `https://zivett.com/r/*` opens the app on the emulator. Still to do: append the Play App Signing certificate fingerprint once the Play listing exists (comma-separated, then `config:cache`).
 - [!] **Device-only verification**: live location while en route, camera capture, and the Stripe 3DS challenge were only exercised as far as the emulator allows. Run each once on a physical phone. (Push delivery + tap routing are verified on the emulator, warm and cold.)
-- [~] **Release signing**: done 2026-09-06 — upload keystore at `~/.android/zivett-upload.jks` (wired through `local.properties`, env-var fallback for CI), date-based `versionCode`, R8 on for release with line-number keep rules, backup rules made explicit (nothing leaves the device). The shrunk build was walked as customer (home, jobs, messages, account, invoices, pay sheet) and company-new (setup, subscription, PaymentSheet launch) against local Sail, and a production login round-trip. `bundleRelease` produces a signed AAB. Still to do: the Play Console entry itself (listing, data safety, content rating, internal-testing upload), then the App Links fingerprint above.
+- [~] **Release signing**: done 2026-09-06 — upload keystore at `~/.android/zivett-upload.jks` (wired through `local.properties`, env-var fallback for CI), day-count `versionCode` (Play rejected yyyyMMdd on 2026-09-11), R8 on for release with line-number keep rules, backup rules made explicit (nothing leaves the device). The shrunk build was walked as customer (home, jobs, messages, account, invoices, pay sheet) and company-new (setup, subscription, PaymentSheet launch) against local Sail, and a production login round-trip. `bundleRelease` produces a signed AAB. Still to do: the Play Console entry itself (listing, data safety, content rating, internal-testing upload), then the App Links fingerprint above.
 - [x] **Git**: initialised 2026-09-06, remote `github.com/agm1984/zivett-android`.
+
+## Play Console checklist (2026-09-08)
+
+Code is done: `bundleRelease` produces a signed AAB (upload key in
+`~/.android/zivett-upload.jks`) with the R8 mapping embedded under
+`BUNDLE-METADATA`, so Play retraces crashes without a separate upload.
+What remains, in order. The listing copy, Data safety answers,
+screenshot plan, and the icon/feature-graphic assets each step needs are
+in `store/` (start at `store/README.md`).
+
+1. [ ] **Developer account** registered and verified. A new *personal*
+   account must run a closed test with at least 12 testers opted in for
+   14 continuous days before it can publish to production; organization
+   accounts are exempt. Start this first.
+2. [x] **Create the app** (`com.zivett.app`) and upload the AAB to
+   internal testing — done 2026-09-11, versionCode 2530 published to
+   the internal track. Play App Signing enrolled on that upload.
+3. [x] **App Links fingerprints** — done 2026-09-11: production's
+   `assetlinks.json` now lists the debug, upload, and Play app-signing
+   certs (all three written out in `store/README.md`). Verify on a
+   device with `adb shell pm verify-app-links --re-verify com.zivett.app`.
+4. [~] **Store listing**: copy in `store/LISTING.md`; icon and feature
+   graphic in `store/`; ten 1080×1920 phone screenshots captured
+   2026-09-11 in `~/Desktop/ZiVETT Play Store Screenshots/` (same
+   numbering and seed data as the iOS set). Left: paste into the
+   Console.
+5. [ ] **App content**: Data safety (name, email, phone, addresses,
+   photos, foreground location, push token, payments via Stripe,
+   encrypted in transit, deletion documented at
+   `https://zivett.com/support`), content rating, target audience 18+,
+   no ads, App access credentials = the `review-*@zivett.com` demo
+   accounts seeded by `AppReviewDemoSeeder`.
+6. [ ] **Physical-phone pass** on the internal-testing build: live
+   location while en route, camera capture, Stripe 3DS challenge. Read
+   the pre-launch report.
+7. [~] **Closed test** (personal account → 12 testers opted in for 14
+   days before production access). Submitted 2026-09-11: Alpha track,
+   release 2530, Canada only, testers = Google Group
+   `zivett-android-beta@googlegroups.com` (anyone can join, so the
+   website can link to it). Opt-in URL
+   `https://play.google.com/apps/testing/com.zivett.app`. Waiting on
+   Google's first review; then recruit testers, then apply for
+   production access.
 
 ## Known divergences (intentional)
 - Material 3 controls instead of iOS look-alikes (NavigationBar tabs, ModalBottomSheet, ExposedDropdownMenu, Snackbar pill toasts, system pickers). Screen content and copy match iOS.

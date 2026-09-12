@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.zivett.app.core.auth.Access
 import com.zivett.app.core.auth.AuthState
 import com.zivett.app.core.models.User
+import com.zivett.app.design.LightStatusBarIcons
 import com.zivett.app.design.BrandMark
 import com.zivett.app.design.BrandWordmark
 import com.zivett.app.design.ZBody
@@ -87,6 +88,7 @@ private fun SignedInRouter(user: User) {
 /// panel doesn't flip with the system theme.
 @Composable
 fun SplashScreen() {
+    LightStatusBarIcons()
     var arrived by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { arrived = true }
     val scale by animateFloatAsState(if (arrived) 1f else 0.88f, spring(dampingRatio = 0.6f), label = "splash-scale")

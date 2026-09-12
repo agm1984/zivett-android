@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>ZiVETT Play Store icon</title>
+  <!-- Full-bleed twin of mipmap-anydpi-v26/ic_launcher.xml: Play applies its
+       own corner mask, so no rounding or padding here. Navy base + the 35%
+       diamond from ic_launcher_background, then the check from
+       ic_launcher_foreground at its exact 0.62/194 safe-zone transform. -->
+  <rect width="1024" height="1024" fill="#151B23"/>
+  <path d="M512,0 L1024,512 L512,1024 L0,512 Z" fill="#0B0F14" fill-opacity="0.35"/>
+  <g transform="translate(194,194) scale(0.62)">
+    <defs>
+      <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="512" y1="265" x2="512" y2="835">
+        <stop offset="0" stop-color="#FFE27A"/>
+        <stop offset="0.45" stop-color="#D4AF37"/>
+        <stop offset="1" stop-color="#A97910"/>
+      </linearGradient>
+    </defs>
+    <path d="M248 500 L405 702 L790 265 L850 330 L405 835 L180 545 Z" fill="url(#gold)"/>
+  </g>
+</svg>

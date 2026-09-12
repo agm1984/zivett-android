@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zivett.app.app.AddressesRoute
@@ -149,7 +150,7 @@ fun CustomerHomeScreen(model: CustomerHomeModel) {
             ZAvatar(user?.initials ?: "?", onDark = true)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(greeting?.kicker ?: " ", style = ZType.caption.copy(fontSize = 12.sp), color = if (dark) Color.White.copy(alpha = 0.7f) else colors.inkMuted)
-                Text(greeting?.heading ?: " ", style = ZType.headline.copy(fontWeight = FontWeight.Bold), color = if (dark) Color.White else colors.ink, maxLines = 1)
+                Text(greeting?.heading ?: " ", style = ZType.headline.copy(fontWeight = FontWeight.Bold), color = if (dark) Color.White else colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             NotificationBell(bell.unread, dark) { nav.navigate(NotificationsRoute(Areas.CUSTOMER)) }
         }

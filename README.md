@@ -257,8 +257,8 @@ attributes so crash stacks retrace). The libraries' own consumer rules
 cover kotlinx.serialization, Stripe, OkHttp, Coil, osmdroid and
 Firebase; the shrunk build was walked through login, home, jobs,
 messages, account, invoices, the pay sheet and the Stripe PaymentSheet
-launch on 2026-09-06. Upload `app/build/outputs/mapping/release/mapping.txt`
-to Play Console with each release so stack traces are readable.
+launch on 2026-09-06. The AAB embeds the mapping file under `BUNDLE-METADATA`,
+so Play Console retraces crash stacks without a separate upload.
 
 ### Signing
 
@@ -282,11 +282,13 @@ the release build still assembles, just unsigned.
 
 ### Version code
 
-`versionCode` is `yyyyMMdd × 10 + build number`, computed at build time
-(today's first build is `2026090600`), so it is monotonic without
-bookkeeping. A second upload the same day passes `-PbuildNumber=1`
-(up to 9); `-PversionCode=N` overrides outright. `versionName` is set by
-hand.
+`versionCode` is `(days since 2026-01-01) × 10 + build number`, computed
+at build time (2026-09-11's first build is `2530`), so it is monotonic
+without bookkeeping and stays far below Play's 2.1-billion ceiling. Play
+rejects a raw `yyyyMMdd` code on upload as "significantly higher than
+your previous version code", which is why the scheme is day-count rather
+than date. A second upload the same day passes `-PbuildNumber=1` (up to
+9); `-PversionCode=N` overrides outright. `versionName` is set by hand.
 
 ### Building for Play
 
