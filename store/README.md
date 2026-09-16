@@ -10,12 +10,15 @@ Generated 2026-09-09. The ordered checklist lives in `PARITY.md` under
 | `SCREENSHOTS.md` | Shot list plus the emulator/adb commands to capture them |
 | `play-icon-512.png` | 512×512 app icon. Full-bleed twin of the launcher icon — Play applies its own corner mask |
 | `feature-graphic-1024x500.jpg` | 1024×500 feature graphic, no alpha channel |
-| `play-icon.svg`, `feature-graphic.svg` | Sources. Re-render with `qlmanage -t -s 1024 -o . <file>.svg` (see below) |
+| `play-icon.svg`, `feature-graphic.svg` | Sources (the icon SVG is the pre-2026-09 design, kept for reference) |
 
-Both PNG/JPEG assets were rendered from the SVGs with macOS Quick Look,
-which pads a thumbnail to a square — `feature-graphic.svg` is therefore
-authored on a 1024×1024 canvas with the artwork in the centre 500 rows, and
-cropped back with `sips -c 500 1024`. Keep that arrangement if you edit it.
+Refreshed 2026-09-15 to the 2026-09 logo set: `play-icon-512.png` is the
+iOS `AppIcon.png` (from `ratedpro-web/resources/brand/generate.py
+--mobile`) downsized with `sips -Z 512`, and `feature-graphic.svg` embeds
+`public/images/zivett-lockup-on-navy-2026-09.png` on brand charcoal,
+rasterised with headless Chrome at 1024×500 (same command as
+`generate.py`'s `render()`) and converted to JPEG with `sips`. A new logo
+set means re-running both steps — never hand-edit the outputs.
 
 ## App Links needs TWO fingerprints, not one
 

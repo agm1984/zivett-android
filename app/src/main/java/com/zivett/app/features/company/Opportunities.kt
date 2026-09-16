@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.zivett.app.app.Areas
 import com.zivett.app.app.LocalAppEnvironment
-import com.zivett.app.app.SubscriptionRoute
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.CompanyEndpoints
@@ -159,10 +158,12 @@ fun OpportunitiesScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Opportunities")
                     feed.cooldownUntil?.let { ZBanner("Your feed is paused after recent withdrawals. New opportunities reopen ${Dates.shortTime(it)}. Withdrawals also lower your ranking — completed jobs repair it.", tone = ZTone.DANGER) }
+                    // No tier ships capped today, so this never renders — and if one
+                    // ever does, it states the fact only: no "upgrade" nudge and no
+                    // link (the app never steers toward a plan).
                     feed.leads.limit?.let { limit ->
                         val remaining = feed.leads.remaining ?: 0
-                        ZBanner(if (remaining == 0) "You've used all $limit of your plan's leads this month — upgrade for unlimited." else "$remaining of $limit free leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
-                        if (remaining == 0) ZTextAction("Upgrade for unlimited →") { nav.navigate(SubscriptionRoute(Areas.COMPANY)) }
+                        ZBanner(if (remaining == 0) "You've used all $limit of your plan's leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
                     }
                     if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
                     for (job in feed.opportunities) {

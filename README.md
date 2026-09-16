@@ -36,7 +36,7 @@ day; every password is `password`:
 | `company-new@ratedpro.ca` | unverified email → setup wizard, nothing filled in |
 | `company-pending@ratedpro.ca` | application submitted, awaiting approval |
 | `business@ratedpro.ca` | property manager with properties and requests |
-| `business-new@ratedpro.ca` | business mid-setup (lands on the Plan step) |
+| `business-new@ratedpro.ca` | business mid-setup (lands on the Team step — the app has no plan step) |
 
 The two `-new` and `-pending` accounts start with an unverified email, so
 the app shows the "Check your email" screen first. Grab the code from

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -44,7 +45,7 @@ import com.zivett.app.app.NotificationsRoute
 import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.ProfileRoute
 import com.zivett.app.app.PropertiesRoute
-import com.zivett.app.app.SubscriptionRoute
+import com.zivett.app.app.MembershipRoute
 import com.zivett.app.app.TeamRoute
 import com.zivett.app.app.WarrantiesRoute
 import com.zivett.app.core.models.NotificationArea
@@ -152,7 +153,7 @@ fun BusinessAccountScreen() {
                     ZDivider(Modifier.padding(start = 60.dp))
                     AccountLink("Team", "Invite and manage teammates", Icons.Outlined.Group) { nav.navigate(TeamRoute(Areas.BUSINESS)) }
                     ZDivider(Modifier.padding(start = 60.dp))
-                    AccountLink("Subscription", "Basic or Premium — lower fees, priority booking", Icons.Outlined.CreditCard) { nav.navigate(SubscriptionRoute(Areas.BUSINESS)) }
+                    AccountLink("Membership", "Your current plan and term", Icons.Outlined.Star) { nav.navigate(MembershipRoute(Areas.BUSINESS)) }
                 }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Notifications", "Email and SMS preferences", Icons.Outlined.NotificationsActive) { nav.navigate(NotificationPrefsRoute(Areas.BUSINESS)) }

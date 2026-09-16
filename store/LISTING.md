@@ -49,8 +49,7 @@ Get discovered. Win more jobs. Get paid securely.
 • Share your live location with the customer while you drive, so nobody
   is waiting by the window
 • Invoice on completion and get paid out to your bank through Stripe
-• A plan fee plus a commission on paid jobs. No commission until you are
-  paid
+• No commission until you are paid
 
 FOR PROPERTY MANAGERS
 • Keep your properties, units, and contacts in one place
@@ -74,7 +73,13 @@ quotes, messages, arrivals, and invoices.
 Questions or account deletion: https://zivett.com/support
 Privacy policy: https://zivett.com/privacy
 ```
-About 2,350 characters — room to grow if you want more detail later.
+About 2,300 characters — room to grow if you want more detail later.
+
+**Never mention memberships, plans, tiers, or a plan fee anywhere in the
+listing.** The app sells nothing and shows no plan prices (Play's payments
+policy treats a Pro/Premium plan as a digital service — it's store billing
+or nothing, and the listing must not point at the website to buy one
+either). The "plan fee" bullet was removed 2026-09-15 for exactly this.
 
 ## Store settings
 
@@ -88,7 +93,7 @@ About 2,350 characters — room to grow if you want more detail later.
 | Privacy policy | `https://zivett.com/privacy` |
 | Countries | Canada only (same call as iOS) |
 | Ads | No ads |
-| In-app purchases | No — Play billing is not used. Card payments are for physical trade services performed off-app, which is why Stripe is permitted here rather than Google Play Billing |
+| In-app purchases | No — Play Billing is not used and the app sells nothing. The only in-app card entry pays a tradesperson for physical work done at the customer's home (Stripe is permitted for that). Pro/business memberships are purchased and managed on the ZiVETT website only; the app just reflects the account's current membership (read-only "Membership" row) |
 | Content rating | Complete the questionnaire; expect Everyone / PEGI 3. Answer "yes" to user-to-user communication (messaging) and to sharing location |
 | Target audience | 18+ |
 
@@ -106,5 +111,18 @@ same set Apple got — see the `app-store-review-status` note):
 | `review-business@zivett.com` | property manager: properties, team, requests |
 
 Password: the value of `APP_REVIEW_DEMO_PASSWORD` on production. Put it in
-the App access notes, plus one line: "Payments run in Stripe test mode;
-use card 4242 4242 4242 4242 with any future expiry and any CVC."
+the App access notes, plus these lines (the same text goes in App Store
+Connect's App Review Information for iOS):
+
+> Payments run in Stripe test mode; use card 4242 4242 4242 4242 with any
+> future expiry and any CVC.
+>
+> The app contains no in-app purchases and sells no digital content or
+> subscriptions. The only card entry in the app is on the BOOKER accounts
+> (customer, business) and pays a tradesperson for physical work performed
+> at the home or property, after the job is done. The Pro (company) account
+> never enters a card — payouts run through Stripe Connect. Pro and
+> property-manager memberships are purchased and managed on the ZiVETT
+> website only; the app does not sell, price, or link to them — the
+> "Membership" screen (company: More tab; business: Account tab) is a
+> read-only reflection of the account.

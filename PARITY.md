@@ -36,11 +36,11 @@ verification), pending company, business, and new business.
 - [x] Calendar month grid with chips, blocked days, tap-through
 - [x] Passport: credential uploads (document picker + photo picker), viewer (PdfRenderer / image, "Open with…"), details editor, field guide, business-identity row
 - [x] Setup wizard + credential guide, submit blocked until complete, pending state
-- [x] Subscription (billing card panel, charges history, renewal-aware labels, change confirm/undo), Payouts, Invoices + detail, More, Team, Account
+- [x] **Membership (read-only) — replaced the Subscription screen 2026-09-15 (Play payments policy / mirrors the iOS 3.1.1 rejection fix).** `MembershipScreen` reflects the org's plan (name, tag, term, interval, scheduled change) and never sells: no plan shelf, prices, yearly toggle, billing-card panel, test-card hint, choose/cancel-pending, or change sheet; no company-setup Plan row; no wizard plan step; `SubscriptionPresentation` + tests deleted; org billing/plan-write endpoints removed from `CompanyEndpoints`/`BusinessEndpoints` (booker card endpoints stay). Nothing in the app says where to buy — the approval email does. Don't reintroduce without Play Billing. Payouts, Invoices + detail, More, Team, Account
 
 ## Business
-- [x] Setup gate for org admins (profile → properties → team → plan), skip-for-now dismiss
-- [x] Overview, Requests, Properties (+ form sheet, request-job shortcut), Book (shared wizard with property/unit step), Account (profile, business profile form, team + edit member, subscription, notifications, invoices, warranties)
+- [x] Setup gate for org admins (profile → properties → team — the web's plan step is deliberately absent, store policy), skip-for-now dismiss
+- [x] Overview, Requests, Properties (+ form sheet, request-job shortcut), Book (shared wizard with property/unit step), Account (profile, business profile form, team + edit member, read-only membership, notifications, invoices, warranties)
 
 ## Push, links, payments
 - [x] FCM registration + messaging service + tap routing to the job over any tab; POST_NOTIFICATIONS prompt on shell appear

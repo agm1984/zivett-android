@@ -246,7 +246,6 @@ fun SetupChecklist(setup: CompanySetup) {
             row("Services & rates", setup.steps.details.complete, "Trades, rates, radius and availability are in.", setup.steps.details.missing)
             val docs = "${setup.steps.credentials.uploaded ?: 0} of ${setup.steps.credentials.total ?: 4} documents uploaded"
             row("Credentials", setup.steps.credentials.complete, docs, null, detail = docs)
-            row("Plan", true, (setup.steps.plan.planName ?: "Basic") + (if (setup.steps.plan.confirmed == true) "" else " (default)"), null)
         }
     }
 }

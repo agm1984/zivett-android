@@ -36,7 +36,9 @@ data class CompanySetup(
     )
 
     @Serializable
-    data class Steps(val profile: Step, val details: Step, val credentials: Step, val plan: Step) {
+    // The server's `plan` step is deliberately NOT modelled: the app
+    // never sells or nudges a plan (store policy — see MembershipScreen).
+    data class Steps(val profile: Step, val details: Step, val credentials: Step) {
         @Serializable
         data class Step(
             val complete: Boolean = false,
@@ -44,8 +46,6 @@ data class CompanySetup(
             val uploaded: Int? = null,
             val total: Int? = null,
             val documents: List<Document>? = null,
-            val confirmed: Boolean? = null,
-            val planName: String? = null,
         )
     }
 }
@@ -197,63 +197,28 @@ data class CompanyDetails(
 @Serializable
 data class CompanyOrganizationResponse(val organization: OrganizationProfile, val setup: CompanySetup, val details: CompanyDetails? = null)
 
-/// `GET /api/company/subscription`.
+/// `GET /api/{company|business}/subscription`, decoded only as far as
+/// REFLECTING the org's membership needs. Prices, features, the tier
+/// ladder, and billing history are deliberately not modelled: the app
+/// never sells a plan or shows what one costs (App Store 3.1.1 / Play
+/// payments policy — see MembershipScreen).
 @Serializable
-data class SubscriptionResponse(val plans: List<Plan> = emptyList(), val subscription: Current, val charges: List<Charge>? = null, val changes: List<Change>? = null) {
+data class SubscriptionResponse(val plans: List<Plan> = emptyList(), val subscription: Current) {
     @Serializable
-    data class Plan(
-        val id: Int,
-        val key: String,
-        val name: String,
-        val priceCents: Int = 0,
-        val yearlyPriceCents: Int = 0,
-        /// Company tiers only — business plans carry no commission.
-        val commissionBps: Int? = null,
-        /// Business tiers: the plan-owned trust & support rate + perks.
-        val trustFeeBps: Int? = null,
-        val waivesEmergencyFee: Boolean? = null,
-        val priorityBooking: Boolean? = null,
-        val blurb: String? = null,
-        val features: List<String>? = null,
-        /// The tier ladder — what decides "Upgrade" vs "at renewal"
-        /// (admin repricing can't invert it).
-        val sortOrder: Int? = null,
-    ) {
-        val isFree: Boolean get() = priceCents == 0 && yearlyPriceCents == 0
-    }
+    data class Plan(val id: Int, val key: String, val name: String)
 
     @Serializable
     data class Current(
         val planId: Int,
         val planKey: String,
         val interval: String,
-        val priceCents: Int = 0,
-        val canManage: Boolean? = null,
         val termStartedAt: Instant? = null,
         val termEndsAt: Instant? = null,
-        val renewalCents: Int? = null,
         val pending: Pending? = null,
         val featured: Boolean? = null,
     ) {
         @Serializable data class Pending(val planId: Int? = null, val planName: String? = null, val interval: String? = null)
     }
-
-    @Serializable
-    data class Change(val id: Int, val from: String? = null, val to: String, val interval: String? = null, val by: String? = null, val at: Instant? = null)
-
-    /// One subscription billing period (`platform_charges`).
-    @Serializable
-    data class Charge(
-        val id: Int,
-        val plan: String? = null,
-        val interval: String? = null,
-        val amountCents: Int = 0,
-        val periodStart: Instant? = null,
-        val periodEnd: Instant? = null,
-        /// pending · paid · waived
-        val status: String,
-        val paidAt: Instant? = null,
-    )
 }
 
 /// `GET /api/company/referral` (pro-to-pro — different stats keys from
@@ -410,14 +375,12 @@ object CompanyEndpoints {
     }
     fun deleteLogo() = ApiRequest.delete<LogoResponse>("api/company/organization/logo")
 
+    /// Read-only. The plan-change and org-billing-card endpoints
+    /// (`POST /subscription`, `DELETE /subscription/pending`,
+    /// `/billing/setup-intent`, `/billing/card`) are WEB-ONLY on purpose:
+    /// selling a plan in the app means store billing or nothing, so the
+    /// app reflects the membership and never writes it.
     fun subscription() = ApiRequest.get<SubscriptionResponse>("api/company/subscription")
-    fun updateSubscription(planId: Int, interval: String) = ApiRequest.jsonElement<SubscriptionResponse>(Method.POST, "api/company/subscription", buildJsonObject { put("plan_id", planId); put("interval", interval) })
-    fun cancelPendingSubscription() = ApiRequest.delete<SubscriptionResponse>("api/company/subscription/pending")
-
-    /// The ORG's billing card (distinct from the booker card): the one
-    /// subscriptions charge. Same response shape as BillingContext.
-    fun orgBillingContext() = ApiRequest.post<BillingContext>("api/company/billing/setup-intent")
-    fun saveOrgBillingCard(setupIntentId: String) = ApiRequest.post<SavedCardResponse, Map<String, String>>("api/company/billing/card", mapOf("stripe_setup_intent_id" to setupIntentId))
 
     fun referral() = ApiRequest.get<CompanyReferral>("api/company/referral")
     fun profile() = ApiRequest.get<CustomerProfile>("api/company/profile")

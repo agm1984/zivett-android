@@ -1,7 +1,6 @@
 package com.zivett.app.features.company
 
 import com.zivett.app.core.models.JobStatus
-import com.zivett.app.core.models.SubscriptionResponse
 import com.zivett.app.design.ZTone
 import com.zivett.app.features.customer.jobs.JobPresentation
 import java.time.Instant
@@ -69,58 +68,6 @@ object CompanyPresentation {
         "rejected" -> JobPresentation.Meta("Needs another look", ZTone.DANGER)
         "expired" -> JobPresentation.Meta("Expired", ZTone.DANGER)
         else -> JobPresentation.Meta("Not uploaded", ZTone.NEUTRAL)
-    }
-}
-
-/// The plan card's action wording, ported 1:1 from the web's
-/// `PlanCards.vue` — every tier is a 12-month contract, so the button
-/// has to say what a tap actually does: upgrades land today, everything
-/// else waits for the renewal date.
-object SubscriptionPresentation {
-    /// A plan with no monthly price is yearly-only (Basic): it bills
-    /// yearly under both toggle positions.
-    fun intervalFor(plan: SubscriptionResponse.Plan, browsingYearly: Boolean): String =
-        if (plan.priceCents == 0 || browsingYearly) "yearly" else "monthly"
-
-    /// Upgrades land immediately; everything else waits for renewal.
-    /// Sort order is the tier ladder — the same rule the server applies.
-    fun isUpgrade(plan: SubscriptionResponse.Plan, plans: List<SubscriptionResponse.Plan>, currentPlanId: Int): Boolean {
-        val current = plans.firstOrNull { it.id == currentPlanId } ?: return true
-        return (plan.sortOrder ?: 0) > (current.sortOrder ?: 0)
-    }
-
-    fun actionLabel(plan: SubscriptionResponse.Plan, plans: List<SubscriptionResponse.Plan>, subscription: SubscriptionResponse.Current, browsingYearly: Boolean): String {
-        if (subscription.pending?.planId == plan.id) {
-            val renewal = subscription.termEndsAt
-            return if (renewal != null) "Scheduled for ${Dates.short(renewal)}" else "Scheduled"
-        }
-        val isCurrentPlan = plan.id == subscription.planId
-        // Defaulted onto this tier with no contract started yet: the
-        // button starts the term, it doesn't "switch" anything.
-        if (isCurrentPlan && subscription.termEndsAt == null) return "Start your ${plan.name} plan"
-        if (isCurrentPlan) return "Switch to ${intervalFor(plan, browsingYearly)} billing"
-        return if (isUpgrade(plan, plans, subscription.planId)) "Upgrade to ${plan.name}" else "Move to ${plan.name} at renewal"
-    }
-
-    /// Whether the card being browsed is the org's live selection —
-    /// same plan AND same interval (a yearly-only plan matches both
-    /// toggle positions, like the web's `isCurrent`).
-    fun isCurrent(plan: SubscriptionResponse.Plan, subscription: SubscriptionResponse.Current, browsingYearly: Boolean): Boolean =
-        plan.id == subscription.planId && (subscription.interval == intervalFor(plan, browsingYearly) || plan.priceCents == 0)
-
-    /// The change confirmation's body for an immediate upgrade
-    /// (`SubscriptionPage.upgradeMessage`).
-    fun upgradeMessage(planKey: String, planName: String, interval: String, company: Boolean): String {
-        val badge = when (planKey) {
-            "pro", "elite" -> planKey.uppercase()
-            "business_premium" -> "PREMIUM"
-            else -> null
-        }
-        val badgeLine = badge?.let { tag ->
-            if (company) " The $tag badge now shows beside your name everywhere customers see it."
-            else " The PREMIUM badge now shows beside your business name, and your jobs go to the top of every pro's feed."
-        } ?: ""
-        return "A fresh 12-month term started today, billed $interval.$badgeLine"
     }
 }
 

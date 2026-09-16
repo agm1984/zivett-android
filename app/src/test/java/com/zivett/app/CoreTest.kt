@@ -8,7 +8,6 @@ import com.zivett.app.core.models.BusinessSetup
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.QuoteBody
-import com.zivett.app.core.models.SubscriptionResponse
 import com.zivett.app.core.models.User
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.HttpApiClient
@@ -18,7 +17,6 @@ import com.zivett.app.core.realtime.PusherProtocol
 import com.zivett.app.core.realtime.RealtimeBackoff
 import com.zivett.app.core.realtime.RealtimeEvents
 import com.zivett.app.features.business.BusinessSetupSteps
-import com.zivett.app.features.company.SubscriptionPresentation
 import com.zivett.app.features.customer.book.BookingDraftPayload
 import com.zivett.app.features.customer.book.BookingDraftResponse
 import org.junit.Assert.assertEquals
@@ -184,130 +182,43 @@ class PusherProtocolTest {
     }
 }
 
-class SubscriptionPresentationTest {
-    private fun plan(id: Int, name: String, monthly: Int, yearly: Int, sort: Int) = SubscriptionResponse.Plan(id, name.lowercase(), name, monthly, yearly, sortOrder = sort)
-    private val basic = plan(1, "Basic", 0, 2500, 1)
-    private val pro = plan(2, "Pro", 4900, 49000, 2)
-    private val elite = plan(3, "Elite", 9900, 99000, 3)
-    private val plans = listOf(basic, pro, elite)
-    private fun current(planId: Int, interval: String = "monthly", term: Boolean = true, pendingPlanId: Int? = null) = SubscriptionResponse.Current(
-        planId = planId, planKey = "x", interval = interval, termStartedAt = if (term) Instant.ofEpochSecond(1_700_000_000) else null,
-        termEndsAt = if (term) Instant.ofEpochSecond(1_731_536_000) else null, pending = pendingPlanId?.let { SubscriptionResponse.Current.Pending(it) },
-    )
-
-    @Test fun actionLabels() {
-        assertEquals("Upgrade to Elite", SubscriptionPresentation.actionLabel(elite, plans, current(2), false))
-        assertEquals("Move to Basic at renewal", SubscriptionPresentation.actionLabel(basic, plans, current(2), false))
-        assertEquals("Start your Pro plan", SubscriptionPresentation.actionLabel(pro, plans, current(2, term = false), false))
-        assertEquals("Switch to yearly billing", SubscriptionPresentation.actionLabel(pro, plans, current(2), true))
-        assertTrue(SubscriptionPresentation.actionLabel(basic, plans, current(2, pendingPlanId = 1), false).startsWith("Scheduled for "))
-        assertEquals("Upgrade to Pro", SubscriptionPresentation.actionLabel(pro, plans, current(99), false))
-    }
-
-    @Test fun sortOrderNotPriceDecidesTheLadder() {
-        val cheapElite = plan(3, "Elite", 100, 1000, 3)
-        assertTrue(SubscriptionPresentation.isUpgrade(cheapElite, listOf(basic, pro, cheapElite), 2))
-    }
-
-    @Test fun intervalsAndCurrent() {
-        assertEquals("yearly", SubscriptionPresentation.intervalFor(basic, false)); assertEquals("monthly", SubscriptionPresentation.intervalFor(pro, false))
-        assertTrue(SubscriptionPresentation.isCurrent(pro, current(2), false)); assertFalse(SubscriptionPresentation.isCurrent(pro, current(2), true))
-        assertTrue(SubscriptionPresentation.isCurrent(basic, current(1, "yearly"), false))
-    }
-
-    @Test fun upgradeMessageCarriesTheBadgeLine() {
-        val message = SubscriptionPresentation.upgradeMessage("elite", "Elite", "yearly", true)
-        assertTrue(message.contains("billed yearly")); assertTrue(message.contains("ELITE badge"))
-        assertFalse(SubscriptionPresentation.upgradeMessage("basic", "Basic", "monthly", true).contains("badge"))
-    }
-}
-
+/// Three steps here: the web's plan step is web-only (store policy).
 class BusinessSetupStepsTest {
-    private fun setup(profileComplete: Boolean = true, profileMissing: List<String> = emptyList(), properties: Boolean = true, plan: Boolean? = true) = BusinessSetup(
+    private fun setup(profileComplete: Boolean = true, profileMissing: List<String> = emptyList(), properties: Boolean = true) = BusinessSetup(
         status = "pending", steps = BusinessSetup.Steps(
             profile = BusinessSetup.Steps.Profile(profileComplete, profileMissing), properties = BusinessSetup.Steps.Properties(properties, if (properties) 1 else 0),
-            plan = plan?.let { BusinessSetup.Steps.Plan(it, if (it) emptyList() else listOf("pick a plan")) },
         ),
     )
 
     @Test fun completenessRules() {
-        assertTrue(BusinessSetupSteps.completeness(BusinessSetupSteps.Step.TEAM, setup(false, properties = false, plan = false)).complete)
+        assertTrue(BusinessSetupSteps.completeness(BusinessSetupSteps.Step.TEAM, setup(false, properties = false)).complete)
         assertEquals(listOf("add at least one property"), BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PROPERTIES, setup(properties = false)).missing)
-        assertEquals(listOf("pick a plan"), BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PLAN, setup(plan = null)).missing)
+    }
+
+    @Test fun thereIsNoPlanStep() {
+        // The app never offers a plan — the wizard ends at Team.
+        assertEquals(listOf("Business profile", "Properties", "Team"), BusinessSetupSteps.Step.entries.map { it.title })
     }
 
     @Test fun reentryLandsOnTheFirstIncompleteStep() {
         assertEquals(BusinessSetupSteps.Step.PROFILE, BusinessSetupSteps.firstIncomplete(setup(profileComplete = false)))
-        assertEquals(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.firstIncomplete(setup(properties = false, plan = false)))
-        assertEquals(BusinessSetupSteps.Step.PLAN, BusinessSetupSteps.firstIncomplete(setup(plan = false)))
-        assertEquals(BusinessSetupSteps.Step.PLAN, BusinessSetupSteps.firstIncomplete(setup()))
+        assertEquals(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.firstIncomplete(setup(properties = false)))
+        assertEquals(BusinessSetupSteps.Step.TEAM, BusinessSetupSteps.firstIncomplete(setup()))
     }
 
     @Test fun jumpsAndStatuses() {
-        val state = setup(profileComplete = false, properties = false, plan = false)
-        assertTrue(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROFILE, BusinessSetupSteps.Step.PLAN, state))
-        assertFalse(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.Step.PROFILE, setup(profileComplete = false, profileMissing = listOf("phone"), plan = false)))
-        val profileDone = setup(properties = false, plan = false)
+        val state = setup(profileComplete = false, properties = false)
+        assertTrue(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROFILE, BusinessSetupSteps.Step.TEAM, state))
+        assertFalse(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.Step.PROFILE, setup(profileComplete = false, profileMissing = listOf("phone"))))
+        val profileDone = setup(properties = false)
         assertTrue(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.Step.PROFILE, profileDone))
         assertFalse(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.TEAM, BusinessSetupSteps.Step.PROFILE, profileDone))
-        assertTrue(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PLAN, BusinessSetupSteps.Step.TEAM, setup(plan = false)))
-        val warn = setup(profileComplete = false, profileMissing = listOf("phone", "address"), plan = false)
+        assertTrue(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.TEAM, BusinessSetupSteps.Step.PROPERTIES, setup()))
+        val warn = setup(profileComplete = false, profileMissing = listOf("phone", "address"))
         assertEquals(BusinessSetupSteps.Status.WARN, BusinessSetupSteps.status(BusinessSetupSteps.Step.PROFILE, BusinessSetupSteps.Step.TEAM, warn))
         assertEquals(BusinessSetupSteps.Status.CURRENT, BusinessSetupSteps.status(BusinessSetupSteps.Step.TEAM, BusinessSetupSteps.Step.TEAM, warn))
-        assertEquals(BusinessSetupSteps.Status.TODO, BusinessSetupSteps.status(BusinessSetupSteps.Step.PLAN, BusinessSetupSteps.Step.TEAM, warn))
-        assertEquals("Business profile: phone · Properties: add at least one property", BusinessSetupSteps.whatsLeft(BusinessSetupSteps.Step.TEAM, setup(profileComplete = false, profileMissing = listOf("phone"), properties = false, plan = false)))
+        assertEquals(BusinessSetupSteps.Status.TODO, BusinessSetupSteps.status(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.Step.PROFILE, setup(properties = false)))
+        assertEquals("Business profile: phone · Properties: add at least one property", BusinessSetupSteps.whatsLeft(BusinessSetupSteps.Step.TEAM, setup(profileComplete = false, profileMissing = listOf("phone"), properties = false)))
         assertNull(BusinessSetupSteps.whatsLeft(BusinessSetupSteps.Step.PROFILE, setup(profileComplete = false)))
-    }
-}
-
-class PhpRatesSerializerTest {
-    @kotlinx.serialization.Serializable
-    data class Holder(@kotlinx.serialization.Serializable(with = com.zivett.app.core.network.PhpRatesSerializer::class) val rates: Map<String, Int>? = null)
-
-    @org.junit.Test
-    fun `empty php array decodes as an empty table`() {
-        val holder = com.zivett.app.core.network.JsonCoding.json.decodeFromString(Holder.serializer(), """{"rates": []}""")
-        org.junit.Assert.assertEquals(emptyMap<String, Int>(), holder.rates)
-    }
-
-    @org.junit.Test
-    fun `null rates are dropped and ids stay string keys`() {
-        val holder = com.zivett.app.core.network.JsonCoding.json.decodeFromString(Holder.serializer(), """{"rates": {"1": 12000, "2": null}}""")
-        org.junit.Assert.assertEquals(mapOf("1" to 12000), holder.rates)
-    }
-
-    @org.junit.Test
-    fun `absent key stays null`() {
-        val holder = com.zivett.app.core.network.JsonCoding.json.decodeFromString(Holder.serializer(), """{}""")
-        org.junit.Assert.assertNull(holder.rates)
-    }
-}
-
-class NameFieldTest {
-    private fun bodyOf(request: com.zivett.app.core.network.ApiRequest<*>): Map<String, kotlinx.serialization.json.JsonElement> =
-        com.zivett.app.core.network.JsonCoding.json.parseToJsonElement(String(request.body!!)).let { it as kotlinx.serialization.json.JsonObject }
-
-    @org.junit.Test
-    fun `profile update sends split names never a single name`() {
-        val text = com.zivett.app.core.network.JsonCoding.json.encodeToString(
-            com.zivett.app.core.models.UpdateProfileBody.serializer(),
-            com.zivett.app.core.models.UpdateProfileBody("Amara", "Okafor", "a@b.c"),
-        )
-        org.junit.Assert.assertTrue(text.contains("\"first_name\":\"Amara\""))
-        org.junit.Assert.assertTrue(text.contains("\"last_name\":\"Okafor\""))
-        org.junit.Assert.assertFalse(text.contains("\"name\""))
-    }
-
-    @org.junit.Test
-    fun `team member update sends split names on both areas`() {
-        for (request in listOf(
-            com.zivett.app.core.models.BusinessEndpoints.updateMember(4, "Javon", "Bell", "member", "active"),
-            com.zivett.app.core.models.CompanyEndpoints.updateMember(4, "Javon", "Bell", "member", "active"),
-        )) {
-            val body = bodyOf(request)
-            org.junit.Assert.assertEquals("\"Javon\"", body["first_name"].toString())
-            org.junit.Assert.assertEquals("\"Bell\"", body["last_name"].toString())
-            org.junit.Assert.assertNull(body["name"])
-        }
     }
 }

@@ -12,16 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -44,11 +39,9 @@ import com.zivett.app.app.Areas
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.core.Loadable
-import com.zivett.app.core.Money
 import com.zivett.app.core.auth.AuthSession
 import com.zivett.app.core.models.BusinessEndpoints
 import com.zivett.app.core.models.BusinessSetup
-import com.zivett.app.core.models.SubscriptionResponse
 import com.zivett.app.core.models.Team
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
@@ -62,17 +55,14 @@ import com.zivett.app.design.ZButton
 import com.zivett.app.design.ZButtonStyle
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
-import com.zivett.app.design.ZCheckLine
 import com.zivett.app.design.ZDisplay
 import com.zivett.app.design.ZHeadline
 import com.zivett.app.design.ZIconTile
 import com.zivett.app.design.ZLoadable
 import com.zivett.app.design.ZMono
 import com.zivett.app.design.ZNavRow
-import com.zivett.app.design.ZRadius
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
-import com.zivett.app.design.ZSpinner
 import com.zivett.app.design.ZTextAction
 import com.zivett.app.design.ZTextField
 import com.zivett.app.design.ZTextTone
@@ -81,9 +71,6 @@ import com.zivett.app.design.ZToastBox
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
-import com.zivett.app.features.company.SubscriptionArea
-import com.zivett.app.features.company.SubscriptionModel
-import com.zivett.app.features.company.SubscriptionPresentation
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.launch
 
@@ -121,9 +108,10 @@ class BusinessSetupModel(private val client: ApiClient) {
     }
 }
 
-/// The business setup wizard: profile → properties → team → plan, the
-/// web's `/business/setup` flow. Pushed full-screen to fresh org admins
-/// from the shell and from the overview's "Resume setup" for skippers.
+/// The business setup wizard: profile → properties → team, the web's
+/// `/business/setup` flow minus its plan step. Pushed full-screen to
+/// fresh org admins from the shell and from the overview's "Resume
+/// setup" for skippers.
 @Composable
 fun BusinessSetupScreen(onDismiss: () -> Unit) {
     val environment = LocalAppEnvironment.current
@@ -160,8 +148,7 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
                             when (model.step) {
                                 BusinessSetupSteps.Step.PROFILE -> ProfileStep(model, ::skip)
                                 BusinessSetupSteps.Step.PROPERTIES -> PropertiesStep(model, ::skip)
-                                BusinessSetupSteps.Step.TEAM -> TeamStep(model)
-                                BusinessSetupSteps.Step.PLAN -> PlanStep(model, ::skip) { scope.launch { if (model.complete(environment.session)) model.finished = true } }
+                                BusinessSetupSteps.Step.TEAM -> TeamStep(model) { scope.launch { if (model.complete(environment.session)) model.finished = true } }
                             }
                             Spacer(Modifier.padding(ZSpacing.lg))
                         }
@@ -254,9 +241,10 @@ private fun PropertiesStep(model: BusinessSetupModel, skip: () -> Unit) {
     if (adding) PropertyFormSheet(properties, null) { adding = false; scope.launch { properties.load(); model.refresh() } }
 }
 
-/* Step 3 — invite the team. Genuinely optional. */
+/* Step 3 — invite the team. Genuinely optional, and the last step:
+   Finish stamps setup_completed_at. */
 @Composable
-private fun TeamStep(model: BusinessSetupModel) {
+private fun TeamStep(model: BusinessSetupModel, finish: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val scope = rememberCoroutineScope()
     var email by remember { mutableStateOf("") }
@@ -283,68 +271,6 @@ private fun TeamStep(model: BusinessSetupModel) {
     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         ZButton("Back", style = ZButtonStyle.OUTLINE, fullWidth = false) { model.back() }
         Spacer(Modifier.weight(1f))
-        ZButton("Continue", fullWidth = false) { model.next() }
-    }
-}
-
-/* Step 4 — the membership pick, the wizard's last step. Basic is free,
-   so completing here is choosing, not paying; a Premium pick collects the
-   org billing card first (SubscriptionModel owns that price-gated flow). */
-@Composable
-private fun PlanStep(model: BusinessSetupModel, skip: () -> Unit, finish: () -> Unit) {
-    val environment = LocalAppEnvironment.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val colors = ZTheme.colors
-    val subscription = remember { SubscriptionModel(environment.client, SubscriptionArea.BUSINESS, context) }
-    var yearly by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf<SubscriptionResponse.Plan?>(null) }
-    var tried by remember { mutableStateOf(false) }
-    LaunchedEffect(subscription) { subscription.load() }
-    val alreadyChosen = model.state.value?.let { BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PLAN, it).complete } ?: false
-
-    ZToastBox(subscription.toast, { subscription.toast = null }) {
-        Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-            ZCard {
-                ZHeadline("Pick your membership")
-                ZCaption("Basic is free. Premium drops the trust & support fee, waives emergency call-out fees, and puts your jobs in front of pros first. Both run as 12-month terms — you can upgrade any time, and move down at renewal from your Subscription page.")
-                if (tried && selected == null && !alreadyChosen) ZBanner("Pick a membership to finish — Basic is free, and you can change any time.", tone = ZTone.DANGER)
-                val response = subscription.state.value
-                if (response != null) {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = !yearly, onClick = { yearly = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Monthly") }
-                        SegmentedButton(selected = yearly, onClick = { yearly = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Yearly") }
-                    }
-                    for (plan in response.plans) {
-                        val isSelected = selected?.id == plan.id
-                        Column(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.tile)).background(colors.surface).border(if (isSelected) 2.dp else 1.dp, if (isSelected) colors.navy else colors.borderStrong, RoundedCornerShape(ZRadius.tile)).clickable { selected = plan }.padding(ZSpacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                ZBodyStrong(plan.name, modifier = Modifier.weight(1f))
-                                ZMono(if (plan.isFree) "Free" else if (yearly || plan.priceCents == 0) "${Money.format(plan.yearlyPriceCents)}/yr" else "${Money.format(plan.priceCents)}/mo")
-                            }
-                            plan.blurb?.let { ZCaption(it) }
-                            for (feature in plan.features ?: emptyList()) ZCheckLine(feature)
-                        }
-                    }
-                } else Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ZSpinner() }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                ZButton("Back", style = ZButtonStyle.OUTLINE, fullWidth = false) { model.back() }
-                ZButton("Skip for now", style = ZButtonStyle.GHOST, loading = model.completing, fullWidth = false, onClick = skip)
-                Spacer(Modifier.weight(1f))
-                ZButton("Finish setup", loading = subscription.busy || model.completing, fullWidth = false) {
-                    scope.launch {
-                        val plan = selected
-                        if (plan == null) { if (alreadyChosen) finish() else tried = true; return@launch }
-                        // choose() collects the org billing card first when the pick is paid and no card is on file.
-                        subscription.choose(plan, SubscriptionPresentation.intervalFor(plan, yearly))
-                        if (subscription.changeResult != null) { subscription.changeResult = null; model.refresh(); finish() }
-                    }
-                }
-            }
-        }
+        ZButton("Finish setup", loading = model.completing, fullWidth = false, onClick = finish)
     }
 }

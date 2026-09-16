@@ -8,8 +8,11 @@ import com.zivett.app.core.models.BusinessSetup
 /// skipped-incomplete step wears a warn ring. Pure so the gating is
 /// unit-testable.
 object BusinessSetupSteps {
+    /// Three steps, not the web's four: the plan pick is web-only (the
+    /// app never offers a plan — store policy, see MembershipScreen). The
+    /// server treats an unpicked business plan as free Basic.
     enum class Step(val title: String) {
-        PROFILE("Business profile"), PROPERTIES("Properties"), TEAM("Team"), PLAN("Plan");
+        PROFILE("Business profile"), PROPERTIES("Properties"), TEAM("Team");
 
         val index: Int get() = ordinal
     }
@@ -26,14 +29,10 @@ object BusinessSetupSteps {
         Step.PROFILE -> Completeness(setup.steps.profile.complete, setup.steps.profile.missing ?: emptyList())
         Step.PROPERTIES -> Completeness(setup.steps.properties.complete, if (setup.steps.properties.complete) emptyList() else listOf("add at least one property"))
         Step.TEAM -> Completeness(true, emptyList())
-        Step.PLAN -> {
-            val plan = setup.steps.plan ?: return Completeness(false, listOf("pick a plan"))
-            Completeness(plan.complete, plan.missing ?: emptyList())
-        }
     }
 
     /// Re-entering lands on the first thing still to do, not step 1.
-    fun firstIncomplete(setup: BusinessSetup): Step = Step.entries.firstOrNull { !completeness(it, setup).complete } ?: Step.PLAN
+    fun firstIncomplete(setup: BusinessSetup): Step = Step.entries.firstOrNull { !completeness(it, setup).complete } ?: Step.TEAM
 
     /// Backward is always allowed; forward only when every step before
     /// the target is complete.

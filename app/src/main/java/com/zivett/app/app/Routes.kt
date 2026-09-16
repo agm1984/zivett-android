@@ -48,7 +48,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class NotificationsRoute(val area: String)
 @Serializable data class BookRoute(val area: String, val presetMode: String? = null, val presetCategorySlug: String? = null, val presetPropertyId: Int? = null, val resume: Boolean = false)
 @Serializable data class TeamRoute(val area: String)
-@Serializable data class SubscriptionRoute(val area: String)
+@Serializable data class MembershipRoute(val area: String)
 @Serializable data class OrgProfileRoute(val area: String)
 
 // Business.

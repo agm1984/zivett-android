@@ -32,12 +32,11 @@ data class Property(
 @Serializable
 data class BusinessSetup(val status: String, val setupCompletedAt: Instant? = null, val steps: Steps) {
     @Serializable
-    data class Steps(val profile: Profile, val properties: Properties, val plan: Plan? = null) {
+    // The server's `plan` step is deliberately NOT modelled: the mobile
+    // wizard has no plan step (store policy — see MembershipScreen).
+    data class Steps(val profile: Profile, val properties: Properties) {
         @Serializable data class Profile(val complete: Boolean = false, val missing: List<String>? = null)
         @Serializable data class Properties(val complete: Boolean = false, val count: Int? = null)
-        /// The membership pick — complete once the org has explicitly
-        /// chosen any plan, free Basic included.
-        @Serializable data class Plan(val complete: Boolean = false, val missing: List<String>? = null)
     }
 
     val isComplete: Boolean get() = status == "complete"
@@ -142,11 +141,8 @@ object BusinessEndpoints {
 
     // The business membership — the same contract machine (and response
     // shape) as the company tiers, business shelf.
+    // Read-only in the app, like CompanyEndpoints.subscription().
     fun subscription() = ApiRequest.get<SubscriptionResponse>("api/business/subscription")
-    fun updateSubscription(planId: Int, interval: String) = ApiRequest.jsonElement<SubscriptionResponse>(Method.POST, "api/business/subscription", buildJsonObject { put("plan_id", planId); put("interval", interval) })
-    fun cancelPendingSubscription() = ApiRequest.delete<SubscriptionResponse>("api/business/subscription/pending")
-    fun orgBillingContext() = ApiRequest.post<BillingContext>("api/business/billing/setup-intent")
-    fun saveOrgBillingCard(setupIntentId: String) = ApiRequest.post<SavedCardResponse, Map<String, String>>("api/business/billing/card", mapOf("stripe_setup_intent_id" to setupIntentId))
 
     fun properties() = ApiRequest.get<PropertiesResponse>("api/business/properties")
     fun createProperty(body: PropertyBody) = ApiRequest.post<PropertyResponse, PropertyBody>("api/business/properties", body)
