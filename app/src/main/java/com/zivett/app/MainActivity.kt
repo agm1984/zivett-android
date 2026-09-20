@@ -61,8 +61,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /// Referral links (/r/{code} → hold the code so signup can attribute
-    /// it), team invitations (/invitations/{token}), and push taps (the
-    /// job reference the notification carried).
+    /// it), team invitations (/invitations/{token}), the return from
+    /// Stripe's Connect onboarding, and push taps (the job reference the
+    /// notification carried).
     private fun handleIntent(intent: Intent?) {
         intent ?: return
 
@@ -82,6 +83,14 @@ class MainActivity : ComponentActivity() {
         }
 
         val parts = uri.pathSegments.filter { it.isNotEmpty() }
+
+        // zivett://stripe-return (the return page's button) or the App
+        // Link https://…/app/stripe-return itself.
+        if ((uri.scheme == "zivett" && uri.host == "stripe-return") || parts.takeLast(2) == listOf("app", "stripe-return")) {
+            AppEvents.stripeReturned = true
+            return
+        }
+
         if (parts.size >= 2 && parts[parts.size - 2] == "invitations") {
             AppEvents.invitationToken = parts.last()
         }

@@ -36,8 +36,14 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   `JobRefEndpoints`). The google-services plugin is applied only when
   `app/google-services.json` exists (gitignored), so builds never depend
   on it. Backend: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` env.
-- **Links**: `zivett://` scheme plus App Links for `zivett.com/r/*` and
-  `/invitations/*` (manifest, `autoVerify`). The backend serves
+- **Links**: `zivett://` scheme plus App Links for `zivett.com/r/*`,
+  `/invitations/*` and `/app/stripe-return` (manifest, `autoVerify`).
+  The last is the way back from Stripe's hosted Connect onboarding: the
+  onboarding-link request sends `return_to: "app"`, the server's return
+  page opens the app (App Link, or its `zivett://stripe-return` button),
+  `MainActivity` sets `AppEvents.stripeReturned`, the approved-company
+  shell lands on the dashboard, and the dashboard consumes the flag and
+  re-checks payout status. The backend serves
   `/.well-known/assetlinks.json` when `ANDROID_APP_FINGERPRINTS` is set.
 - **Stripe**: `core/payments/StripeBridge.kt` is the ONE file that
   imports the Stripe SDK. Keyed at runtime from the billing payload's

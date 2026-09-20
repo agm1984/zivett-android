@@ -27,6 +27,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.zivett.app.app.AppEvents
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.models.JobRefEndpoints
 import com.zivett.app.core.models.NotificationArea
@@ -56,6 +57,9 @@ fun RoleShell(
     tabs: List<ShellTab>,
     pushArea: NotificationArea?,
     onPushJob: (NavHostController, Int) -> Unit,
+    /// Back from Stripe's Connect onboarding (`AppEvents.stripeReturned`).
+    /// Only the approved-company shell has somewhere to take it.
+    onStripeReturn: ((NavHostController) -> Unit)? = null,
     graph: NavGraphBuilder.(NavHostController) -> Unit,
 ) {
     val nav = rememberNavController()
@@ -93,6 +97,14 @@ fun RoleShell(
             android.util.Log.d(com.zivett.app.core.push.PushRouting.LOG_TAG, "opening job id=$id")
             onPushJob(nav, id)
         }
+    }
+
+    // The return link from Stripe's hosted onboarding. A shell with no
+    // use for it drops the flag so it can't fire later out of context.
+    val stripeReturned = AppEvents.stripeReturned
+    LaunchedEffect(stripeReturned) {
+        if (!stripeReturned) return@LaunchedEffect
+        if (onStripeReturn != null) onStripeReturn(nav) else AppEvents.stripeReturned = false
     }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalNav provides nav) {

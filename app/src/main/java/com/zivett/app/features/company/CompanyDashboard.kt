@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.zivett.app.app.CompanySetupRoute
+import com.zivett.app.app.AppEvents
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.OpportunitiesRoute
 import com.zivett.app.app.PassportRoute
@@ -92,9 +93,15 @@ class CompanyDashboardModel(private val client: ApiClient) {
     }
 }
 
-/// Opens Stripe's hosted onboarding in the browser.
-fun openUrl(context: android.content.Context, url: String) {
+/// Opens a web link (Stripe's hosted onboarding, directions) in the
+/// browser. False when nothing on the device can — a phone with its
+/// browser disabled used to crash here on ActivityNotFoundException.
+fun openUrl(context: android.content.Context, url: String): Boolean = try {
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    true
+} catch (_: android.content.ActivityNotFoundException) {
+    android.widget.Toast.makeText(context, "No browser is available to open that link.", android.widget.Toast.LENGTH_LONG).show()
+    false
 }
 
 @Composable
@@ -109,8 +116,17 @@ fun CompanyDashboardScreen() {
     LaunchedEffect(model) { model.load() }
     // Back from Stripe's hosted onboarding in the browser → re-poll.
     LifecycleResumeEffect(sentToStripe) {
-        if (sentToStripe) { sentToStripe = false; scope.launch { model.refreshStripeStatus() } }
+        // When the return link brought them back, the effect below does it.
+        if (sentToStripe) { sentToStripe = false; if (!AppEvents.stripeReturned) scope.launch { model.refreshStripeStatus() } }
         onPauseOrDispose { }
+    }
+    // Stripe's return link (`return_to: "app"`) opened the app here —
+    // works after a cold start too, where `sentToStripe` is long gone.
+    // Consuming the flag re-keys this effect and would cancel it, so the
+    // refresh runs on the screen's scope.
+    val stripeReturned = AppEvents.stripeReturned
+    LaunchedEffect(stripeReturned) {
+        if (stripeReturned) { AppEvents.stripeReturned = false; scope.launch { model.refreshStripeStatus() } }
     }
 
     ZToastBox(model.toast, { model.toast = null }) {
@@ -118,7 +134,7 @@ fun CompanyDashboardScreen() {
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { dashboard ->
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     when {
-                        dashboard.approved -> ApprovedContent(dashboard, model, onStripe = { url -> sentToStripe = true; openUrl(context, url) }, onReviews = { showingReviews = true })
+                        dashboard.approved -> ApprovedContent(dashboard, model, onStripe = { url -> sentToStripe = openUrl(context, url) }, onReviews = { showingReviews = true })
                         dashboard.setup.status == "draft" -> {
                             ZPageTitle("Set up your business", "Finish your application and our team takes it from there.")
                             SetupChecklist(dashboard.setup)

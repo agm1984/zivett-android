@@ -173,6 +173,11 @@ registers nothing for 3DS. Connect onboarding for pros is a hosted web link.
 - `zivett://r/CODE` and `https://zivett.com/r/CODE` open signup with a
   referral applied. `https://zivett.com/invitations/TOKEN` opens the
   invitation acceptance screen.
+- `zivett://stripe-return` and `https://zivett.com/app/stripe-return`
+  are the way back from Stripe's hosted Connect onboarding (the link is
+  requested with `return_to: "app"`): they open the company dashboard
+  and re-check payout status. Test with
+  `adb shell am start -a android.intent.action.VIEW -d "zivett://stripe-return"`.
 - The `https` links are App Links (`android:autoVerify`), which only
   verify once `https://zivett.com/.well-known/assetlinks.json` lists the
   signing certificate. The backend serves that file when

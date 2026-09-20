@@ -188,7 +188,7 @@ fun OpportunitiesScreen() {
         QuoteComposerSheet(
             job = job, rateCents = feed?.hourlyRates?.get(job.category.id.toString()), commissionBps = feed?.commissionBps ?: 1500, existing = null,
             payoutsReady = feed?.payoutsReady ?: true,
-            setupPayouts = { quoting = null; scope.launch { model.payoutOnboardingUrl()?.let { sentToStripe = true; openUrl(context, it) } } },
+            setupPayouts = { quoting = null; scope.launch { model.payoutOnboardingUrl()?.let { sentToStripe = openUrl(context, it) } } },
             onDismiss = { quoting = null },
         ) { body -> model.submitQuote(job, body) }
     }

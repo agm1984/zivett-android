@@ -325,7 +325,11 @@ object CompanyEndpoints {
     fun invoices() = ApiRequest.get<InvoicesResponse>("api/company/invoices")
     fun invoice(id: Int) = ApiRequest.get<InvoiceResponse>("api/company/invoices/$id")
     fun payouts() = ApiRequest.get<PayoutsResponse>("api/company/payouts")
-    fun stripeOnboardingLink() = ApiRequest.post<StripeLink>("api/company/stripe/onboarding-link")
+    /// `return_to: "app"` — Stripe's hosted onboarding then returns the
+    /// browser to `/app/stripe-return`, which opens the app (App Link, or
+    /// the page's `zivett://stripe-return` button) instead of stranding
+    /// the pro on the web dashboard. Older servers ignore the key.
+    fun stripeOnboardingLink() = ApiRequest.post<StripeLink, Map<String, String>>("api/company/stripe/onboarding-link", mapOf("return_to" to "app"))
     fun refreshStripeStatus() = ApiRequest.post<PayoutsReady>("api/company/stripe/refresh-status")
 
     fun availability() = ApiRequest.get<AvailabilityResponse>("api/company/availability")
