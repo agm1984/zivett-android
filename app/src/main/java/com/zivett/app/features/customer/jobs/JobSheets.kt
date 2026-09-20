@@ -34,6 +34,8 @@ import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.StripeBridge
+import com.zivett.app.core.payments.PaymentCardSection
+import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZAvatar
@@ -284,14 +286,35 @@ fun ReviewSheet(model: JobDetailModel, onDismiss: () -> Unit) {
 @Composable
 fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val environment = LocalAppEnvironment.current
+    val context = LocalContext.current
     var tip by remember { mutableStateOf("") }
+    // The card that will be charged, changeable right here. The sheet
+    // only leaves on success: it used to dismiss whatever happened, so a
+    // declined card was a toast on the job page with no way out.
+    val card = remember { PaymentCardModel(environment.client, context) }
+    var declined by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { card.load() }
+    // Until the billing context loads, don't block on it — the server is
+    // the real gate, and a failed fetch must not strand a good card.
+    val canPay = !model.busy && (card.billing.value == null || card.canCharge)
     val tipCents = minOf(100_000, maxOf(0, (tip.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()))
     ZSheet(onDismiss = onDismiss, title = "Pay & close") {
         ZBody("Paying closes the job and starts your workmanship warranty — or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
         InvoiceBreakdown(invoice)
         ZTextField("Tip your pro (optional)", tip, { tip = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
-        ZActionBand("Pay ${Money.format(invoice.amountDueCents + tipCents)}", loading = model.busy) {
-            scope.launch { model.close(tipCents); onDismiss() }
+        PaymentCardSection(card, declined = declined) { declined = null }
+        ZActionBand("Pay ${Money.format(invoice.amountDueCents + tipCents)}", loading = model.busy, enabled = canPay) {
+            scope.launch {
+                declined = null
+                when (val outcome = model.close(tipCents)) {
+                    JobDetailModel.CloseOutcome.Closed -> onDismiss()
+                    is JobDetailModel.CloseOutcome.Declined -> declined = outcome.message
+                    // Anything else is explained by the job page's toast,
+                    // which this sheet would cover — so leave.
+                    JobDetailModel.CloseOutcome.Failed -> onDismiss()
+                }
+            }
         }
     }
 }

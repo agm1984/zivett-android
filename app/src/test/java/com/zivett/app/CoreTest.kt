@@ -120,6 +120,19 @@ class DecodingTest {
         assertEquals(listOf("Faucet"), resumed.draft!!.payload!!.intakeAnswers!!["7"]!!.values)
     }
 
+    /// A declined charge is a 422 WITHOUT an `errors` key, carrying a
+    /// `code`. The code used to be dropped on decode, so no screen could
+    /// tell a decline from a form problem.
+    @Test fun aDeclinedChargeKeepsItsCode() {
+        val declined = HttpApiClient.errorFor(422, null, """{"message":"Your card was declined.","code":"payment_declined"}""".toByteArray())
+        assertEquals("Your card was declined.", declined.paymentDeclinedMessage)
+        assertEquals("Your card was declined.", declined.userMessage)
+
+        val form = HttpApiClient.errorFor(422, null, """{"message":"x","errors":{"email":["Taken."]}}""".toByteArray())
+        assertEquals(null, form.paymentDeclinedMessage)
+        assertEquals("Taken.", form.first("email"))
+    }
+
     @Test fun httpErrorsMapToTheirMeaning() {
         assertEquals(ApiError.Unauthenticated, HttpApiClient.errorFor(401, null, "{}".toByteArray()))
         assertEquals(ApiError.Forbidden("Nope"), HttpApiClient.errorFor(403, null, """{"message":"Nope"}""".toByteArray()))

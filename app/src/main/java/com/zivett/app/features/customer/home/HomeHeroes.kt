@@ -58,6 +58,7 @@ import com.zivett.app.core.models.Invoice
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.Quote
+import com.zivett.app.core.payments.PaymentCardSection
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBodyStrong
@@ -202,11 +203,11 @@ fun HeroInvoiceCard(invoice: Invoice, onPaid: suspend () -> Unit) {
                 Text(Money.format(model.totalCents), style = ZType.money.copy(fontSize = 26.sp, fontWeight = FontWeight.ExtraBold), color = colors.navyDeep.takeIf { !colors.isDark } ?: colors.ink)
             }
             model.error?.let { Text(it, style = ZType.caption.copy(fontSize = 12.5.sp), color = colors.danger, modifier = Modifier.padding(top = ZSpacing.xs)) }
-            val billing = model.billing
-            if (billing is Loadable.Loaded && billing.loaded.savedCard == null && billing.loaded.driver == "stripe") {
-                ZButton(if (model.addingCard) "Opening…" else "Add a payment card", style = ZButtonStyle.OUTLINE, enabled = !model.addingCard, modifier = Modifier.padding(top = ZSpacing.sm)) { scope.launch { model.addCard() } }
-                if (billing.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode — use card 4242 4242 4242 4242, any future expiry and CVC.", tone = ZTextTone.FAINT, modifier = Modifier.padding(top = 4.dp))
-            }
+            // The card that will be charged, changeable right here — a
+            // declined charge leads it with the bank's message. (This hero
+            // only offered a card when NONE was on file, so a declined
+            // saved card had no way out.)
+            PaymentCardSection(model.card, declined = model.declined, modifier = Modifier.padding(top = ZSpacing.sm)) { model.declined = null }
             if (!cancellation) Text("Paying closes the job — or it settles automatically 48 hours after invoicing.", style = ZType.caption.copy(fontSize = 12.sp), color = colors.inkMuted, modifier = Modifier.padding(top = ZSpacing.sm))
         }
 

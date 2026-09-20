@@ -1,0 +1,144 @@
+package com.zivett.app.core.payments
+
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.zivett.app.core.Loadable
+import com.zivett.app.core.models.BillingContext
+import com.zivett.app.core.models.CustomerEndpoints
+import com.zivett.app.core.network.ApiClient
+import com.zivett.app.core.network.ApiError
+import com.zivett.app.core.network.userMessage
+import com.zivett.app.core.reloaded
+import com.zivett.app.design.ZBanner
+import com.zivett.app.design.ZBody
+import com.zivett.app.design.ZBodyStrong
+import com.zivett.app.design.ZButton
+import com.zivett.app.design.ZButtonStyle
+import com.zivett.app.design.ZCaption
+import com.zivett.app.design.ZCard
+import com.zivett.app.design.ZSpacing
+import com.zivett.app.design.ZSpinner
+import com.zivett.app.design.ZTextTone
+import com.zivett.app.design.ZTheme
+import com.zivett.app.design.ZTone
+import kotlinx.coroutines.launch
+
+/// The booker's card on a PAY surface (Pay & close, Pay invoice, the
+/// home pay hero): what will be charged, and the way to change it.
+///
+/// Before this, the only place the app could take a card was quote
+/// acceptance, and the pay screens offered "Add a payment card" only when
+/// NO card was on file. So when a saved card declined — "Retry or use a
+/// different card" — there was nowhere to do it: the booker was stuck
+/// with a dead card until the 48-hour auto-close failed on it too.
+///
+/// Saving goes PaymentSheet (setup mode, on the billing context's
+/// SetupIntent) → `POST /api/billing/card`, which also re-pins the new
+/// card on the booker's live holds, so the very next attempt uses it.
+class PaymentCardModel(private val client: ApiClient, private val context: Context? = null) {
+    var billing by mutableStateOf<Loadable<BillingContext>>(Loadable.Loading)
+    var changing by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+
+    /// A stored card, or the simulated driver, means a charge can go
+    /// straight through.
+    val canCharge: Boolean get() = billing.value?.canChargeWithoutCardForm ?: false
+    val publishableKey: String? get() = billing.value?.publishableKey
+
+    suspend fun load() { billing = billing.reloaded { client.send(CustomerEndpoints.billingContext()) } }
+
+    /// Collect a card and make it the booker's payment method. Works with
+    /// or without one already on file. True when a card was saved (false =
+    /// they backed out of the sheet, or it failed — see `error`).
+    suspend fun changeCard(): Boolean {
+        if (changing) return false
+        changing = true; error = null
+        try {
+            // Each SetupIntent secret is single-use: always start from a
+            // fresh context, never the one the screen loaded with.
+            load()
+            val fresh = billing.value
+            val secret = fresh?.clientSecret
+            val key = fresh?.publishableKey
+            val androidContext = context
+            if (secret == null || key == null || androidContext == null) {
+                error = "Card setup isn't available right now — try again in a moment."
+                return false
+            }
+            StripeBridge.configure(androidContext, key)
+            val setupIntentId = StripeBridge.collectCard(secret) ?: return false
+            client.send(CustomerEndpoints.saveCard(setupIntentId))
+            load()
+            return true
+        } catch (apiError: ApiError) {
+            error = apiError.userMessage
+            load()
+        } catch (e: Exception) {
+            error = e.userMessage
+        } finally {
+            changing = false
+        }
+        return false
+    }
+}
+
+/// The card row every pay surface embeds. `declined` is the bank's
+/// message from a charge that just failed — it leads the card with the
+/// reason and promotes the change-card action from a quiet link to the
+/// main button.
+@Composable
+fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifier: Modifier = Modifier, onSaved: () -> Unit = {}) {
+    val scope = rememberCoroutineScope()
+    val colors = ZTheme.colors
+    ZCard(modifier = modifier) {
+        when (val billing = model.billing) {
+            Loadable.Loading -> ZSpinner()
+            is Loadable.Failed -> ZCaption(billing.message)
+            is Loadable.Loaded -> {
+                val context = billing.loaded
+                if (context.driver != "stripe") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
+                        ZBody("Test payments (simulated)")
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                        declined?.let { ZBanner(it, tone = ZTone.DANGER) }
+
+                        val card = context.savedCard
+                        Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
+                            ZBodyStrong(if (card != null) "${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}" else "No card on file")
+                        }
+
+                        model.error?.let { ZCaption(it, color = colors.danger) }
+
+                        ZButton(
+                            if (model.changing) "Opening…" else if (card == null) "Add a payment card" else "Use a different card",
+                            style = if (declined != null || card == null) ZButtonStyle.OUTLINE else ZButtonStyle.GHOST,
+                            compact = true,
+                            enabled = !model.changing,
+                            fullWidth = false,
+                        ) { scope.launch { if (model.changeCard()) onSaved() } }
+
+                        if (context.publishableKey?.startsWith("pk_test_") == true) {
+                            ZCaption("Test mode — use card 4242 4242 4242 4242, any future expiry and CVC.", tone = ZTextTone.FAINT)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

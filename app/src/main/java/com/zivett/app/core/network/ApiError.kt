@@ -53,16 +53,27 @@ sealed class ApiError : RuntimeException() {
 
     override val message: String get() = userMessage
 
+    /// The bank's message when this is a DECLINED charge — a 422 that
+    /// isn't a form problem (`{ message, code: "payment_declined" }`, no
+    /// `errors`). Pay surfaces react by keeping the screen open and
+    /// offering "Use a different card" instead of toasting and closing.
+    val paymentDeclinedMessage: String?
+        get() = (this as? Validation)?.errors?.takeIf { it.code == "payment_declined" }?.message
+
     /// The first message for a field, if this is a validation failure —
     /// lets a form show inline errors with a one-liner.
     fun first(field: String): String? = (this as? Validation)?.errors?.first(field)
 }
 
-/// Laravel's 422 body: `{ message, errors: { field: [messages] } }`.
+/// Laravel's 422 body: `{ message, errors: { field: [messages] } }` — or,
+/// for a domain refusal rather than a form problem, `{ message, code }`
+/// with no `errors` (a declined card is `payment_declined`). The `code`
+/// used to be dropped on decode, so no screen could tell the two apart.
 @Serializable
 data class ValidationErrors(
     val message: String,
     val errors: Map<String, List<String>> = emptyMap(),
+    val code: String? = null,
 ) {
     fun first(field: String): String? = errors[field]?.firstOrNull()
 

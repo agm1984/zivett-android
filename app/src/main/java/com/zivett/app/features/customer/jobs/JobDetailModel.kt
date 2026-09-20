@@ -55,8 +55,17 @@ class JobDetailModel(val jobId: Int, private val client: ApiClient, val area: Jo
     /// bank's 3DS challenge in-app; the `payment_intent.succeeded`
     /// webhook then finishes settlement server-side, so we poll the job
     /// until it lands.
-    suspend fun close(tipCents: Int) {
-        mutate("Could not close this job. Please try again.") {
+    /// What Pay & close came back with — the sheet stays up on a decline
+    /// and hands the booker the bank's message + a way to swap cards.
+    sealed interface CloseOutcome {
+        data object Closed : CloseOutcome
+        data class Declined(val message: String) : CloseOutcome
+        data object Failed : CloseOutcome
+    }
+
+    suspend fun close(tipCents: Int): CloseOutcome {
+        var declined: String? = null
+        val succeeded = mutate("Could not close this job. Please try again.", onDeclined = { declined = it }) {
             try {
                 val job = client.send(area.close(jobId, tipCents)).job
                 justClosed = job.closedAt != null
@@ -82,6 +91,8 @@ class JobDetailModel(val jobId: Int, private val client: ApiClient, val area: Jo
                 throw ApiError.Conflict(null, error.body)
             }
         }
+        declined?.let { return CloseOutcome.Declined(it) }
+        return if (succeeded) CloseOutcome.Closed else CloseOutcome.Failed
     }
 
     /// After an in-app 3DS confirmation, the webhook settles the invoice
@@ -218,11 +229,19 @@ class JobDetailModel(val jobId: Int, private val client: ApiClient, val area: Jo
         }
     }
 
-    private suspend fun mutate(fallback: String, operation: suspend () -> Job) {
+    /// `onDeclined` receives the bank's message for a declined charge
+    /// INSTEAD of a toast — the pay sheet shows it beside the card.
+    private suspend fun mutate(fallback: String, onDeclined: ((String) -> Unit)? = null, operation: suspend () -> Job): Boolean {
         busy = true
         try {
             state = Loadable.Loaded(operation())
+            return true
         } catch (error: ApiError) {
+            val declinedMessage = error.paymentDeclinedMessage
+            if (onDeclined != null && declinedMessage != null) {
+                onDeclined(declinedMessage)
+                return false
+            }
             toast = when (error) {
                 is ApiError.Validation -> error.errors.message
                 is ApiError.Server -> error.detail ?: fallback
@@ -233,5 +252,6 @@ class JobDetailModel(val jobId: Int, private val client: ApiClient, val area: Jo
         } finally {
             busy = false
         }
+        return false
     }
 }

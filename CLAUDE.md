@@ -46,7 +46,18 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   + `client_secret` on pay/close, after which the webhook settles
   server-side and the models poll briefly. Return URL
   `zivett://stripe-redirect`. `StripeHost` is mounted in `MainActivity`.
-  Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS).
+  Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS),
+  4000 0000 0000 0341 (saves fine, DECLINES at charge — the one to test
+  the card-change flow with).
+- **Every pay surface shows the card and lets it be changed**
+  (`core/payments/PaymentCard.kt` — `PaymentCardModel` +
+  `PaymentCardSection`, which go through `StripeBridge`, never the SDK):
+  pay invoice, Pay & close, the home invoice hero. A declined charge is a
+  422 `{ message, code: "payment_declined" }` with NO `errors` key
+  (`ApiError.paymentDeclinedMessage`) — keep the surface open, show the
+  bank's message in the section, and let them swap cards; never
+  toast-and-dismiss. `POST /api/billing/card` also re-pins the new card
+  on the booker's live holds server-side.
 
 ## Layout
 
