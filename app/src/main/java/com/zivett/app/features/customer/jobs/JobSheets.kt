@@ -86,7 +86,12 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
     var collectingCard by remember { mutableStateOf(false) }
     var cardError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { billing = billing.reloaded { runCatching { environment.client.send(CustomerEndpoints.billingContext()) }.getOrElse { BillingContext(driver = "simulated") } } }
+    // A failed fetch is a FAILED state with a Retry. It used to fall back
+    // to a made-up simulated context — on a real Stripe backend that read
+    // "Test payments (simulated)" with Confirm enabled, and the accept
+    // then 422'd for want of a card.
+    suspend fun loadBilling() { billing = billing.reloaded { environment.client.send(CustomerEndpoints.billingContext()) } }
+    LaunchedEffect(Unit) { model.acceptError = null; loadBilling() }
 
     val stripe = billing.value?.driver == "stripe"
     val canConfirm = !model.busy && ((billing.value?.canChargeWithoutCardForm ?: false) || setupIntentId != null)
@@ -122,6 +127,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                     ZButton("Not now", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
                 } else {
                     ZBody("${JobPresentation.quoteCompanyName(quote)} can no longer make the time they proposed. These windows from your original offer still work for them — pick one to accept the quote:", tone = ZTextTone.SOFT)
+                    model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
                     for (w in current.validWindows) {
                         ZButton(JobPresentation.windowSlot(w.date, w.window), style = ZButtonStyle.OUTLINE, loading = model.busy) {
                             scope.launch { outcome = model.acceptQuote(quote, w.date, w.window, setupIntentId) ?: outcome }
@@ -167,13 +173,25 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                 ZCard {
                     when (val state = billing) {
                         Loadable.Loading -> ZSpinner()
-                        is Loadable.Failed -> CardLine("Test payments (simulated)")
+                        is Loadable.Failed -> {
+                            ZBodyStrong("We couldn't load your payment details")
+                            ZCaption(state.message)
+                            ZButton("Retry", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { scope.launch { billing = Loadable.Loading; loadBilling() } }
+                        }
                         is Loadable.Loaded -> {
                             val card = state.loaded.savedCard
                             when {
                                 card != null -> CardLine("${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}")
                                 state.loaded.driver != "stripe" -> CardLine("Test payments (simulated)")
-                                setupIntentId != null -> CardLine("Card added — it's saved when you confirm")
+                                setupIntentId != null -> {
+                                    CardLine("Card added — it's saved when you confirm")
+                                    // The way out when the server couldn't save that card:
+                                    // a fresh SetupIntent (each secret is single-use).
+                                    if (model.acceptError != null) ZButton("Use a different card", style = ZButtonStyle.GHOST, compact = true, enabled = !model.busy, fullWidth = false) {
+                                        setupIntentId = null
+                                        scope.launch { loadBilling() }
+                                    }
+                                }
                                 else -> {
                                     ZBodyStrong("Add a payment card to accept this quote")
                                     ZCaption("Nothing is charged now — the card is only billed when the job is done and you close it.")
@@ -186,6 +204,9 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                     }
                 }
 
+                // Beside the button that caused it — never a toast, which
+                // renders under this sheet.
+                model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
                 ZButton("Confirm — ${Money.format(quote.amountCents)}", style = ZButtonStyle.SUCCESS, loading = model.busy, enabled = canConfirm) {
                     scope.launch { outcome = model.acceptQuote(quote, setupIntentId = setupIntentId) }
                 }

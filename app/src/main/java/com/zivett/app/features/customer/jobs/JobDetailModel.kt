@@ -44,6 +44,12 @@ class JobDetailModel(
     var toast by mutableStateOf<String?>(null)
     var justClosed by mutableStateOf(false)
     var busy by mutableStateOf(false)
+    /// Why accepting a quote failed — shown INSIDE the accept sheet. It
+    /// used to go to `toast`, which renders underneath the modal sheet
+    /// and is gone in four seconds, so a refusal (no card, the card
+    /// couldn't be saved, already assigned, throttled, offline) looked
+    /// like a Confirm button that did nothing.
+    var acceptError by mutableStateOf<String?>(null)
 
     val job: Job? get() = state.value
 
@@ -116,7 +122,7 @@ class JobDetailModel(
     }
 
     suspend fun acceptQuote(quote: Quote, scheduledDate: String? = null, window: String? = null, setupIntentId: String? = null): AcceptOutcome? {
-        busy = true
+        busy = true; acceptError = null
         try {
             val body = AcceptQuoteBody(couponCode = null, scheduledDate = scheduledDate, scheduledWindow = window, stripeSetupIntentId = setupIntentId)
             val job = client.send(area.acceptQuote(jobId, quote.id, body)).job
@@ -127,11 +133,11 @@ class JobDetailModel(
         } catch (error: ApiError.Conflict) {
             val conflict = runCatching { JsonCoding.json.decodeFromString<ScheduleConflict>(error.body.decodeToString()) }.getOrNull()
             if (conflict?.code == "schedule_conflict") return AcceptOutcome.ScheduleConflictOutcome(conflict.validWindows ?: emptyList())
-            toast = error.detail ?: "This job already has a pro assigned."
+            acceptError = error.detail ?: "This job already has a pro assigned."
         } catch (error: ApiError) {
-            toast = error.first("coupon_code") ?: error.userMessage
+            acceptError = error.first("coupon_code") ?: error.first("stripe_setup_intent_id") ?: error.userMessage
         } catch (error: Exception) {
-            toast = error.userMessage
+            acceptError = error.userMessage
         } finally {
             busy = false
         }

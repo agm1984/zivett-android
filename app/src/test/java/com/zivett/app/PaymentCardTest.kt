@@ -4,7 +4,10 @@ import com.zivett.app.core.models.BillingContext
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.JobResponse
 import com.zivett.app.core.models.JobStatus
+import com.zivett.app.core.models.Quote
+import com.zivett.app.core.models.QuoteStatus
 import com.zivett.app.core.network.ApiError
+import com.zivett.app.core.network.HttpApiClient
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.network.ValidationErrors
 import com.zivett.app.core.payments.PaymentCardModel
@@ -70,5 +73,28 @@ class PaymentCardTest {
 
         assertEquals(JobDetailModel.CloseOutcome.Failed, model.close(0))
         assertEquals("This job has an open dispute.", model.toast)
+    }
+
+    /// The accept sheet covers the job page's toast, so a refusal has to
+    /// land where the sheet can show it.
+    @Test fun anAcceptRefusalStaysInTheSheet() = runTest {
+        val quote = Quote(id = 9, amountCents = 18000, status = QuoteStatus.PENDING)
+        val client = PreviewApiClient(mapOf("api/customer/jobs/5" to JobResponse(Fixtures.job(id = 5))))
+        val model = JobDetailModel(5, client, JobArea.customer)
+        model.load()
+
+        client.errors["api/customer/jobs/5/quotes/9/accept"] = ApiError.Validation(ValidationErrors("Add a payment card to accept this quote."))
+        assertNull(model.acceptQuote(quote))
+        assertEquals("Add a payment card to accept this quote.", model.acceptError)
+        assertNull(model.toast)
+
+        client.errors["api/customer/jobs/5/quotes/9/accept"] = HttpApiClient.errorFor(409, null, """{"message":"This job was just taken."}""".toByteArray())
+        assertNull(model.acceptQuote(quote))
+        assertEquals("This job was just taken.", model.acceptError)
+
+        client.errors["api/customer/jobs/5/quotes/9/accept"] = ApiError.Transport("timeout")
+        assertNull(model.acceptQuote(quote))
+        assertTrue(model.acceptError!!.contains("couldn't reach"))
+        assertFalse(model.busy)
     }
 }
