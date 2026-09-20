@@ -65,7 +65,12 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   (`ApiError.paymentDeclinedMessage`) — keep the surface open, show the
   bank's message in the section, and let them swap cards; never
   toast-and-dismiss. `POST /api/billing/card` also re-pins the new card
-  on the booker's live holds server-side.
+  on the booker's live holds server-side. The Pay gate is
+  `PaymentCardModel.blocksPay` on all three — only a LOADED "Stripe, no
+  card" context disables Pay; loading or a failed fetch (which shows a
+  Retry) never does, because the server is the real gate. There is no
+  read-only saved-card endpoint: every `load()` is
+  `POST /api/billing/setup-intent` and mints a SetupIntent.
 
 - **Money calls are never abandoned.** `JobDetailModel.close` /
   `acceptQuote` / `cancel` and `PayInvoiceModel.pay` run

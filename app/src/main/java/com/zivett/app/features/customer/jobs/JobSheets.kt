@@ -317,9 +317,9 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
     val card = remember { PaymentCardModel(environment.client, context) }
     var declined by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { card.load() }
-    // Until the billing context loads, don't block on it — the server is
-    // the real gate, and a failed fetch must not strand a good card.
-    val canPay = !model.busy && (card.billing.value == null || card.canCharge)
+    // The shared gate: only a loaded "no card" context blocks Pay — the
+    // server is the real gate, and a failed fetch must not strand a good card.
+    val canPay = !model.busy && !card.blocksPay
     val tipCents = minOf(100_000, maxOf(0, (tip.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()))
     // Pinned open while the charge is in flight: swiping it away used to
     // cancel the request and toast a failure the server never reported.

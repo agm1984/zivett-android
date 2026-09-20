@@ -58,7 +58,18 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
     val canCharge: Boolean get() = billing.value?.canChargeWithoutCardForm ?: false
     val publishableKey: String? get() = billing.value?.publishableKey
 
+    /// The ONE pay gate all three surfaces share: only a context that
+    /// actually LOADED and says "Stripe, no card" blocks the Pay button.
+    /// While it loads, or when the fetch failed, paying stays possible —
+    /// the server is the real gate, and a failed fetch must not strand a
+    /// good card. (The invoice screen and home hero used to require
+    /// `canCharge`, so one dropped request disabled Pay with no way back.)
+    val blocksPay: Boolean get() = billing.value?.let { !it.canChargeWithoutCardForm } ?: false
+
     suspend fun load() { billing = billing.reloaded { client.send(CustomerEndpoints.billingContext()) } }
+
+    /// From the failed state: back to the spinner, then try again.
+    suspend fun retry() { billing = Loadable.Loading; load() }
 
     /// Collect a card and make it the booker's payment method. Works with
     /// or without one already on file. True when a card was saved (false =
@@ -108,7 +119,11 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
     ZCard(modifier = modifier) {
         when (val billing = model.billing) {
             Loadable.Loading -> ZSpinner()
-            is Loadable.Failed -> ZCaption(billing.message)
+            is Loadable.Failed -> Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                ZBodyStrong("We couldn't load your card")
+                ZCaption("${billing.message} You can still pay — we'll charge the card on file.")
+                ZButton("Retry", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { scope.launch { model.retry() } }
+            }
             is Loadable.Loaded -> {
                 val context = billing.loaded
                 if (context.driver != "stripe") {

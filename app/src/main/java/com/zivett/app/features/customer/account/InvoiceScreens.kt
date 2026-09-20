@@ -277,7 +277,7 @@ class PayInvoiceModel(
 
     val totalCents: Int get() = invoice.amountDueCents + tipCents
 
-    val canPay: Boolean get() = !paying && card.canCharge && tipCents <= 100_000
+    val canPay: Boolean get() = !paying && !card.blocksPay && tipCents <= 100_000
 
     suspend fun load() { card.load() }
 
@@ -298,7 +298,9 @@ class PayInvoiceModel(
             // payment_intent.succeeded webhook settles asynchronously.
             val action = apiError.paymentAction
             if (action != null) {
-                val key = card.publishableKey
+                // The billing fetch may have failed earlier (Pay doesn't
+                // wait on it) — one more try before giving up on the key.
+                val key = card.publishableKey ?: run { card.load(); card.publishableKey }
                 val challenger = challenger
                 if (key == null || challenger == null) {
                     error = ChallengeOutcome.UNAVAILABLE_COPY

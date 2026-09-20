@@ -1,5 +1,6 @@
 package com.zivett.app
 
+import com.zivett.app.core.Loadable
 import com.zivett.app.core.models.BillingContext
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.JobResponse
@@ -13,6 +14,7 @@ import com.zivett.app.core.network.HttpApiClient
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.network.ValidationErrors
 import com.zivett.app.core.payments.PaymentCardModel
+import com.zivett.app.features.customer.account.PayInvoiceModel
 import com.zivett.app.features.customer.jobs.JobDetailModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -44,6 +46,24 @@ class PaymentCardTest {
         val simulated = PaymentCardModel(PreviewApiClient(mapOf("api/billing/setup-intent" to BillingContext(driver = "simulated"))))
         simulated.load()
         assertTrue(simulated.canCharge)
+    }
+
+    /// One dropped billing request used to disable Pay for good on the
+    /// invoice screen and the home hero. Only a LOADED "no card" blocks.
+    @Test fun aFailedBillingFetchNeverBlocksPayAndCanBeRetried() = runTest {
+        val client = PreviewApiClient()
+        client.errors["api/billing/setup-intent"] = ApiError.Transport("offline")
+        val invoice = PayInvoiceModel(Fixtures.invoice(), client)
+        assertTrue(invoice.canPay) // still loading
+        invoice.load()
+        assertTrue(invoice.card.billing is Loadable.Failed)
+        assertTrue(invoice.canPay)
+
+        client.errors.clear()
+        client.responses["api/billing/setup-intent"] = context(saved = false)
+        invoice.card.retry()
+        assertTrue(invoice.card.blocksPay)
+        assertFalse(invoice.canPay)
     }
 
     @Test fun changingACardWithoutASetupIntentExplainsItself() = runTest {
