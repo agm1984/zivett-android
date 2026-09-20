@@ -190,11 +190,6 @@ data class AddressBody(
 @Serializable
 data class ScheduleConflict(val message: String? = null, val code: String? = null, val validWindows: List<AvailabilityWindow>? = null)
 
-/// The `{ code, client_secret? }` shape a 409 body carries (schedule
-/// conflicts, 3DS challenges) — shared by every payer path.
-@Serializable
-data class ConflictCode(val code: String? = null, val clientSecret: String? = null)
-
 @Serializable data class ReviewResponse(val review: Review)
 @Serializable data class DisputeResponse(val dispute: Dispute)
 @Serializable data class UnreadCount(val unread: Int = 0)

@@ -47,7 +47,8 @@ verification), pending company, business, and new business.
 - [x] FCM registration + messaging service + tap routing to the job over any tab; POST_NOTIFICATIONS prompt on shell appear
 - [x] Backend: `App\Support\Push` gained an `fcm` driver (HTTP v1, service-account JWT, dead-token pruning) and the `/.well-known/assetlinks.json` route; tests added
 - [x] `zivett://` scheme + App Links intent filters; referral and invitation links routed
-- [x] StripeBridge (PaymentSheet setup mode + `handleNextActionForPayment`), StripeHost in MainActivity, `zivett://stripe-redirect` return
+- [x] StripeBridge (PaymentSheet setup mode + `PaymentLauncher`), StripeHost in MainActivity
+- [x] **Pay-time 3-D Secure recovery (2026-09-20).** The server charges off-session, so the 409's PaymentIntent is `requires_payment_method` and `handleNextActionForPayment` failed on it — every 3DS card was a dead end. Now re-confirmed on-session with the 409's `payment_method_id` through the Activity Result–based `PaymentLauncher` (MainActivity's deprecated `onActivityResult` route and the unused `zivett://stripe-redirect` return URL are gone). Outcomes are told apart: canceled / refused by the bank (their message, beside the card row) / unknown (poll, and never claim "nothing was charged"). iOS needs the same fix.
 
 ## Needs a manual step
 - [x] **Firebase**: project `zivett-android`, app `com.zivett.app`, `google-services.json` in `app/` (gitignored) — done 2026-09-06; the emulator registers a token and receives pushes.

@@ -60,6 +60,15 @@ sealed class ApiError : RuntimeException() {
     val paymentDeclinedMessage: String?
         get() = (this as? Validation)?.errors?.takeIf { it.code == "payment_declined" }?.message
 
+    /// The bank wants to authenticate a pay-time charge: 409
+    /// `{ code: "payment_action_required", client_secret, payment_method_id }`.
+    /// Null for every other conflict, so callers can fall through to the
+    /// server's own message.
+    val paymentAction: PaymentAction?
+        get() = (this as? Conflict)
+            ?.let { runCatching { JsonCoding.json.decodeFromString<PaymentAction>(it.body.decodeToString()) }.getOrNull() }
+            ?.takeIf { it.code == "payment_action_required" }
+
     /// The first message for a field, if this is a validation failure —
     /// lets a form show inline errors with a one-liner.
     fun first(field: String): String? = (this as? Validation)?.errors?.first(field)
@@ -81,6 +90,14 @@ data class ValidationErrors(
     val firstMessages: Map<String, String>
         get() = errors.mapNotNull { (key, value) -> value.firstOrNull()?.let { key to it } }.toMap()
 }
+
+/// The 409 a pay/close call answers when the bank demands authentication.
+/// The server charges OFF-session, so the PaymentIntent sits in
+/// `requires_payment_method` — it has to be CONFIRMED again on-session
+/// with `paymentMethodId`, not just "next-actioned". An older server
+/// omits the id.
+@Serializable
+data class PaymentAction(val code: String? = null, val clientSecret: String? = null, val paymentMethodId: String? = null)
 
 /// Laravel's generic error body (`abort(403, 'message')` and friends).
 @Serializable

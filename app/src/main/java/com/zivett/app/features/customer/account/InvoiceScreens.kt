@@ -53,18 +53,18 @@ import com.zivett.app.core.Features
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.BillingContext
-import com.zivett.app.core.models.ConflictCode
 import com.zivett.app.core.models.CustomerEndpoints
 import com.zivett.app.core.models.Invoice
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.initialsOf
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
-import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.userMessage
+import com.zivett.app.core.payments.ChallengeOutcome
 import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.core.payments.PaymentCardSection
-import com.zivett.app.core.payments.StripeBridge
+import com.zivett.app.core.payments.PaymentChallenger
+import com.zivett.app.core.payments.StripeChallenger
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZAvatar
@@ -244,7 +244,14 @@ fun InvoiceDetailScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
 /// card on file — or add one right here (PaymentSheet on the billing
 /// context's SetupIntent → `POST /api/billing/card`), so a booker who
 /// never accepted a quote in the app isn't dead-ended.
-class PayInvoiceModel(val invoice: Invoice, private val client: ApiClient, private val area: JobArea = JobArea.customer, private val context: Context? = null) {
+class PayInvoiceModel(
+    val invoice: Invoice,
+    private val client: ApiClient,
+    private val area: JobArea = JobArea.customer,
+    private val context: Context? = null,
+    /// Runs the bank's confirmation on a 409 `payment_action_required`.
+    private val challenger: PaymentChallenger? = context?.let { StripeChallenger(it) },
+) {
     var couponCode by mutableStateOf("")
     var customTip by mutableStateOf("")
     var paying by mutableStateOf(false)
@@ -277,23 +284,22 @@ class PayInvoiceModel(val invoice: Invoice, private val client: ApiClient, priva
         try {
             return client.send(area.payInvoice(invoice.id, couponCode.ifEmpty { null }?.uppercase(), tipCents)).invoice
         } catch (apiError: ApiError) {
-            // 3DS challenge: run it in-app, then poll — the
+            // Bank confirmation: run it in-app, then poll — the
             // payment_intent.succeeded webhook settles asynchronously.
-            val conflict = (apiError as? ApiError.Conflict)?.let { runCatching { JsonCoding.json.decodeFromString<ConflictCode>(it.body.decodeToString()) }.getOrNull() }
-            if (conflict?.code == "payment_action_required") {
-                val secret = conflict.clientSecret
+            val action = apiError.paymentAction
+            if (action != null) {
                 val key = card.publishableKey
-                val context = context
-                if (secret != null && key != null && context != null) {
-                    StripeBridge.configure(context, key)
-                    if (StripeBridge.handleNextAction(secret)) {
-                        pollUntilPaid()?.let { return it }
-                        error = "Payment confirmed — it can take a few seconds to settle. Check back in a moment."
-                    } else {
-                        error = "The bank confirmation wasn't completed — nothing was charged. Try again when you're ready."
-                    }
-                } else {
-                    error = "Your bank needs an extra confirmation for this payment. Please complete it from zivett.com for now."
+                val challenger = challenger
+                if (key == null || challenger == null) {
+                    error = ChallengeOutcome.UNAVAILABLE_COPY
+                } else when (val outcome = challenger.confirm(key, action)) {
+                    ChallengeOutcome.Succeeded -> { pollUntilPaid()?.let { return it }; error = ChallengeOutcome.SETTLING_COPY }
+                    ChallengeOutcome.Canceled -> error = ChallengeOutcome.CANCELED_COPY
+                    // The bank said no — same way out as a decline.
+                    is ChallengeOutcome.Failed -> declined = outcome.message ?: ChallengeOutcome.FAILED_COPY
+                    // The result never reached us: look before claiming
+                    // anything about whether the card was charged.
+                    ChallengeOutcome.Unknown -> { pollUntilPaid()?.let { return it }; error = ChallengeOutcome.UNKNOWN_COPY }
                 }
             } else if (apiError.paymentDeclinedMessage != null) {
                 // A declined card is not a dead end: keep the screen up

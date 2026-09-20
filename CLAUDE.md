@@ -42,10 +42,18 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
 - **Stripe**: `core/payments/StripeBridge.kt` is the ONE file that
   imports the Stripe SDK. Keyed at runtime from the billing payload's
   `publishable_key`. PaymentSheet in setup mode for card capture;
-  `Stripe.handleNextActionForPayment` for a 409 `payment_action_required`
-  + `client_secret` on pay/close, after which the webhook settles
-  server-side and the models poll briefly. Return URL
-  `zivett://stripe-redirect`. `StripeHost` is mounted in `MainActivity`.
+  `PaymentLauncher` (Activity Result based — no `onActivityResult`, no
+  app return URL) for a 409 `payment_action_required` on pay/close. The
+  server charges OFF-session, so that PaymentIntent is in
+  `requires_payment_method`: `StripeBridge.confirmPayment` CONFIRMS it
+  again with the 409's `payment_method_id` (next-action only when an
+  older server omits the id), then the webhook settles server-side and
+  the models poll briefly. The result is a `ChallengeOutcome`
+  (`core/payments/PaymentChallenge.kt`, SDK-free; models take a
+  `PaymentChallenger` so tests can drive it): canceled and a bank
+  refusal mean nothing was charged, `Unknown` (the result never reached
+  us) must NEVER be worded that way — poll first. `StripeHost` is
+  mounted in `MainActivity`.
   Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS),
   4000 0000 0000 0341 (saves fine, DECLINES at charge — the one to test
   the card-change flow with).
@@ -122,5 +130,7 @@ app/src/test/java/com/zivett/app/   JUnit 4; Fixtures + PreviewApiClient stand i
 - osmdroid's `MapView` in `AndroidView` draws past its bounds; wrap it in
   a clipping `FrameLayout` and add `Modifier.clipToBounds()` (see
   `design/Maps.kt`).
-- `Stripe.handleNextActionForPayment` needs a `ComponentActivity`, not a
-  plain `Activity`.
+- `rememberPaymentLauncher` needs the publishable key at composition
+  time, but the key only arrives with a billing payload — so
+  `StripeBridge.publishableKey` is Compose state and `confirmPayment`
+  waits (briefly) for `StripeHost` to build the launcher.

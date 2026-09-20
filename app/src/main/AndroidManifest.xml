@@ -34,7 +34,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Referral links (zivett://r/CODE) and the Stripe 3DS return (zivett://stripe-redirect). -->
+            <!-- Referral links (zivett://r/CODE). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

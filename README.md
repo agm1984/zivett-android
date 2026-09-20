@@ -156,17 +156,17 @@ Use a job code the signed-in account can actually see.
 `core/payments/StripeBridge.kt` is the only file that touches the Stripe
 SDK. The publishable key arrives at runtime in the billing payload, so
 there is nothing to configure in the app. Two jobs: PaymentSheet in setup
-mode confirms the SetupIntent when a card is saved, and
-`Stripe.handleNextActionForPayment` runs 3DS when pay/close comes back
-409 with a `client_secret`. Test cards:
+mode confirms the SetupIntent when a card is saved, and `PaymentLauncher`
+re-confirms the charge on-session (the 3DS challenge) when pay/close
+comes back 409 with a `client_secret` + `payment_method_id`. Test cards:
 
 | Card | Behaviour |
 |---|---|
 | 4242 4242 4242 4242 | succeeds |
 | 4000 0027 6000 3184 | forces the 3DS challenge |
 
-3DS returns through `zivett://stripe-redirect`; the scheme is registered
-on `MainActivity`. Connect onboarding for pros is a hosted web link.
+The launcher owns its own result route and return URL, so the app
+registers nothing for 3DS. Connect onboarding for pros is a hosted web link.
 
 ## Deep links
 

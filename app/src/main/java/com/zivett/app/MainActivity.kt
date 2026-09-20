@@ -16,7 +16,6 @@ import com.zivett.app.app.AppEvents
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.RootScreen
 import com.zivett.app.core.PendingReferral
-import com.zivett.app.core.payments.StripeBridge
 import com.zivett.app.core.push.PendingPushOpen
 import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.core.push.PushRouting
@@ -36,7 +35,7 @@ class MainActivity : ComponentActivity() {
             val current = environment ?: return@setContent
             ZivettTheme {
                 CompositionLocalProvider(LocalAppEnvironment provides current) {
-                    StripeHost(this)
+                    StripeHost()
                     RootScreen()
                 }
             }
@@ -86,12 +85,5 @@ class MainActivity : ComponentActivity() {
         if (parts.size >= 2 && parts[parts.size - 2] == "invitations") {
             AppEvents.invitationToken = parts.last()
         }
-    }
-
-    @Deprecated("Stripe's 3DS result rides the legacy activity-result path")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (StripeBridge.onActivityResult(requestCode, data)) return
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
     }
 }
