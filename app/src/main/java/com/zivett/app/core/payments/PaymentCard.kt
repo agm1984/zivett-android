@@ -21,6 +21,7 @@ import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.reloaded
+import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBanner
 import com.zivett.app.design.ZBody
 import com.zivett.app.design.ZBodyStrong
@@ -136,16 +137,15 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
                         declined?.let { ZBanner(it, tone = ZTone.DANGER) }
 
                         val card = context.savedCard
-                        Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
-                            ZBodyStrong(if (card != null) "${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}" else "No card on file")
-                        }
+                        val expired = card?.isExpired() == true
+                        SavedCardLine(card)
+                        if (expired) ZCaption("This card has expired — use a different card before you pay.", color = colors.danger)
 
                         model.error?.let { ZCaption(it, color = colors.danger) }
 
                         ZButton(
                             if (model.changing) "Opening…" else if (card == null) "Add a payment card" else "Use a different card",
-                            style = if (declined != null || card == null) ZButtonStyle.OUTLINE else ZButtonStyle.GHOST,
+                            style = if (declined != null || card == null || expired) ZButtonStyle.OUTLINE else ZButtonStyle.GHOST,
                             compact = true,
                             enabled = !model.changing,
                             fullWidth = false,
@@ -157,6 +157,24 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
                     }
                 }
             }
+        }
+    }
+}
+
+/// The card on file wherever it renders: brand •••• last4, "exp MM/YY"
+/// when the server sent one, and a danger EXPIRED badge once it lapses.
+@Composable
+fun SavedCardLine(card: BillingContext.SavedCard?, modifier: Modifier = Modifier) {
+    val colors = ZTheme.colors
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
+        if (card == null) {
+            ZBodyStrong("No card on file")
+        } else {
+            val expired = card.isExpired()
+            ZBodyStrong(card.label)
+            if (expired) ZBadge("Expired", ZTone.DANGER)
+            else card.expiryLabel?.let { ZCaption(it) }
         }
     }
 }

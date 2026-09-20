@@ -35,6 +35,7 @@ import com.zivett.app.core.models.Quote
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.StripeBridge
 import com.zivett.app.core.payments.PaymentCardSection
+import com.zivett.app.core.payments.SavedCardLine
 import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
@@ -181,7 +182,6 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                         is Loadable.Loaded -> {
                             val card = state.loaded.savedCard
                             when {
-                                card != null -> CardLine("${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}")
                                 state.loaded.driver != "stripe" -> CardLine("Test payments (simulated)")
                                 setupIntentId != null -> {
                                     CardLine("Card added — it's saved when you confirm")
@@ -190,6 +190,16 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                                     if (model.acceptError != null) ZButton("Use a different card", style = ZButtonStyle.GHOST, compact = true, enabled = !model.busy, fullWidth = false) {
                                         setupIntentId = null
                                         scope.launch { loadBilling() }
+                                    }
+                                }
+                                card != null -> {
+                                    SavedCardLine(card)
+                                    // An expired card will most likely be refused at
+                                    // closure — offer the swap now (the accept pins it).
+                                    if (card.isExpired()) {
+                                        ZCaption("This card has expired — add a different one so closing the job goes through.", color = colors.danger)
+                                        cardError?.let { ZCaption(it, color = colors.danger) }
+                                        ZButton("Use a different card", style = ZButtonStyle.OUTLINE, compact = true, loading = collectingCard, fullWidth = false) { collectCard(state.loaded) }
                                     }
                                 }
                                 else -> {

@@ -69,6 +69,9 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   `PaymentCardModel.blocksPay` on all three — only a LOADED "Stripe, no
   card" context disables Pay; loading or a failed fetch (which shows a
   Retry) never does, because the server is the real gate. There is no
+  The card itself always renders through `SavedCardLine` (brand ••••
+  last4, "exp MM/YY", a danger EXPIRED badge + a promoted "Use a
+  different card"); `saved_card.exp_month/exp_year` are nullable. No
   read-only saved-card endpoint: every `load()` is
   `POST /api/billing/setup-intent` and mints a SetupIntent.
 

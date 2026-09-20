@@ -212,8 +212,28 @@ data class BillingContext(
     val clientSecret: String? = null,
     val savedCard: SavedCard? = null,
 ) {
+    /// `exp_month` / `exp_year` are null for cards saved before the
+    /// server started sending them — every reader is null-safe.
     @Serializable
-    data class SavedCard(val brand: String? = null, val last4: String? = null)
+    data class SavedCard(val brand: String? = null, val last4: String? = null, val expMonth: Int? = null, val expYear: Int? = null) {
+        /// "Visa •••• 4242"
+        val label: String get() = "${(brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${last4 ?: ""}"
+
+        /// "exp 04/27", or null when the expiry is unknown.
+        val expiryLabel: String?
+            get() {
+                val month = expMonth?.takeIf { it in 1..12 } ?: return null
+                val year = expYear ?: return null
+                return "exp %02d/%02d".format(month, year % 100)
+            }
+
+        /// A card is good THROUGH its expiry month. Unknown = not expired.
+        fun isExpired(today: java.time.YearMonth = java.time.YearMonth.now()): Boolean {
+            val month = expMonth?.takeIf { it in 1..12 } ?: return false
+            val year = expYear ?: return false
+            return java.time.YearMonth.of(year, month).isBefore(today)
+        }
+    }
 
     /// A stored card (or the simulated driver) means accept/pay can go
     /// straight through without collecting a card natively.

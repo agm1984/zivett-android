@@ -11,6 +11,7 @@ import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.ApiRequest
 import com.zivett.app.core.network.HttpApiClient
+import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.network.ValidationErrors
 import com.zivett.app.core.payments.PaymentCardModel
@@ -25,6 +26,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.YearMonth
 
 /// Changing the card on a pay surface. PaymentSheet itself can't run in
 /// a unit test, so these cover the decisions around it — and that a
@@ -64,6 +66,21 @@ class PaymentCardTest {
         invoice.card.retry()
         assertTrue(invoice.card.blocksPay)
         assertFalse(invoice.canPay)
+    }
+
+    @Test fun aSavedCardShowsItsExpiryAndKnowsWhenItLapsed() {
+        val card = BillingContext.SavedCard("visa", "4242", expMonth = 4, expYear = 2027)
+        assertEquals("Visa •••• 4242", card.label)
+        assertEquals("exp 04/27", card.expiryLabel)
+        // Good THROUGH its expiry month.
+        assertFalse(card.isExpired(YearMonth.of(2027, 4)))
+        assertTrue(card.isExpired(YearMonth.of(2027, 5)))
+
+        // Cards saved before the server sent an expiry decode as unknown.
+        val old = JsonCoding.json.decodeFromString<BillingContext>("""{"driver":"stripe","saved_card":{"brand":"visa","last4":"4242","exp_month":null}}""").savedCard!!
+        assertNull(old.expiryLabel)
+        assertFalse(old.isExpired())
+        assertEquals(4, JsonCoding.json.decodeFromString<BillingContext>("""{"saved_card":{"brand":"visa","last4":"4242","exp_month":4,"exp_year":2027}}""").savedCard!!.expMonth)
     }
 
     @Test fun changingACardWithoutASetupIntentExplainsItself() = runTest {
