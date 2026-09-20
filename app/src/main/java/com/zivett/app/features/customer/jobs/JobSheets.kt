@@ -67,7 +67,6 @@ import com.zivett.app.design.ZType
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.MoneyRow
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
 
 /// The accept modal: what you're agreeing to, the hold preview, the
 /// arrival, then confirm. Handles the 409 schedule-conflict fallback and
@@ -322,7 +321,7 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
     // The shared gate: only a loaded "no card" context blocks Pay — the
     // server is the real gate, and a failed fetch must not strand a good card.
     val canPay = !model.busy && !card.blocksPay
-    val tipCents = minOf(100_000, maxOf(0, (tip.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()))
+    val tipCents = Money.tipCents(tip)
     // Pinned open while the charge is in flight: swiping it away used to
     // cancel the request and toast a failure the server never reported.
     ZSheet(onDismiss = onDismiss, title = "Pay & close", dismissable = !model.busy) {

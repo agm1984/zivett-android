@@ -106,7 +106,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.math.BigDecimal
 
 @Composable
 fun InvoicesScreen(area: JobArea, onBack: () -> Unit) {
@@ -274,11 +273,7 @@ class PayInvoiceModel(
     // One dollar input, strictly opt-in — no suggested amounts on
     // purpose: preset pills read as an expectation, and a tip isn't one
     // (mirrors the web's TipPicker). Clamped to the API's $1,000 ceiling.
-    val tipCents: Int
-        get() {
-            val dollars = customTip.toBigDecimalOrNull() ?: return 0
-            return minOf(100_000, maxOf(0, dollars.multiply(BigDecimal(100)).toInt()))
-        }
+    val tipCents: Int get() = Money.tipCents(customTip)
 
     val totalCents: Int get() = invoice.amountDueCents + tipCents
 

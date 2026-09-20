@@ -106,7 +106,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
 
 class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
     var state by mutableStateOf<Loadable<Job>>(Loadable.Loading)
@@ -448,7 +447,7 @@ private fun ChangeOrderSheet(model: CompanyJobDetailModel, onDismiss: () -> Unit
     var amount by remember { mutableStateOf("") }
     var descope by remember { mutableStateOf(false) }
     var materials by remember { mutableStateOf(false) }
-    val cents = (amount.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()
+    val cents = Money.parseCents(amount) ?: 0
     val amountCents = if (descope) -cents else cents
     ZSheet(onDismiss = onDismiss, title = "Propose a change") {
         ZTextField("Change description", label, { label = it }, placeholder = "Replace shut-off valve", capitalization = KeyboardCapitalization.Sentences)

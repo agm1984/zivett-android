@@ -57,6 +57,29 @@ class AddressPartsTest {
         assertEquals("$1,234.50", Money.format(123_450))
         assertEquals("$0.00", Money.format(0))
     }
+
+    /// The decimal keyboard follows the phone's locale: "5,50" on a
+    /// fr-CA device used to parse as nothing — a $0 tip.
+    @Test fun typedAmountsAcceptEitherDecimalSeparator() {
+        assertEquals(550, Money.parseCents("5,50"))
+        assertEquals(550, Money.parseCents("5.50"))
+        assertEquals(550, Money.parseCents("5,5"))
+        assertEquals(50, Money.parseCents(",5"))
+        assertEquals(2000, Money.parseCents("$20"))
+        assertEquals(100_000, Money.parseCents("1,000"))
+        assertEquals(123_450, Money.parseCents("1,234.50"))
+        assertEquals(123_450, Money.parseCents("1 234,50"))
+        assertEquals(123_450, Money.parseCents("1.234,50"))
+        assertEquals(556, Money.parseCents("5.555"))
+        assertEquals(null, Money.parseCents(""))
+        assertEquals(null, Money.parseCents("abc"))
+        assertEquals(null, Money.parseCents("1,2,3"))
+
+        assertEquals(550, Money.tipCents("5,50"))
+        assertEquals(0, Money.tipCents(""))
+        assertEquals(0, Money.tipCents("-5"))
+        assertEquals(100_000, Money.tipCents("5000"))
+    }
 }
 
 class DecodingTest {
