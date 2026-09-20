@@ -33,6 +33,7 @@ import com.zivett.app.design.ZSpinner
 import com.zivett.app.design.ZTextTone
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZTone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /// The booker's card on a PAY surface (Pay & close, Pay invoice, the
@@ -85,6 +86,8 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
         } catch (apiError: ApiError) {
             error = apiError.userMessage
             load()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error = e.userMessage
         } finally {

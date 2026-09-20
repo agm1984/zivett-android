@@ -51,8 +51,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -67,6 +69,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -712,12 +715,22 @@ fun ZHeroPanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.(
 /// A modal bottom sheet with the app's ground color, keyboard-aware, that
 /// opens fully expanded — the Android home for what iOS presents as a
 /// sheet. `title` renders the standard sheet header.
+/// `dismissable = false` pins the sheet open — swipe, scrim and back are
+/// all refused. Pay sheets pass `!busy`: a charge must never be walked
+/// away from mid-request.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ZSheet(onDismiss: () -> Unit, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun ZSheet(onDismiss: () -> Unit, title: String? = null, dismissable: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     val colors = ZTheme.colors
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = colors.cream, contentColor = colors.ink) {
+    val canDismiss by rememberUpdatedState(dismissable)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { canDismiss || it != SheetValue.Hidden })
+    ModalBottomSheet(
+        onDismissRequest = { if (canDismiss) onDismiss() },
+        sheetState = sheetState,
+        containerColor = colors.cream,
+        contentColor = colors.ink,
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = dismissable),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

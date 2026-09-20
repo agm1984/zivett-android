@@ -22,7 +22,10 @@ import com.zivett.app.core.payments.ChallengeOutcome
 import com.zivett.app.core.payments.PaymentChallenger
 import com.zivett.app.core.payments.StripeChallenger
 import com.zivett.app.core.reloaded
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /// Everything the job page can do. Every mutation swaps the whole job
 /// from the response (the API returns the full show-shaped payload), so
@@ -57,11 +60,15 @@ class JobDetailModel(
 
     // Actions
 
+    /// NonCancellable like the other money calls — a cancellation past
+    /// the grace window charges its fee on the spot.
     suspend fun cancel() {
-        mutate("Could not cancel this job — work may have already started.") {
-            val job = client.send(area.cancel(jobId)).job
-            toast = "${job.code ?: "Job"} cancelled"
-            job
+        withContext(NonCancellable) {
+            mutate("Could not cancel this job — work may have already started.") {
+                val job = client.send(area.cancel(jobId)).job
+                toast = "${job.code ?: "Job"} cancelled"
+                job
+            }
         }
     }
 
@@ -71,13 +78,36 @@ class JobDetailModel(
         data object Closed : CloseOutcome
         data class Declined(val message: String) : CloseOutcome
         data object Failed : CloseOutcome
+        /// A second tap while the first charge is still in flight — ignore it.
+        data object InFlight : CloseOutcome
     }
+
+    // `busy` is shared by every action on the page; the two calls that
+    // commit money get a guard of their own so neither can ever be
+    // entered twice, whatever else flips `busy`.
+    private var closing = false
+    private var accepting = false
 
     /// Pay & close. On 409 `payment_action_required` the SDK re-confirms
     /// the charge in-app (the bank's 3DS challenge); the
     /// `payment_intent.succeeded` webhook then finishes settlement
     /// server-side, so we poll the job until it lands.
+    ///
+    /// Runs NonCancellable: the caller's scope belongs to a sheet, and a
+    /// scope that died mid-request used to cancel the HTTP call and
+    /// report "Could not close this job" — about a card that may well
+    /// have been charged. The sheet also refuses to dismiss while busy.
     suspend fun close(tipCents: Int): CloseOutcome {
+        if (closing) return CloseOutcome.InFlight
+        closing = true
+        try {
+            return withContext(NonCancellable) { closeNow(tipCents) }
+        } finally {
+            closing = false
+        }
+    }
+
+    private suspend fun closeNow(tipCents: Int): CloseOutcome {
         var declined: String? = null
         val succeeded = mutate("Could not close this job. Please try again.", onDeclined = { declined = it }) {
             try {
@@ -121,7 +151,19 @@ class JobDetailModel(
         return null
     }
 
+    /// NonCancellable for the same reason as `close`: accepting is the
+    /// payment commitment, and must not be abandoned half-sent.
     suspend fun acceptQuote(quote: Quote, scheduledDate: String? = null, window: String? = null, setupIntentId: String? = null): AcceptOutcome? {
+        if (accepting) return null
+        accepting = true
+        try {
+            return withContext(NonCancellable) { acceptNow(quote, scheduledDate, window, setupIntentId) }
+        } finally {
+            accepting = false
+        }
+    }
+
+    private suspend fun acceptNow(quote: Quote, scheduledDate: String?, window: String?, setupIntentId: String?): AcceptOutcome? {
         busy = true; acceptError = null
         try {
             val body = AcceptQuoteBody(couponCode = null, scheduledDate = scheduledDate, scheduledWindow = window, stripeSetupIntentId = setupIntentId)
@@ -136,6 +178,8 @@ class JobDetailModel(
             acceptError = error.detail ?: "This job already has a pro assigned."
         } catch (error: ApiError) {
             acceptError = error.first("coupon_code") ?: error.first("stripe_setup_intent_id") ?: error.userMessage
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             acceptError = error.userMessage
         } finally {
@@ -262,6 +306,10 @@ class JobDetailModel(
                 is ApiError.Server -> error.detail ?: fallback
                 else -> fallback
             }
+        } catch (error: CancellationException) {
+            // Never an "ordinary failure": a cancelled call says nothing
+            // about what the server did with it.
+            throw error
         } catch (_: Exception) {
             toast = fallback
         } finally {

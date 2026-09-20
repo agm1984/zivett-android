@@ -67,6 +67,13 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   toast-and-dismiss. `POST /api/billing/card` also re-pins the new card
   on the booker's live holds server-side.
 
+- **Money calls are never abandoned.** `JobDetailModel.close` /
+  `acceptQuote` / `cancel` and `PayInvoiceModel.pay` run
+  `withContext(NonCancellable)` (their callers' scopes belong to sheets),
+  the sheets pin themselves with `ZSheet(dismissable = !busy)`, and every
+  `catch (Exception)` on a money path rethrows `CancellationException`
+  first — a cancelled call says nothing about what the server did.
+
 ## Layout
 
 ```

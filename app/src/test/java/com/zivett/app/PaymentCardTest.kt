@@ -6,12 +6,17 @@ import com.zivett.app.core.models.JobResponse
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.models.QuoteStatus
+import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
+import com.zivett.app.core.network.ApiRequest
 import com.zivett.app.core.network.HttpApiClient
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.network.ValidationErrors
 import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.features.customer.jobs.JobDetailModel
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -95,6 +100,39 @@ class PaymentCardTest {
         client.errors["api/customer/jobs/5/quotes/9/accept"] = ApiError.Transport("timeout")
         assertNull(model.acceptQuote(quote))
         assertTrue(model.acceptError!!.contains("couldn't reach"))
+        assertFalse(model.busy)
+    }
+
+    /// Swiping the pay sheet away kills its coroutine scope. That used to
+    /// cancel the HTTP call and toast "Could not close this job" about a
+    /// card the server may have charged; now the call runs to the end and
+    /// the job page gets the real answer.
+    @Test fun aChargeInFlightOutlivesItsSheet() = runTest {
+        val closed = Fixtures.job(id = 5, status = JobStatus.INVOICED).copy(closedAt = java.time.Instant.EPOCH)
+        val gate = CompletableDeferred<Unit>()
+        val preview = PreviewApiClient(mapOf("api/customer/jobs/5" to JobResponse(Fixtures.job(id = 5, status = JobStatus.INVOICED)), "api/customer/jobs/5/close" to JobResponse(closed)))
+        val client = object : ApiClient {
+            override suspend fun <T> send(request: ApiRequest<T>): T {
+                if (request.path.endsWith("/close")) gate.await()
+                return preview.send(request)
+            }
+        }
+        val model = JobDetailModel(5, client, JobArea.customer)
+        model.load()
+
+        val sheet = launch { model.close(0) }
+        runCurrent()
+        assertTrue(model.busy)
+        // A second tap can't start a second charge.
+        assertEquals(JobDetailModel.CloseOutcome.InFlight, model.close(0))
+
+        sheet.cancel()
+        gate.complete(Unit)
+        sheet.join()
+
+        assertEquals(listOf("GET api/customer/jobs/5", "POST api/customer/jobs/5/close"), preview.sent)
+        assertTrue(model.justClosed)
+        assertNull(model.toast)
         assertFalse(model.busy)
     }
 }

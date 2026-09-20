@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.height
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -98,6 +99,8 @@ import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -278,9 +281,16 @@ class PayInvoiceModel(
 
     suspend fun load() { card.load() }
 
+    /// NonCancellable: leaving the screen mid-charge used to cancel the
+    /// request and surface a failure about a card that may have been
+    /// charged. (`paying` doubles as the re-entrancy guard via `canPay`.)
     suspend fun pay(): Invoice? {
         if (!canPay) return null
         paying = true; error = null; declined = null; fieldErrors = emptyMap()
+        return withContext(NonCancellable) { payNow() }
+    }
+
+    private suspend fun payNow(): Invoice? {
         try {
             return client.send(area.payInvoice(invoice.id, couponCode.ifEmpty { null }?.uppercase(), tipCents)).invoice
         } catch (apiError: ApiError) {
@@ -310,6 +320,8 @@ class PayInvoiceModel(
             } else {
                 error = apiError.userMessage
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error = e.userMessage
         } finally {
@@ -336,12 +348,18 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
     var invoiceState by remember { mutableStateOf<Loadable<Invoice>>(Loadable.Loading) }
     LaunchedEffect(invoiceId) { invoiceState = invoiceState.reloaded { environment.client.send(area.invoiceDetail(invoiceId)).invoice } }
 
+    // Nobody walks away from a charge in flight: back (gesture and
+    // arrow) waits for the answer.
+    var paying by remember { mutableStateOf(false) }
+    BackHandler(enabled = paying) {}
+
     Column {
-        ZTopBar("Pay", onBack = onBack)
+        ZTopBar("Pay", onBack = { if (!paying) onBack() })
         ZScreen {
             ZLoadable(invoiceState, retry = { scope.launch { invoiceState = invoiceState.reloaded { environment.client.send(area.invoiceDetail(invoiceId)).invoice } } }) { invoice ->
                 val model = remember(invoice.id) { PayInvoiceModel(invoice, environment.client, area, context) }
                 LaunchedEffect(model) { model.load() }
+                paying = model.paying
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Pay invoice", invoice.job?.title)
                     model.error?.let { ZBanner(it, tone = ZTone.DANGER) }

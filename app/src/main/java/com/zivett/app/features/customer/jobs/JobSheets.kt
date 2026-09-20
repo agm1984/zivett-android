@@ -108,7 +108,8 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
         }
     }
 
-    ZSheet(onDismiss = onDismiss) {
+    // Pinned open while the accept is in flight — see `ZSheet`.
+    ZSheet(onDismiss = onDismiss, dismissable = !model.busy) {
         when (val current = outcome) {
             is JobDetailModel.AcceptOutcome.Accepted -> {
                 Icon(Icons.Filled.Verified, contentDescription = null, tint = colors.brandGold, modifier = Modifier.padding(0.dp))
@@ -227,7 +228,7 @@ private fun CardLine(text: String) {
 fun CancelJobSheet(job: Job, model: JobDetailModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
-    ZSheet(onDismiss = onDismiss, title = "Cancel ${job.code ?: "this job"}?") {
+    ZSheet(onDismiss = onDismiss, title = "Cancel ${job.code ?: "this job"}?", dismissable = !model.busy) {
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) {
             ZCard { ZMono("Cancellation fee — charged now"); ZMonoLarge(Money.format(fee), color = colors.danger) }
@@ -320,7 +321,9 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
     // the real gate, and a failed fetch must not strand a good card.
     val canPay = !model.busy && (card.billing.value == null || card.canCharge)
     val tipCents = minOf(100_000, maxOf(0, (tip.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()))
-    ZSheet(onDismiss = onDismiss, title = "Pay & close") {
+    // Pinned open while the charge is in flight: swiping it away used to
+    // cancel the request and toast a failure the server never reported.
+    ZSheet(onDismiss = onDismiss, title = "Pay & close", dismissable = !model.busy) {
         ZBody("Paying closes the job and starts your workmanship warranty — or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
         InvoiceBreakdown(invoice)
         ZTextField("Tip your pro (optional)", tip, { tip = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
@@ -331,6 +334,7 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
                 when (val outcome = model.close(tipCents)) {
                     JobDetailModel.CloseOutcome.Closed -> onDismiss()
                     is JobDetailModel.CloseOutcome.Declined -> declined = outcome.message
+                    JobDetailModel.CloseOutcome.InFlight -> Unit
                     // Anything else is explained by the job page's toast,
                     // which this sheet would cover — so leave.
                     JobDetailModel.CloseOutcome.Failed -> onDismiss()
