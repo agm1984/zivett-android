@@ -316,6 +316,8 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
     // declined card was a toast on the job page with no way out.
     val card = remember { PaymentCardModel(environment.client, context) }
     var declined by remember { mutableStateOf<String?>(null) }
+    // The call ended without an answer and the job still reads unpaid.
+    var unconfirmed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { card.load() }
     // The shared gate: only a loaded "no card" context blocks Pay — the
     // server is the real gate, and a failed fetch must not strand a good card.
@@ -328,12 +330,14 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
         InvoiceBreakdown(invoice)
         ZTextField("Tip your pro (optional)", tip, { tip = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
         PaymentCardSection(card, declined = declined) { declined = null }
+        unconfirmed?.let { ZBanner(it, tone = ZTone.WARNING) }
         ZActionBand("Pay ${Money.format(invoice.amountDueCents + tipCents)}", loading = model.busy, enabled = canPay) {
             scope.launch {
-                declined = null
+                declined = null; unconfirmed = null
                 when (val outcome = model.close(tipCents)) {
                     JobDetailModel.CloseOutcome.Closed -> onDismiss()
                     is JobDetailModel.CloseOutcome.Declined -> declined = outcome.message
+                    is JobDetailModel.CloseOutcome.Unconfirmed -> unconfirmed = outcome.message
                     JobDetailModel.CloseOutcome.InFlight -> Unit
                     // Anything else is explained by the job page's toast,
                     // which this sheet would cover — so leave.

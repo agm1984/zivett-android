@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Share
@@ -265,6 +266,10 @@ class PayInvoiceModel(
     /// The card that will be charged, changeable on every pay surface.
     val card = PaymentCardModel(client, context)
     var fieldErrors by mutableStateOf<Map<String, String>>(emptyMap())
+    /// The settled invoice — the screen swaps to its confirmation. It
+    /// used to navigate back without a word, which after a bank
+    /// challenge read as "did that work?".
+    var paid by mutableStateOf<Invoice?>(null)
 
     // One dollar input, strictly opt-in — no suggested amounts on
     // purpose: preset pills read as an expectation, and a tip isn't one
@@ -287,7 +292,7 @@ class PayInvoiceModel(
     suspend fun pay(): Invoice? {
         if (!canPay) return null
         paying = true; error = null; declined = null; fieldErrors = emptyMap()
-        return withContext(NonCancellable) { payNow() }
+        return withContext(NonCancellable) { payNow() }?.also { paid = it }
     }
 
     private suspend fun payNow(): Invoice? {
@@ -313,6 +318,12 @@ class PayInvoiceModel(
                     // anything about whether the card was charged.
                     ChallengeOutcome.Unknown -> { pollUntilPaid()?.let { return it }; error = ChallengeOutcome.UNKNOWN_COPY }
                 }
+            } else if (apiError.unconfirmedPaymentMessage != null) {
+                // A timeout, a 5xx or 503 `payment_provider_error`: the
+                // charge may have landed anyway — look before speaking.
+                val fresh = runCatching { client.send(area.invoiceDetail(invoice.id)).invoice }.getOrNull()
+                if (fresh?.isPaid == true) return fresh
+                error = apiError.unconfirmedPaymentMessage
             } else if (apiError.paymentDeclinedMessage != null) {
                 // A declined card is not a dead end: keep the screen up
                 // and let them swap cards right here.
@@ -362,7 +373,9 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
                 val model = remember(invoice.id) { PayInvoiceModel(invoice, environment.client, area, context) }
                 LaunchedEffect(model) { model.load() }
                 paying = model.paying
-                Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
+                val paid = model.paid
+                if (paid != null) PaymentReceived(paid, onDone = onBack)
+                else Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Pay invoice", invoice.job?.title)
                     model.error?.let { ZBanner(it, tone = ZTone.DANGER) }
                     InvoiceBreakdown(invoice)
@@ -372,12 +385,24 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
                     ZTextField("Tip your pro (optional)", model.customTip, { model.customTip = it }, placeholder = "0.00", error = model.fieldErrors["tip_cents"], keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
                     PaymentCardSection(model.card, declined = model.declined) { model.declined = null }
                     ZActionBand("Pay ${Money.format(model.totalCents)}", loading = model.paying, enabled = model.canPay) {
-                        scope.launch { if (model.pay() != null) onBack() }
+                        scope.launch { model.pay() }
                     }
                     Spacer(Modifier.padding(ZSpacing.lg))
                 }
             }
         }
+    }
+}
+
+/// What the pay screen becomes once the invoice settles.
+@Composable
+private fun PaymentReceived(invoice: Invoice, onDone: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
+        Icon(Icons.Filled.Verified, contentDescription = null, tint = ZTheme.colors.brandGold)
+        ZMono("Payment received")
+        ZPageTitle("Thanks — you're all paid up", invoice.job?.title)
+        ZBanner("${invoice.number ?: "Your invoice"} is paid. We've emailed your receipt, and you can share a PDF copy from the invoice any time.", tone = ZTone.SUCCESS)
+        ZButton("Done", onClick = onDone)
     }
 }
 

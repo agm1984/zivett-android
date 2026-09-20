@@ -78,6 +78,9 @@ class JobDetailModel(
         data object Closed : CloseOutcome
         data class Declined(val message: String) : CloseOutcome
         data object Failed : CloseOutcome
+        /// The call ended without an answer and the job still reads
+        /// unpaid — the sheet stays up with this and they can retry.
+        data class Unconfirmed(val message: String) : CloseOutcome
         /// A second tap while the first charge is still in flight — ignore it.
         data object InFlight : CloseOutcome
     }
@@ -109,6 +112,7 @@ class JobDetailModel(
 
     private suspend fun closeNow(tipCents: Int): CloseOutcome {
         var declined: String? = null
+        var unconfirmed: String? = null
         val succeeded = mutate("Could not close this job. Please try again.", onDeclined = { declined = it }) {
             try {
                 val job = client.send(area.close(jobId, tipCents)).job
@@ -131,11 +135,28 @@ class JobDetailModel(
                     // charged" would be a guess. Look before saying anything.
                     ChallengeOutcome.Unknown -> pollUntilClosed() ?: throw ApiError.Server(409, ChallengeOutcome.UNKNOWN_COPY)
                 }
+            } catch (error: ApiError) {
+                // A timeout, a 5xx or 503 `payment_provider_error`: the
+                // charge may have landed anyway. Look before speaking —
+                // if the job settled this WAS a success.
+                val message = error.unconfirmedPaymentMessage ?: throw error
+                val fresh = runCatching { client.send(area.job(jobId)).job }.getOrNull()
+                if (fresh != null && fresh.isSettled) {
+                    justClosed = fresh.closedAt != null
+                    fresh
+                } else {
+                    fresh?.let { state = Loadable.Loaded(it) }
+                    unconfirmed = message
+                    throw error
+                }
             }
         }
+        unconfirmed?.let { return CloseOutcome.Unconfirmed(it) }
         declined?.let { return CloseOutcome.Declined(it) }
         return if (succeeded) CloseOutcome.Closed else CloseOutcome.Failed
     }
+
+    private val Job.isSettled: Boolean get() = invoice?.isPaid == true || closedAt != null
 
     /// After an in-app 3DS confirmation, the webhook settles the invoice
     /// asynchronously — give it a few beats before giving up.
@@ -143,7 +164,7 @@ class JobDetailModel(
         repeat(5) {
             delay(2000)
             val job = runCatching { client.send(area.job(jobId)).job }.getOrNull()
-            if (job != null && (job.invoice?.isPaid == true || job.closedAt != null)) {
+            if (job != null && job.isSettled) {
                 justClosed = job.closedAt != null
                 return job
             }
@@ -298,12 +319,15 @@ class JobDetailModel(
                 onDeclined(declinedMessage)
                 return false
             }
-            // The operation already reported a decline of its own (a
-            // failed bank confirmation) — no toast on top of it.
-            if (onDeclined != null && error.paymentAction != null) return false
+            // The operation already reported this itself (a failed bank
+            // confirmation, an unconfirmed charge) — no toast on top.
+            if (onDeclined != null && (error.paymentAction != null || error.unconfirmedPaymentMessage != null)) return false
             toast = when (error) {
                 is ApiError.Validation -> error.errors.message
                 is ApiError.Server -> error.detail ?: fallback
+                // The server's own words ("This job has an open dispute")
+                // used to be swapped for the generic fallback.
+                is ApiError.Conflict -> error.detail ?: fallback
                 else -> fallback
             }
         } catch (error: CancellationException) {

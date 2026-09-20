@@ -1,6 +1,7 @@
 package com.zivett.app
 
 import com.zivett.app.core.models.BillingContext
+import com.zivett.app.core.models.InvoiceResponse
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.JobResponse
 import com.zivett.app.core.models.JobStatus
@@ -87,5 +88,66 @@ class PaymentChallengeTest {
         val unknown = payWith(ChallengeOutcome.Unknown)
         assertEquals(ChallengeOutcome.UNKNOWN_COPY, unknown.error)
         assertTrue(unknown.declined == null)
+    }
+
+    // A pay call that ends WITHOUT an answer (timeout, 5xx, the server's
+    // own 503 "couldn't reach the payment provider").
+
+    @Test fun aProviderErrorKeepsTheServersWordsAndACodeToReactTo() {
+        val error = HttpApiClient.errorFor(503, null, """{"message":"We couldn't reach the payment provider. Check back shortly before retrying.","code":"payment_provider_error"}""".toByteArray())
+        assertEquals("We couldn't reach the payment provider. Check back shortly before retrying.", error.unconfirmedPaymentMessage)
+        assertEquals(ApiError.UNCONFIRMED_PAYMENT, ApiError.Transport("timeout").unconfirmedPaymentMessage)
+        assertEquals(ApiError.UNCONFIRMED_PAYMENT, HttpApiClient.errorFor(500, null, "{}".toByteArray()).unconfirmedPaymentMessage)
+        assertNull(HttpApiClient.errorFor(422, null, """{"message":"x"}""".toByteArray()).unconfirmedPaymentMessage)
+    }
+
+    @Test fun aTimeoutThatActuallySettledIsASuccess() = runTest {
+        val client = jobClient()
+        client.errors["api/customer/jobs/5/close"] = ApiError.Transport("timeout")
+        val model = JobDetailModel(5, client, JobArea.customer)
+        model.load()
+        // By the time we look again, the charge has landed.
+        client.responses["api/customer/jobs/5"] = JobResponse(Fixtures.job(id = 5, status = JobStatus.INVOICED).copy(closedAt = java.time.Instant.EPOCH))
+
+        assertEquals(JobDetailModel.CloseOutcome.Closed, model.close(0))
+        assertTrue(model.justClosed)
+        assertNull(model.toast)
+    }
+
+    @Test fun aTimeoutThatDidNotSettleSaysSoInTheSheet() = runTest {
+        val client = jobClient()
+        client.errors["api/customer/jobs/5/close"] = ApiError.Server(503, "We couldn't reach the payment provider.", "payment_provider_error")
+        val model = JobDetailModel(5, client, JobArea.customer)
+        model.load()
+
+        assertEquals(JobDetailModel.CloseOutcome.Unconfirmed("We couldn't reach the payment provider."), model.close(0))
+        assertNull(model.toast)
+        // It looked before it spoke.
+        assertEquals("GET api/customer/jobs/5", client.sent.last())
+    }
+
+    @Test fun aNonPaymentConflictKeepsTheServersMessage() = runTest {
+        val client = jobClient()
+        client.errors["api/customer/jobs/5/close"] = HttpApiClient.errorFor(409, null, """{"message":"This job has an open dispute — support will be in touch."}""".toByteArray())
+        val model = JobDetailModel(5, client, JobArea.customer)
+        model.load()
+
+        assertEquals(JobDetailModel.CloseOutcome.Failed, model.close(0))
+        assertEquals("This job has an open dispute — support will be in touch.", model.toast)
+    }
+
+    @Test fun theInvoiceScreenLooksBeforeReportingATimeout() = runTest {
+        val client = PreviewApiClient(mapOf("api/billing/setup-intent" to billing, "api/customer/invoices/1" to InvoiceResponse(Fixtures.invoice())))
+        client.errors["api/customer/invoices/1/pay"] = ApiError.Transport("timeout")
+        val unpaid = PayInvoiceModel(Fixtures.invoice(), client)
+        assertNull(unpaid.pay())
+        assertEquals(ApiError.UNCONFIRMED_PAYMENT, unpaid.error)
+        assertNull(unpaid.paid)
+
+        client.responses["api/customer/invoices/1"] = InvoiceResponse(Fixtures.invoice().copy(paidAt = java.time.Instant.EPOCH))
+        val settled = PayInvoiceModel(Fixtures.invoice(), client)
+        assertTrue(settled.pay()!!.isPaid)
+        assertTrue(settled.paid!!.isPaid)
+        assertNull(settled.error)
     }
 }

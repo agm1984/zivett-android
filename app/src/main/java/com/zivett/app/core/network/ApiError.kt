@@ -28,8 +28,9 @@ sealed class ApiError : RuntimeException() {
     /// 429 — throttled. `retryAfter` is seconds when the server said so.
     data class RateLimited(val retryAfter: Int?) : ApiError()
 
-    /// Any other non-2xx.
-    data class Server(val status: Int, val detail: String?) : ApiError()
+    /// Any other non-2xx. `code` is the body's machine-readable reason
+    /// when it has one (503 `payment_provider_error`).
+    data class Server(val status: Int, val detail: String?, val code: String? = null) : ApiError()
 
     /// The request never produced a response (offline, DNS, timeout).
     data class Transport(val detail: String) : ApiError()
@@ -60,6 +61,19 @@ sealed class ApiError : RuntimeException() {
     val paymentDeclinedMessage: String?
         get() = (this as? Validation)?.errors?.takeIf { it.code == "payment_declined" }?.message
 
+    /// Non-null when a PAY call ended without telling us whether the card
+    /// was charged: no response at all, a 5xx, a 2xx we couldn't read, or
+    /// the server's own 503 `payment_provider_error` ("couldn't reach the
+    /// payment provider" — its message wins). Pay surfaces must reload the
+    /// job/invoice before saying anything, and must never word this as
+    /// "nothing was charged". Retrying is safe: the server is idempotent.
+    val unconfirmedPaymentMessage: String?
+        get() = when {
+            this is Server && code == "payment_provider_error" -> detail ?: UNCONFIRMED_PAYMENT
+            this is Transport || this is Decoding || (this is Server && status >= 500) -> UNCONFIRMED_PAYMENT
+            else -> null
+        }
+
     /// The bank wants to authenticate a pay-time charge: 409
     /// `{ code: "payment_action_required", client_secret, payment_method_id }`.
     /// Null for every other conflict, so callers can fall through to the
@@ -72,6 +86,10 @@ sealed class ApiError : RuntimeException() {
     /// The first message for a field, if this is a validation failure —
     /// lets a form show inline errors with a one-liner.
     fun first(field: String): String? = (this as? Validation)?.errors?.first(field)
+
+    companion object {
+        const val UNCONFIRMED_PAYMENT = "We couldn't confirm that payment. If it went through it will show here shortly — otherwise it's safe to try again."
+    }
 }
 
 /// Laravel's 422 body: `{ message, errors: { field: [messages] } }` — or,
@@ -101,7 +119,7 @@ data class PaymentAction(val code: String? = null, val clientSecret: String? = n
 
 /// Laravel's generic error body (`abort(403, 'message')` and friends).
 @Serializable
-data class ServerMessage(val message: String? = null)
+data class ServerMessage(val message: String? = null, val code: String? = null)
 
 /// The error message a screen shows for any throwable: the API's human
 /// copy when it's ours, the platform's otherwise.
