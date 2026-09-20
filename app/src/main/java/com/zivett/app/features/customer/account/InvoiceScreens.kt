@@ -465,7 +465,7 @@ object InvoicePdf {
         canvas.drawLine(left, y - 10f, right, y - 10f, Paint().apply { color = AndroidColor.parseColor("#E3E1DA") })
         row("Service subtotal", invoice.totalCents, bold = true)
         val feeBps = invoice.customerFeeBps; val fee = invoice.customerFeeCents
-        if (feeBps != null && fee != null) row("Booking & support fee (${JobPresentation.percent(feeBps)})", fee)
+        if (feeBps != null && fee != null) row("${invoice.feeLabel} (${JobPresentation.percent(feeBps)})", fee)
         invoice.gstCents?.takeIf { invoice.gstBps != null }?.let { row("GST", it + (invoice.customerFeeGstCents ?: 0)) }
         invoice.pstCents?.takeIf { invoice.pstBps != null && it > 0 }?.let { row("PST", it) }
         invoice.tipCents?.takeIf { it > 0 }?.let { row("Tip", it) }

@@ -183,7 +183,7 @@ fun HeroInvoiceCard(invoice: Invoice, onPaid: suspend () -> Unit) {
             for (item in invoice.lineItems ?: emptyList()) HeroMoneyRow(item.label, item.amount)
             // Fee + GST ride above the total; pre-fee invoices skip the block entirely.
             if (invoice.customerFeeBps != null) {
-                invoice.customerFeeCents?.takeIf { it > 0 }?.let { HeroMoneyRow("Trust & support fee", it) }
+                invoice.customerFeeCents?.takeIf { it > 0 }?.let { HeroMoneyRow(invoice.feeLabel, it) }
                 val gst = (invoice.gstCents ?: 0) + (invoice.customerFeeGstCents ?: 0)
                 if (gst > 0) HeroMoneyRow(invoice.gstBps?.let { "GST (${it / 100.0}%)" } ?: "GST", gst)
                 invoice.pstCents?.takeIf { it > 0 }?.let { HeroMoneyRow(invoice.pstBps?.let { b -> "PST (${b / 100.0}%)" } ?: "PST", it) }

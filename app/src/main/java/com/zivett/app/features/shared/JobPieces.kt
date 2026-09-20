@@ -177,7 +177,7 @@ fun InvoiceBreakdown(invoice: Invoice) {
         MoneyRow("Service subtotal", invoice.totalCents, strong = true)
         val feeBps = invoice.customerFeeBps
         val fee = invoice.customerFeeCents
-        if (feeBps != null && fee != null) MoneyRow("Booking & support fee (${JobPresentation.percent(feeBps)})", fee)
+        if (feeBps != null && fee != null) MoneyRow("${invoice.feeLabel} (${JobPresentation.percent(feeBps)})", fee)
         val gst = invoice.gstCents
         if (gst != null && invoice.gstBps != null) MoneyRow("GST", gst + (invoice.customerFeeGstCents ?: 0))
         val pst = invoice.pstCents

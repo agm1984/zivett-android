@@ -58,6 +58,14 @@ class AddressPartsTest {
         assertEquals("$0.00", Money.format(0))
     }
 
+    /// The booker-side fee was renamed; the invoice screen and PDF kept
+    /// printing "Booking & support fee". A label from the server wins.
+    @Test fun theBookerFeeIsNamedOnce() {
+        assertEquals("Trust & support fee", Fixtures.invoice().feeLabel)
+        assertEquals("Booking & support fee", Fixtures.invoice().copy(customerFeeLabel = "Booking & support fee").feeLabel)
+        assertEquals("Trust & support fee", Fixtures.invoice().copy(customerFeeLabel = " ").feeLabel)
+    }
+
     /// The decimal keyboard follows the phone's locale: "5,50" on a
     /// fr-CA device used to parse as nothing — a $0 tip.
     @Test fun typedAmountsAcceptEitherDecimalSeparator() {
