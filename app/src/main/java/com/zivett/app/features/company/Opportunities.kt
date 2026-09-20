@@ -113,7 +113,8 @@ class OpportunitiesModel(private val client: ApiClient) {
         } catch (_: Exception) { toast = "Could not decline ${job.code ?: "that job"}. Please try again." } finally { actingOnId = null }
     }
 
-    /// null = success (card removed); non-null = inline error for the composer.
+    /// null = the composer closes (sent, or the job is gone); non-null =
+    /// an inline error and the composer — with everything typed — stays.
     suspend fun submitQuote(job: Job, body: QuoteBody): String? {
         actingOnId = job.id
         try {
@@ -125,10 +126,17 @@ class OpportunitiesModel(private val client: ApiClient) {
             if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) {
                 return error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.first("message") ?: error.errors.message
             }
-            // 409 / bodyless 422: the job is gone — drop the card.
-            state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
-            toast = error.userMessage
-            return null
+            // Only a 409 (quotes closed / already quoted) or a 404 means
+            // the job is gone — drop the card. Everything else — offline,
+            // a 5xx, a 429, the bodyless 422s ("Set up payouts first", a
+            // feed cooldown, no rate for the trade) — used to drop it too,
+            // taking a quotable job and the drafted quote with it.
+            if (error is ApiError.Conflict || error is ApiError.NotFound) {
+                state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
+                toast = error.userMessage
+                return null
+            }
+            return error.userMessage
         } catch (error: Exception) {
             return error.userMessage
         } finally {
