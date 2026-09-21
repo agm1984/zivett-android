@@ -7,7 +7,6 @@ import com.zivett.app.core.Loadable
 import com.zivett.app.core.models.AcceptQuoteBody
 import com.zivett.app.core.models.AvailabilityWindow
 import com.zivett.app.core.models.ChangeOrder
-import com.zivett.app.core.models.CustomerEndpoints
 import com.zivett.app.core.models.Dispute
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobArea
@@ -19,6 +18,7 @@ import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.ChallengeOutcome
+import com.zivett.app.core.payments.billingCard
 import com.zivett.app.core.payments.PaymentChallenger
 import com.zivett.app.core.payments.StripeChallenger
 import com.zivett.app.core.reloaded
@@ -122,7 +122,7 @@ class JobDetailModel(
                 val action = error.paymentAction ?: throw error
                 // The in-app bank confirmation needs the publishable key;
                 // without one (billing fetch failed) explain instead.
-                val key = runCatching { client.send(CustomerEndpoints.billingContext()).publishableKey }.getOrNull()
+                val key = runCatching { client.billingCard().publishableKey }.getOrNull()
                 val challenger = challenger
                 if (key == null || challenger == null) throw ApiError.Server(409, ChallengeOutcome.UNAVAILABLE_COPY)
                 when (val outcome = challenger.confirm(key, action)) {

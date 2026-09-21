@@ -37,15 +37,15 @@ class PaymentCardTest {
         BillingContext(driver = driver, publishableKey = "pk_test_x", clientSecret = secret, savedCard = if (saved) BillingContext.SavedCard("visa", "4242") else null)
 
     @Test fun aSavedCardOrTheSimulatedDriverCanCharge() = runTest {
-        val saved = PaymentCardModel(PreviewApiClient(mapOf("api/billing/setup-intent" to context(saved = true))))
+        val saved = PaymentCardModel(PreviewApiClient(mapOf("api/billing/card" to context(saved = true))))
         saved.load()
         assertTrue(saved.canCharge)
 
-        val none = PaymentCardModel(PreviewApiClient(mapOf("api/billing/setup-intent" to context(saved = false))))
+        val none = PaymentCardModel(PreviewApiClient(mapOf("api/billing/card" to context(saved = false))))
         none.load()
         assertFalse(none.canCharge)
 
-        val simulated = PaymentCardModel(PreviewApiClient(mapOf("api/billing/setup-intent" to BillingContext(driver = "simulated"))))
+        val simulated = PaymentCardModel(PreviewApiClient(mapOf("api/billing/card" to BillingContext(driver = "simulated"))))
         simulated.load()
         assertTrue(simulated.canCharge)
     }
@@ -54,7 +54,7 @@ class PaymentCardTest {
     /// invoice screen and the home hero. Only a LOADED "no card" blocks.
     @Test fun aFailedBillingFetchNeverBlocksPayAndCanBeRetried() = runTest {
         val client = PreviewApiClient()
-        client.errors["api/billing/setup-intent"] = ApiError.Transport("offline")
+        client.errors["api/billing/card"] = ApiError.Transport("offline")
         val invoice = PayInvoiceModel(Fixtures.invoice(), client)
         assertTrue(invoice.canPay) // still loading
         invoice.load()
@@ -62,7 +62,7 @@ class PaymentCardTest {
         assertTrue(invoice.canPay)
 
         client.errors.clear()
-        client.responses["api/billing/setup-intent"] = context(saved = false)
+        client.responses["api/billing/card"] = context(saved = false)
         invoice.card.retry()
         assertTrue(invoice.card.blocksPay)
         assertFalse(invoice.canPay)
@@ -83,6 +83,64 @@ class PaymentCardTest {
         assertEquals(4, JsonCoding.json.decodeFromString<BillingContext>("""{"saved_card":{"brand":"visa","last4":"4242","exp_month":4,"exp_year":2027}}""").savedCard!!.expMonth)
     }
 
+    /// Showing the card is a READ. The setup-intent POST used to double
+    /// as it, so every home / pay / accept load minted a Stripe
+    /// SetupIntent that nobody used.
+    @Test fun loadingTheCardNeverMintsASetupIntent() = runTest {
+        val client = PreviewApiClient(mapOf("api/billing/card" to context(saved = true, secret = null)))
+        val model = PaymentCardModel(client)
+        model.load()
+        model.retry()
+        PayInvoiceModel(Fixtures.invoice(), client).load()
+
+        assertTrue(model.canCharge)
+        assertEquals(List(3) { "GET api/billing/card" }, client.sent)
+    }
+
+    /// ...and the POST happens exactly when the card form is about to
+    /// open — a fresh intent per attempt.
+    @Test fun openingTheCardFormIsWhatMintsTheSetupIntent() = runTest {
+        val client = PreviewApiClient(mapOf("api/billing/card" to context(saved = true, secret = null), "api/billing/setup-intent" to context(saved = true, secret = null)))
+        val model = PaymentCardModel(client)
+        model.load()
+        model.changeCard()
+        model.changeCard()
+
+        assertEquals(listOf("GET api/billing/card", "POST api/billing/setup-intent", "POST api/billing/setup-intent"), client.sent)
+    }
+
+    /// A server from before `GET /api/billing/card` answers 404 (or 405 —
+    /// the path exists for POST): fall back to the old read.
+    @Test fun anOlderServerStillGetsItsCardRead() = runTest {
+        for (missing in listOf(ApiError.NotFound, ApiError.Server(405, "Method Not Allowed"))) {
+            val client = PreviewApiClient(mapOf("api/billing/setup-intent" to context(saved = true)))
+            client.errors["api/billing/card"] = missing
+            val model = PaymentCardModel(client)
+            model.load()
+
+            assertTrue(model.canCharge)
+            assertEquals(listOf("GET api/billing/card", "POST api/billing/setup-intent"), client.sent)
+        }
+
+        // Any other failure is a failure — no quiet minting behind it.
+        val client = PreviewApiClient(mapOf("api/billing/setup-intent" to context(saved = true)))
+        client.errors["api/billing/card"] = ApiError.Transport("offline")
+        val model = PaymentCardModel(client)
+        model.load()
+        assertTrue(model.billing is Loadable.Failed)
+        assertEquals(listOf("GET api/billing/card"), client.sent)
+    }
+
+    /// The server's `expired` (marketplace clock) beats the phone's guess.
+    @Test fun theServersExpiredVerdictWins() {
+        val card = BillingContext.SavedCard("visa", "4242", expMonth = 4, expYear = 2027)
+        assertTrue(card.copy(expired = true).isExpired(YearMonth.of(2027, 1)))
+        assertFalse(card.copy(expired = false).isExpired(YearMonth.of(2030, 1)))
+        assertTrue(JsonCoding.json.decodeFromString<BillingContext>("""{"driver":"stripe","publishable_key":"pk_test_x","saved_card":{"brand":"visa","last4":"4242","exp_month":4,"exp_year":2027,"expired":true}}""").savedCard!!.isExpired(YearMonth.of(2027, 1)))
+        // A non-stripe driver sends `driver` alone.
+        assertTrue(JsonCoding.json.decodeFromString<BillingContext>("""{"driver":"simulated"}""").canChargeWithoutCardForm)
+    }
+
     @Test fun changingACardWithoutASetupIntentExplainsItself() = runTest {
         val client = PreviewApiClient(mapOf("api/billing/setup-intent" to context(saved = true, secret = null)))
         val model = PaymentCardModel(client)
@@ -91,7 +149,7 @@ class PaymentCardTest {
 
         assertTrue(model.error!!.contains("isn't available"))
         assertFalse(model.changing)
-        // It asked for a FRESH context (secrets are single-use) and never
+        // It minted a FRESH intent (secrets are single-use) and never
         // tried to save a card it didn't collect.
         assertEquals(listOf("POST api/billing/setup-intent"), client.sent)
     }

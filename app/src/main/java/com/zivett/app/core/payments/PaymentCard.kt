@@ -46,8 +46,9 @@ import kotlinx.coroutines.launch
 /// different card" — there was nowhere to do it: the booker was stuck
 /// with a dead card until the 48-hour auto-close failed on it too.
 ///
-/// Saving goes PaymentSheet (setup mode, on the billing context's
-/// SetupIntent) → `POST /api/billing/card`, which also re-pins the new
+/// Showing the card is a plain read (`GET /api/billing/card`). Saving
+/// goes `POST /api/billing/setup-intent` (minted per attempt, at the tap)
+/// → PaymentSheet in setup mode → `POST /api/billing/card`, which also re-pins the new
 /// card on the booker's live holds, so the very next attempt uses it.
 class PaymentCardModel(private val client: ApiClient, private val context: Context? = null) {
     var billing by mutableStateOf<Loadable<BillingContext>>(Loadable.Loading)
@@ -67,7 +68,8 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
     /// `canCharge`, so one dropped request disabled Pay with no way back.)
     val blocksPay: Boolean get() = billing.value?.let { !it.canChargeWithoutCardForm } ?: false
 
-    suspend fun load() { billing = billing.reloaded { client.send(CustomerEndpoints.billingContext()) } }
+    /// A READ — never mints a SetupIntent (that's `changeCard`'s job).
+    suspend fun load() { billing = billing.reloaded { client.billingCard() } }
 
     /// From the failed state: back to the spinner, then try again.
     suspend fun retry() { billing = Loadable.Loading; load() }
@@ -79,12 +81,12 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
         if (changing) return false
         changing = true; error = null
         try {
-            // Each SetupIntent secret is single-use: always start from a
-            // fresh context, never the one the screen loaded with.
-            load()
-            val fresh = billing.value
-            val secret = fresh?.clientSecret
-            val key = fresh?.publishableKey
+            // The one moment a SetupIntent is minted: the card form is
+            // about to open. Each secret is single-use, so every attempt
+            // gets its own.
+            val fresh = client.send(CustomerEndpoints.cardSetupIntent())
+            val secret = fresh.clientSecret
+            val key = fresh.publishableKey
             val androidContext = context
             if (secret == null || key == null || androidContext == null) {
                 error = "Card setup isn't available right now — try again in a moment."
@@ -107,6 +109,16 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
         }
         return false
     }
+}
+
+/// The payment context for DISPLAY — driver, publishable key, saved card
+/// — without touching Stripe. A server from before `GET /api/billing/card`
+/// answers 404/405; only then fall back to the setup-intent POST that
+/// used to double as the read.
+suspend fun ApiClient.billingCard(): BillingContext = try {
+    send(CustomerEndpoints.billingCard())
+} catch (error: ApiError) {
+    if (error is ApiError.NotFound || (error is ApiError.Server && error.status == 405)) send(CustomerEndpoints.cardSetupIntent()) else throw error
 }
 
 /// The card row every pay surface embeds. `declined` is the bank's

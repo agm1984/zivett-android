@@ -155,7 +155,9 @@ Use a job code the signed-in account can actually see.
 
 `core/payments/StripeBridge.kt` is the only file that touches the Stripe
 SDK. The publishable key arrives at runtime in the billing payload, so
-there is nothing to configure in the app. Two jobs: PaymentSheet in setup
+there is nothing to configure in the app. Showing the saved card is a
+plain `GET /api/billing/card`; `POST /api/billing/setup-intent` is only
+called at the moment a card form opens. Two jobs: PaymentSheet in setup
 mode confirms the SetupIntent when a card is saved, and `PaymentLauncher`
 re-confirms the charge on-session (the 3DS challenge) when pay/close
 comes back 409 with a `client_secret` + `payment_method_id`. Test cards:

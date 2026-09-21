@@ -91,7 +91,15 @@ object CustomerEndpoints {
     fun notifications() = ApiRequest.get<NotificationFeed>("api/notifications")
     fun markRead(id: String) = ApiRequest.post<UnreadCount>("api/notifications/$id/read")
     fun markAllRead() = ApiRequest.post<UnreadCount>("api/notifications/read-all")
-    fun billingContext() = ApiRequest.post<BillingContext>("api/billing/setup-intent")
+    /// READ the payment context — driver, publishable key, saved card.
+    /// No Stripe call behind it: this is what every pay surface loads to
+    /// show the card and decide whether Pay can go straight through. Go
+    /// through `ApiClient.billingCard()`, which tolerates an older server.
+    fun billingCard() = ApiRequest.get<BillingContext>("api/billing/card")
+    /// The same context PLUS a freshly minted SetupIntent `client_secret`.
+    /// ONLY when a card form is about to open — it used to be the read as
+    /// well, so every home/pay/accept load minted an intent nobody used.
+    fun cardSetupIntent() = ApiRequest.post<BillingContext>("api/billing/setup-intent")
     /// Save a confirmed SetupIntent's card as the booker's payment
     /// method outside quote acceptance (the invoice-pay path).
     fun saveCard(setupIntentId: String) = ApiRequest.post<SavedCardResponse, Map<String, String>>("api/billing/card", mapOf("stripe_setup_intent_id" to setupIntentId))
@@ -204,7 +212,8 @@ data class CouponPreviewResponse(val matches: List<Match> = emptyList()) {
 @Serializable
 data class SavedCardResponse(val savedCard: BillingContext.SavedCard? = null)
 
-/// `POST /api/billing/setup-intent`.
+/// `GET /api/billing/card` (no `client_secret`; a non-stripe driver sends
+/// `driver` alone) and `POST /api/billing/setup-intent` (with one).
 @Serializable
 data class BillingContext(
     val driver: String = "simulated",
@@ -215,7 +224,14 @@ data class BillingContext(
     /// `exp_month` / `exp_year` are null for cards saved before the
     /// server started sending them — every reader is null-safe.
     @Serializable
-    data class SavedCard(val brand: String? = null, val last4: String? = null, val expMonth: Int? = null, val expYear: Int? = null) {
+    data class SavedCard(
+        val brand: String? = null,
+        val last4: String? = null,
+        val expMonth: Int? = null,
+        val expYear: Int? = null,
+        /// The server's verdict on the marketplace clock; absent on older servers.
+        val expired: Boolean? = null,
+    ) {
         /// "Visa •••• 4242"
         val label: String get() = "${(brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${last4 ?: ""}"
 
@@ -227,8 +243,11 @@ data class BillingContext(
                 return "exp %02d/%02d".format(month, year % 100)
             }
 
-        /// A card is good THROUGH its expiry month. Unknown = not expired.
+        /// The server's `expired` wins when it sent one. Otherwise worked
+        /// out here: a card is good THROUGH its expiry month, and an
+        /// unknown expiry is not expired.
         fun isExpired(today: java.time.YearMonth = java.time.YearMonth.now()): Boolean {
+            expired?.let { return it }
             val month = expMonth?.takeIf { it in 1..12 } ?: return false
             val year = expYear ?: return false
             return java.time.YearMonth.of(year, month).isBefore(today)

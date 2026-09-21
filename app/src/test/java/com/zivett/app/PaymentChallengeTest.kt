@@ -31,7 +31,7 @@ class PaymentChallengeTest {
 
     private fun jobClient() = PreviewApiClient(mapOf(
         "api/customer/jobs/5" to JobResponse(Fixtures.job(id = 5, status = JobStatus.INVOICED)),
-        "api/billing/setup-intent" to billing,
+        "api/billing/card" to billing,
     )).also { it.errors["api/customer/jobs/5/close"] = actionRequired() }
 
     @Test fun theConflictCarriesThePaymentMethodToConfirmWith() {
@@ -45,11 +45,16 @@ class PaymentChallengeTest {
 
     @Test fun theChallengeIsRunWithTheServersPaymentMethod() = runTest {
         var seen: PaymentAction? = null
-        val model = JobDetailModel(5, jobClient(), JobArea.customer, challenger = PaymentChallenger { _, action -> seen = action; ChallengeOutcome.Canceled })
+        val client = jobClient()
+        val model = JobDetailModel(5, client, JobArea.customer, challenger = PaymentChallenger { _, action -> seen = action; ChallengeOutcome.Canceled })
         model.load()
 
         assertEquals(JobDetailModel.CloseOutcome.Failed, model.close(0))
         assertEquals("pm_3", seen?.paymentMethodId)
+        // The publishable key came from the READ — a bank challenge is no
+        // reason to mint a SetupIntent.
+        assertFalse(client.sent.contains("POST api/billing/setup-intent"))
+        assertTrue(client.sent.contains("GET api/billing/card"))
         assertEquals(ChallengeOutcome.CANCELED_COPY, model.toast)
     }
 
@@ -75,7 +80,7 @@ class PaymentChallengeTest {
 
     @Test fun theInvoiceScreenTellsTheOutcomesApartToo() = runTest {
         suspend fun payWith(outcome: ChallengeOutcome): PayInvoiceModel {
-            val client = PreviewApiClient(mapOf("api/billing/setup-intent" to billing))
+            val client = PreviewApiClient(mapOf("api/billing/card" to billing))
             client.errors["api/customer/invoices/1/pay"] = actionRequired()
             val model = PayInvoiceModel(Fixtures.invoice(), client, challenger = PaymentChallenger { _, _ -> outcome })
             model.load()
@@ -137,7 +142,7 @@ class PaymentChallengeTest {
     }
 
     @Test fun theInvoiceScreenLooksBeforeReportingATimeout() = runTest {
-        val client = PreviewApiClient(mapOf("api/billing/setup-intent" to billing, "api/customer/invoices/1" to InvoiceResponse(Fixtures.invoice())))
+        val client = PreviewApiClient(mapOf("api/billing/card" to billing, "api/customer/invoices/1" to InvoiceResponse(Fixtures.invoice())))
         client.errors["api/customer/invoices/1/pay"] = ApiError.Transport("timeout")
         val unpaid = PayInvoiceModel(Fixtures.invoice(), client)
         assertNull(unpaid.pay())

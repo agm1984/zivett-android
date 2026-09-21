@@ -36,6 +36,7 @@ import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.StripeBridge
 import com.zivett.app.core.payments.PaymentCardSection
 import com.zivett.app.core.payments.SavedCardLine
+import com.zivett.app.core.payments.billingCard
 import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
@@ -90,18 +91,24 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
     // to a made-up simulated context — on a real Stripe backend that read
     // "Test payments (simulated)" with Confirm enabled, and the accept
     // then 422'd for want of a card.
-    suspend fun loadBilling() { billing = billing.reloaded { environment.client.send(CustomerEndpoints.billingContext()) } }
+    // A READ: opening the sheet with a card on file mints nothing.
+    suspend fun loadBilling() { billing = billing.reloaded { environment.client.billingCard() } }
     LaunchedEffect(Unit) { model.acceptError = null; loadBilling() }
 
     val stripe = billing.value?.driver == "stripe"
     val canConfirm = !model.busy && ((billing.value?.canChargeWithoutCardForm ?: false) || setupIntentId != null)
 
-    fun collectCard(billingContext: BillingContext) {
-        val key = billingContext.publishableKey; val secret = billingContext.clientSecret
-        if (key == null || secret == null) { cardError = "Card setup isn't available right now — try again in a moment."; return }
+    // The SetupIntent is minted HERE, when the booker actually needs the
+    // card form (no card on file, or they chose a different one) — one
+    // per attempt, never on sheet open.
+    fun collectCard() {
+        if (collectingCard) return
         collectingCard = true; cardError = null
         scope.launch {
             try {
+                val fresh = environment.client.send(CustomerEndpoints.cardSetupIntent())
+                val key = fresh.publishableKey; val secret = fresh.clientSecret
+                if (key == null || secret == null) { cardError = "Card setup isn't available right now — try again in a moment."; return@launch }
                 StripeBridge.configure(context, key)
                 setupIntentId = StripeBridge.collectCard(secret)
             } catch (error: Exception) { cardError = error.userMessage } finally { collectingCard = false }
@@ -199,7 +206,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                                     if (card.isExpired()) {
                                         ZCaption("This card has expired — add a different one so closing the job goes through.", color = colors.danger)
                                         cardError?.let { ZCaption(it, color = colors.danger) }
-                                        ZButton("Use a different card", style = ZButtonStyle.OUTLINE, compact = true, loading = collectingCard, fullWidth = false) { collectCard(state.loaded) }
+                                        ZButton("Use a different card", style = ZButtonStyle.OUTLINE, compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
                                     }
                                 }
                                 else -> {
@@ -207,7 +214,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                                     ZCaption("Nothing is charged now — the card is only billed when the job is done and you close it.")
                                     if (state.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode — use card 4242 4242 4242 4242 with any future expiry and CVC.", tone = ZTextTone.FAINT)
                                     cardError?.let { ZCaption(it, color = colors.danger) }
-                                    ZButton("Add a card", compact = true, loading = collectingCard, fullWidth = false) { collectCard(state.loaded) }
+                                    ZButton("Add a card", compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
                                 }
                             }
                         }

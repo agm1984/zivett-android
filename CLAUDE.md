@@ -77,9 +77,16 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   Retry) never does, because the server is the real gate. There is no
   The card itself always renders through `SavedCardLine` (brand ••••
   last4, "exp MM/YY", a danger EXPIRED badge + a promoted "Use a
-  different card"); `saved_card.exp_month/exp_year` are nullable. No
-  read-only saved-card endpoint: every `load()` is
-  `POST /api/billing/setup-intent` and mints a SetupIntent.
+  different card"); `saved_card.exp_month/exp_year` are nullable, and
+  the server's `saved_card.expired` wins over the local month maths
+  when present.
+- **Reading the card never mints a SetupIntent.** Display / `canCharge`
+  / the 3DS publishable key all go through `ApiClient.billingCard()` →
+  `GET /api/billing/card` (no Stripe call; falls back to the POST only
+  when an older server 404/405s). `POST /api/billing/setup-intent`
+  (`CustomerEndpoints.cardSetupIntent()`) is called ONLY when a card
+  form is about to open — `PaymentCardModel.changeCard` and the accept
+  sheet's `collectCard()` — one fresh intent per attempt.
 
 - **Money calls are never abandoned.** `JobDetailModel.close` /
   `acceptQuote` / `cancel` and `PayInvoiceModel.pay` run
