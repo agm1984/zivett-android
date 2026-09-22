@@ -33,7 +33,7 @@ data class Property(
 data class BusinessSetup(val status: String, val setupCompletedAt: Instant? = null, val steps: Steps) {
     @Serializable
     // The server's `plan` step is deliberately NOT modelled: the mobile
-    // wizard has no plan step (store policy — see MembershipScreen).
+    // wizard has no plan step (store policy — see PARITY.md).
     data class Steps(val profile: Profile, val properties: Properties) {
         @Serializable data class Profile(val complete: Boolean = false, val missing: List<String>? = null)
         @Serializable data class Properties(val complete: Boolean = false, val count: Int? = null)
@@ -139,10 +139,8 @@ object BusinessEndpoints {
     fun updateOrganization(body: Map<String, String?>) = ApiRequest.json<BusinessOrganizationResponse, Map<String, String?>>(Method.PATCH, "api/business/organization", body, coder = JsonCoding.explicitNulls)
     fun completeSetup() = ApiRequest.post<BusinessOrganizationResponse>("api/business/organization/setup/complete")
 
-    // The business membership — the same contract machine (and response
-    // shape) as the company tiers, business shelf.
-    // Read-only in the app, like CompanyEndpoints.subscription().
-    fun subscription() = ApiRequest.get<SubscriptionResponse>("api/business/subscription")
+    // No membership endpoints, reads included — see the note in
+    // CompanyEndpoints.
 
     fun properties() = ApiRequest.get<PropertiesResponse>("api/business/properties")
     fun createProperty(body: PropertyBody) = ApiRequest.post<PropertyResponse, PropertyBody>("api/business/properties", body)

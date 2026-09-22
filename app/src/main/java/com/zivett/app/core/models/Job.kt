@@ -74,6 +74,10 @@ data class JobCategory(
 data class CompanySummary(
     val id: Int? = null,
     val name: String,
+    /// 'pro' | 'elite' | null. DECODED BUT NEVER RENDERED in the app — the
+    /// PRO/ELITE chips and "ZiVETT Elite professional" lines were pulled
+    /// 2026-09-21 so nothing plan-shaped is on screen for store review
+    /// (see PARITY.md "plan chips"). The web keeps them.
     val plan: String? = null,
     val rating: Double? = null,
     val count: Int? = null,

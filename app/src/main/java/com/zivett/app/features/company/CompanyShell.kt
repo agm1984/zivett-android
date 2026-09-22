@@ -13,7 +13,6 @@ import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.HourglassEmpty
@@ -59,7 +58,6 @@ import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.PassportRoute
 import com.zivett.app.app.PayoutsRoute
 import com.zivett.app.app.ProfileRoute
-import com.zivett.app.app.MembershipRoute
 import com.zivett.app.app.TeamRoute
 import com.zivett.app.core.models.NotificationArea
 import com.zivett.app.core.models.OrganizationRole
@@ -169,7 +167,7 @@ private fun BellScreen(title: String, onBack: (() -> Unit)? = null, content: @Co
 }
 
 /// Everything behind "More": calendar, invoices, payouts, passport,
-/// profile, membership (read-only), team, account.
+/// profile, team, account.
 @Composable
 fun CompanyMoreScreen() {
     val environment = LocalAppEnvironment.current
@@ -199,8 +197,6 @@ fun CompanyMoreScreen() {
                 AccountLink("Business profile", "What customers see", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.COMPANY)) }
                 // Org-admin concerns — members don't get the rows (UX only; the server enforces).
                 if (isAdmin) {
-                    ZDivider(Modifier.padding(start = 60.dp))
-                    AccountLink("Membership", "Your current plan and term", Icons.Outlined.Star) { nav.navigate(MembershipRoute(Areas.COMPANY)) }
                     ZDivider(Modifier.padding(start = 60.dp))
                     AccountLink("Team", "Invite and manage teammates", Icons.Outlined.Group) { nav.navigate(TeamRoute(Areas.COMPANY)) }
                 }

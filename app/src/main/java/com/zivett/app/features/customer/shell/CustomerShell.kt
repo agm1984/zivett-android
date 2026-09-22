@@ -32,13 +32,11 @@ import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.PayInvoiceRoute
 import com.zivett.app.app.ProfileRoute
 import com.zivett.app.app.ReferralRoute
-import com.zivett.app.app.MembershipRoute
 import com.zivett.app.app.TeamRoute
 import com.zivett.app.app.WarrantiesRoute
 import com.zivett.app.core.models.NotificationArea
 import com.zivett.app.features.business.OrganizationFormScreen
 import com.zivett.app.features.business.TeamScreen
-import com.zivett.app.features.company.MembershipScreen
 import com.zivett.app.features.customer.account.AccountHomeScreen
 import com.zivett.app.features.customer.account.AddressesScreen
 import com.zivett.app.features.customer.account.InvoiceDetailScreen
@@ -123,7 +121,6 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     composable<AddressesRoute> { AddressesScreen { nav.popBackStack() } }
     composable<ReferralRoute> { ReferralScreen { nav.popBackStack() } }
     composable<TeamRoute> { entry -> TeamScreen(Areas.teamArea(entry.toRoute<TeamRoute>().area)) { nav.popBackStack() } }
-    composable<MembershipRoute> { entry -> MembershipScreen(entry.toRoute<MembershipRoute>().area) { nav.popBackStack() } }
     composable<OrgProfileRoute> { entry -> OrganizationFormScreen(entry.toRoute<OrgProfileRoute>().area) { nav.popBackStack() } }
     composable<BookRoute> { entry ->
         val route = entry.toRoute<BookRoute>()

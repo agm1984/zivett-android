@@ -166,12 +166,12 @@ fun OpportunitiesScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Opportunities")
                     feed.cooldownUntil?.let { ZBanner("Your feed is paused after recent withdrawals. New opportunities reopen ${Dates.shortTime(it)}. Withdrawals also lower your ranking — completed jobs repair it.", tone = ZTone.DANGER) }
-                    // No tier ships capped today, so this never renders — and if one
-                    // ever does, it states the fact only: no "upgrade" nudge and no
-                    // link (the app never steers toward a plan).
+                    // Nothing ships capped today, so this never renders — and if a cap
+                    // ever does, it states the fact only: the app never mentions
+                    // memberships (see PARITY.md, App Store 3.1.1 / Play payments).
                     feed.leads.limit?.let { limit ->
                         val remaining = feed.leads.remaining ?: 0
-                        ZBanner(if (remaining == 0) "You've used all $limit of your plan's leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
+                        ZBanner(if (remaining == 0) "You've used all $limit of your leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
                     }
                     if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
                     for (job in feed.opportunities) {
@@ -206,7 +206,8 @@ fun OpportunityCard(job: Job, commissionBps: Int, busy: Boolean, quote: () -> Un
                     ZFlowRow(spacing = 4.dp) {
                         val mode = JobPresentation.modeMeta(job.mode)
                         ZBadge(mode.label, mode.tone)
-                        // Business Premium's perk made visible: pinned to the top of the feed.
+                        // The feed pins some bookers' jobs first; the badge names the
+                        // ORDERING, never the plan behind it (PARITY.md "plan chips").
                         if (job.priority == true) ZPlanTag("PRIORITY")
                         CompanyPresentation.urgencyBadge(job.urgency)?.let { ZBadge(it.label, it.tone) }
                         if (job.bookerType == "business") ZBadge("Property manager", ZTone.INFO)

@@ -58,7 +58,6 @@ import com.zivett.app.design.ZLoadable
 import com.zivett.app.design.ZMono
 import com.zivett.app.design.ZMonoLarge
 import com.zivett.app.design.ZPhotoAvatar
-import com.zivett.app.design.ZPlanTag
 import com.zivett.app.design.ZRadius
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
@@ -266,7 +265,8 @@ private fun ProCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         ZBodyStrong(company.name)
-                        company.plan?.takeIf { it.isNotEmpty() }?.let { ZPlanTag(it) }
+                        // Plan chip pulled (PARITY.md "plan chips") — the web renders
+                        // `ZPlanTag(company.plan)` here.
                         Icon(Icons.Filled.Check, contentDescription = "Verified", tint = colors.brandGold, modifier = Modifier.padding(0.dp))
                     }
                     // The rating opens the actual reviews — a number nobody

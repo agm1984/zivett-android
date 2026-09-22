@@ -93,7 +93,8 @@ class JobPresentationTest {
     @Test fun pendingQuotesCarryTheCompanyName() {
         val quote = Quote(id = 1, amountCents = 1, status = QuoteStatus.PENDING, company = CompanySummary(id = 4, name = "Pro A", plan = "pro", rating = 4.8, count = 12))
         assertEquals("Pro A", JobPresentation.quoteCompanyName(quote))
-        assertEquals("ZiVETT Pro professional · ★ 4.8 (12 reviews)", JobPresentation.proLine(quote.company))
+        // Tier never shows, even for a Pro-plan company (PARITY.md "plan chips").
+        assertEquals("ZiVETT-verified professional · ★ 4.8 (12 reviews)", JobPresentation.proLine(quote.company))
         assertEquals("ZiVETT-verified professional · new to the platform", JobPresentation.proLine(CompanySummary(id = 1, name = "New", count = 0)))
     }
 

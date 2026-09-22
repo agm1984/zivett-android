@@ -92,7 +92,7 @@ class AddressPartsTest {
 
 class DecodingTest {
     @Test fun decodesTheUserWithLaravelDates() {
-        val json = """{"id":2,"first_name":"Amara","last_name":"Okafor","name":"Amara Okafor","email":"a@b.c","role":"company","organization_role":"admin","organization":{"id":1,"type":"company","name":"Ravensworth","approved_at":"2026-08-22T14:03:11.000000Z","plan_badge":"pro"},"email_verified_at":"2026-08-22","phone":null,"extra_key":true}"""
+        val json = """{"id":2,"first_name":"Amara","last_name":"Okafor","name":"Amara Okafor","email":"a@b.c","role":"company","organization_role":"admin","organization":{"id":1,"type":"company","name":"Ravensworth","approved_at":"2026-08-22T14:03:11.000000Z"},"email_verified_at":"2026-08-22","phone":null,"extra_key":true}"""
         val user = JsonCoding.json.decodeFromString<User>(json)
         assertEquals("Amara", user.firstName)
         assertTrue(user.organization!!.isApproved)
