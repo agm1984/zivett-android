@@ -34,14 +34,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Referral links (zivett://r/CODE) and the Stripe 3DS return (zivett://stripe-redirect). -->
+            <!-- Referral links (zivett://r/CODE) and the return from Stripe's
+                 Connect onboarding (zivett://stripe-return). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="zivett" />
             </intent-filter>
-            <!-- App Links: https://zivett.com/r/* and /invitations/* — verified
+            <!-- App Links: https://zivett.com/r/*, /invitations/* and
+                 /app/stripe-return (where Stripe's hosted Connect onboarding
+                 sends the browser when the link was asked for with
+                 return_to=app) — verified
                  against /.well-known/assetlinks.json once the signing cert
                  fingerprint is published (see README "Deep links"). -->
             <intent-filter android:autoVerify="true">
@@ -50,6 +54,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="zivett.com" android:pathPrefix="/r/" />
                 <data android:scheme="https" android:host="zivett.com" android:pathPrefix="/invitations/" />
+                <data android:scheme="https" android:host="zivett.com" android:path="/app/stripe-return" />
             </intent-filter>
         </activity>
 

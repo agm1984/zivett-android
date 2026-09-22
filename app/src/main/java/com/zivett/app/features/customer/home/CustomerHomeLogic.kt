@@ -125,12 +125,11 @@ object HomeHeroLogic {
     }
 
     /// The pro behind an option, in ZiVETT's voice (`HeroQuotes.vue`).
+    /// The web reads the tier off `company.plan` here ("ZiVETT Elite
+    /// professional"); the app says "ZiVETT-verified" for every tier —
+    /// plan chips were pulled for store review (PARITY.md "plan chips").
     fun proLine(quote: Quote): String {
-        val baseTier = when (quote.company?.plan) {
-            "elite" -> "ZiVETT Elite professional"
-            "pro" -> "ZiVETT Pro professional"
-            else -> "ZiVETT-verified professional"
-        }
+        val baseTier = "ZiVETT-verified professional"
         val name = quote.company?.name
         val tier = if (!name.isNullOrEmpty()) "$name · $baseTier" else baseTier
         val rating = quote.company?.rating

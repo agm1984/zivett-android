@@ -13,7 +13,6 @@ import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.HourglassEmpty
@@ -31,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.zivett.app.app.Areas
@@ -58,7 +58,6 @@ import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.PassportRoute
 import com.zivett.app.app.PayoutsRoute
 import com.zivett.app.app.ProfileRoute
-import com.zivett.app.app.MembershipRoute
 import com.zivett.app.app.TeamRoute
 import com.zivett.app.core.models.NotificationArea
 import com.zivett.app.core.models.OrganizationRole
@@ -121,7 +120,16 @@ fun CompanyShell(approved: Boolean) {
         )
     }
 
-    RoleShell(tabs, NotificationArea.COMPANY, onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) }) { nav ->
+    // Back from Stripe's onboarding: the dashboard owns the payout-status
+    // re-check (and its "Set up payouts" card), so land there.
+    val onStripeReturn: ((androidx.navigation.NavHostController) -> Unit)? = if (!approved) null else { nav ->
+        nav.navigate(CompanyDashboardTab) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = false }
+            launchSingleTop = true
+        }
+    }
+
+    RoleShell(tabs, NotificationArea.COMPANY, onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) }, onStripeReturn = onStripeReturn) { nav ->
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
         composable<CompanyQuotesTab> { BellScreen("Quotes") { CompanyQuotesScreen() } }
@@ -159,7 +167,7 @@ private fun BellScreen(title: String, onBack: (() -> Unit)? = null, content: @Co
 }
 
 /// Everything behind "More": calendar, invoices, payouts, passport,
-/// profile, membership (read-only), team, account.
+/// profile, team, account.
 @Composable
 fun CompanyMoreScreen() {
     val environment = LocalAppEnvironment.current
@@ -189,8 +197,6 @@ fun CompanyMoreScreen() {
                 AccountLink("Business profile", "What customers see", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.COMPANY)) }
                 // Org-admin concerns — members don't get the rows (UX only; the server enforces).
                 if (isAdmin) {
-                    ZDivider(Modifier.padding(start = 60.dp))
-                    AccountLink("Membership", "Your current plan and term", Icons.Outlined.Star) { nav.navigate(MembershipRoute(Areas.COMPANY)) }
                     ZDivider(Modifier.padding(start = 60.dp))
                     AccountLink("Team", "Invite and manage teammates", Icons.Outlined.Group) { nav.navigate(TeamRoute(Areas.COMPANY)) }
                 }

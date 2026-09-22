@@ -37,7 +37,7 @@ data class CompanySetup(
 
     @Serializable
     // The server's `plan` step is deliberately NOT modelled: the app
-    // never sells or nudges a plan (store policy — see MembershipScreen).
+    // never sells or nudges a plan (store policy — see PARITY.md).
     data class Steps(val profile: Step, val details: Step, val credentials: Step) {
         @Serializable
         data class Step(
@@ -197,30 +197,6 @@ data class CompanyDetails(
 @Serializable
 data class CompanyOrganizationResponse(val organization: OrganizationProfile, val setup: CompanySetup, val details: CompanyDetails? = null)
 
-/// `GET /api/{company|business}/subscription`, decoded only as far as
-/// REFLECTING the org's membership needs. Prices, features, the tier
-/// ladder, and billing history are deliberately not modelled: the app
-/// never sells a plan or shows what one costs (App Store 3.1.1 / Play
-/// payments policy — see MembershipScreen).
-@Serializable
-data class SubscriptionResponse(val plans: List<Plan> = emptyList(), val subscription: Current) {
-    @Serializable
-    data class Plan(val id: Int, val key: String, val name: String)
-
-    @Serializable
-    data class Current(
-        val planId: Int,
-        val planKey: String,
-        val interval: String,
-        val termStartedAt: Instant? = null,
-        val termEndsAt: Instant? = null,
-        val pending: Pending? = null,
-        val featured: Boolean? = null,
-    ) {
-        @Serializable data class Pending(val planId: Int? = null, val planName: String? = null, val interval: String? = null)
-    }
-}
-
 /// `GET /api/company/referral` (pro-to-pro — different stats keys from
 /// the customer referral).
 @Serializable
@@ -325,7 +301,11 @@ object CompanyEndpoints {
     fun invoices() = ApiRequest.get<InvoicesResponse>("api/company/invoices")
     fun invoice(id: Int) = ApiRequest.get<InvoiceResponse>("api/company/invoices/$id")
     fun payouts() = ApiRequest.get<PayoutsResponse>("api/company/payouts")
-    fun stripeOnboardingLink() = ApiRequest.post<StripeLink>("api/company/stripe/onboarding-link")
+    /// `return_to: "app"` — Stripe's hosted onboarding then returns the
+    /// browser to `/app/stripe-return`, which opens the app (App Link, or
+    /// the page's `zivett://stripe-return` button) instead of stranding
+    /// the pro on the web dashboard. Older servers ignore the key.
+    fun stripeOnboardingLink() = ApiRequest.post<StripeLink, Map<String, String>>("api/company/stripe/onboarding-link", mapOf("return_to" to "app"))
     fun refreshStripeStatus() = ApiRequest.post<PayoutsReady>("api/company/stripe/refresh-status")
 
     fun availability() = ApiRequest.get<AvailabilityResponse>("api/company/availability")
@@ -375,12 +355,13 @@ object CompanyEndpoints {
     }
     fun deleteLogo() = ApiRequest.delete<LogoResponse>("api/company/organization/logo")
 
-    /// Read-only. The plan-change and org-billing-card endpoints
-    /// (`POST /subscription`, `DELETE /subscription/pending`,
-    /// `/billing/setup-intent`, `/billing/card`) are WEB-ONLY on purpose:
-    /// selling a plan in the app means store billing or nothing, so the
-    /// app reflects the membership and never writes it.
-    fun subscription() = ApiRequest.get<SubscriptionResponse>("api/company/subscription")
+    // The `/subscription` and org `/billing/*` endpoints are deliberately
+    // NOT in the app client, reads included. App Review rejected the iOS
+    // plan shelf (3.1.1, 2026-09-15) and then the read-only Membership
+    // screen that replaced it (3.1.3(b), 2026-09-21: showing a plan
+    // bought elsewhere requires offering it through In-App Purchase);
+    // Android mirrors it. Memberships live on the web account only —
+    // see PARITY.md.
 
     fun referral() = ApiRequest.get<CompanyReferral>("api/company/referral")
     fun profile() = ApiRequest.get<CustomerProfile>("api/company/profile")

@@ -28,8 +28,9 @@ sealed class ApiError : RuntimeException() {
     /// 429 — throttled. `retryAfter` is seconds when the server said so.
     data class RateLimited(val retryAfter: Int?) : ApiError()
 
-    /// Any other non-2xx.
-    data class Server(val status: Int, val detail: String?) : ApiError()
+    /// Any other non-2xx. `code` is the body's machine-readable reason
+    /// when it has one (503 `payment_provider_error`).
+    data class Server(val status: Int, val detail: String?, val code: String? = null) : ApiError()
 
     /// The request never produced a response (offline, DNS, timeout).
     data class Transport(val detail: String) : ApiError()
@@ -53,16 +54,53 @@ sealed class ApiError : RuntimeException() {
 
     override val message: String get() = userMessage
 
+    /// The bank's message when this is a DECLINED charge — a 422 that
+    /// isn't a form problem (`{ message, code: "payment_declined" }`, no
+    /// `errors`). Pay surfaces react by keeping the screen open and
+    /// offering "Use a different card" instead of toasting and closing.
+    val paymentDeclinedMessage: String?
+        get() = (this as? Validation)?.errors?.takeIf { it.code == "payment_declined" }?.message
+
+    /// Non-null when a PAY call ended without telling us whether the card
+    /// was charged: no response at all, a 5xx, a 2xx we couldn't read, or
+    /// the server's own 503 `payment_provider_error` ("couldn't reach the
+    /// payment provider" — its message wins). Pay surfaces must reload the
+    /// job/invoice before saying anything, and must never word this as
+    /// "nothing was charged". Retrying is safe: the server is idempotent.
+    val unconfirmedPaymentMessage: String?
+        get() = when {
+            this is Server && code == "payment_provider_error" -> detail ?: UNCONFIRMED_PAYMENT
+            this is Transport || this is Decoding || (this is Server && status >= 500) -> UNCONFIRMED_PAYMENT
+            else -> null
+        }
+
+    /// The bank wants to authenticate a pay-time charge: 409
+    /// `{ code: "payment_action_required", client_secret, payment_method_id }`.
+    /// Null for every other conflict, so callers can fall through to the
+    /// server's own message.
+    val paymentAction: PaymentAction?
+        get() = (this as? Conflict)
+            ?.let { runCatching { JsonCoding.json.decodeFromString<PaymentAction>(it.body.decodeToString()) }.getOrNull() }
+            ?.takeIf { it.code == "payment_action_required" }
+
     /// The first message for a field, if this is a validation failure —
     /// lets a form show inline errors with a one-liner.
     fun first(field: String): String? = (this as? Validation)?.errors?.first(field)
+
+    companion object {
+        const val UNCONFIRMED_PAYMENT = "We couldn't confirm that payment. If it went through it will show here shortly — otherwise it's safe to try again."
+    }
 }
 
-/// Laravel's 422 body: `{ message, errors: { field: [messages] } }`.
+/// Laravel's 422 body: `{ message, errors: { field: [messages] } }` — or,
+/// for a domain refusal rather than a form problem, `{ message, code }`
+/// with no `errors` (a declined card is `payment_declined`). The `code`
+/// used to be dropped on decode, so no screen could tell the two apart.
 @Serializable
 data class ValidationErrors(
     val message: String,
     val errors: Map<String, List<String>> = emptyMap(),
+    val code: String? = null,
 ) {
     fun first(field: String): String? = errors[field]?.firstOrNull()
 
@@ -71,9 +109,17 @@ data class ValidationErrors(
         get() = errors.mapNotNull { (key, value) -> value.firstOrNull()?.let { key to it } }.toMap()
 }
 
+/// The 409 a pay/close call answers when the bank demands authentication.
+/// The server charges OFF-session, so the PaymentIntent sits in
+/// `requires_payment_method` — it has to be CONFIRMED again on-session
+/// with `paymentMethodId`, not just "next-actioned". An older server
+/// omits the id.
+@Serializable
+data class PaymentAction(val code: String? = null, val clientSecret: String? = null, val paymentMethodId: String? = null)
+
 /// Laravel's generic error body (`abort(403, 'message')` and friends).
 @Serializable
-data class ServerMessage(val message: String? = null)
+data class ServerMessage(val message: String? = null, val code: String? = null)
 
 /// The error message a screen shows for any throwable: the API's human
 /// copy when it's ours, the platform's otherwise.

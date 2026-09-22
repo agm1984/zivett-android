@@ -57,11 +57,42 @@ class AddressPartsTest {
         assertEquals("$1,234.50", Money.format(123_450))
         assertEquals("$0.00", Money.format(0))
     }
+
+    /// The booker-side fee was renamed; the invoice screen and PDF kept
+    /// printing "Booking & support fee". A label from the server wins.
+    @Test fun theBookerFeeIsNamedOnce() {
+        assertEquals("Trust & support fee", Fixtures.invoice().feeLabel)
+        assertEquals("Booking & support fee", Fixtures.invoice().copy(customerFeeLabel = "Booking & support fee").feeLabel)
+        assertEquals("Trust & support fee", Fixtures.invoice().copy(customerFeeLabel = " ").feeLabel)
+    }
+
+    /// The decimal keyboard follows the phone's locale: "5,50" on a
+    /// fr-CA device used to parse as nothing — a $0 tip.
+    @Test fun typedAmountsAcceptEitherDecimalSeparator() {
+        assertEquals(550, Money.parseCents("5,50"))
+        assertEquals(550, Money.parseCents("5.50"))
+        assertEquals(550, Money.parseCents("5,5"))
+        assertEquals(50, Money.parseCents(",5"))
+        assertEquals(2000, Money.parseCents("$20"))
+        assertEquals(100_000, Money.parseCents("1,000"))
+        assertEquals(123_450, Money.parseCents("1,234.50"))
+        assertEquals(123_450, Money.parseCents("1 234,50"))
+        assertEquals(123_450, Money.parseCents("1.234,50"))
+        assertEquals(556, Money.parseCents("5.555"))
+        assertEquals(null, Money.parseCents(""))
+        assertEquals(null, Money.parseCents("abc"))
+        assertEquals(null, Money.parseCents("1,2,3"))
+
+        assertEquals(550, Money.tipCents("5,50"))
+        assertEquals(0, Money.tipCents(""))
+        assertEquals(0, Money.tipCents("-5"))
+        assertEquals(100_000, Money.tipCents("5000"))
+    }
 }
 
 class DecodingTest {
     @Test fun decodesTheUserWithLaravelDates() {
-        val json = """{"id":2,"first_name":"Amara","last_name":"Okafor","name":"Amara Okafor","email":"a@b.c","role":"company","organization_role":"admin","organization":{"id":1,"type":"company","name":"Ravensworth","approved_at":"2026-08-22T14:03:11.000000Z","plan_badge":"pro"},"email_verified_at":"2026-08-22","phone":null,"extra_key":true}"""
+        val json = """{"id":2,"first_name":"Amara","last_name":"Okafor","name":"Amara Okafor","email":"a@b.c","role":"company","organization_role":"admin","organization":{"id":1,"type":"company","name":"Ravensworth","approved_at":"2026-08-22T14:03:11.000000Z"},"email_verified_at":"2026-08-22","phone":null,"extra_key":true}"""
         val user = JsonCoding.json.decodeFromString<User>(json)
         assertEquals("Amara", user.firstName)
         assertTrue(user.organization!!.isApproved)
@@ -118,6 +149,19 @@ class DecodingTest {
         assertEquals(1, resumed.draft!!.payload!!.form.serviceCategoryId)
         assertTrue(resumed.draft!!.payload!!.addressChoice!!.isNew)
         assertEquals(listOf("Faucet"), resumed.draft!!.payload!!.intakeAnswers!!["7"]!!.values)
+    }
+
+    /// A declined charge is a 422 WITHOUT an `errors` key, carrying a
+    /// `code`. The code used to be dropped on decode, so no screen could
+    /// tell a decline from a form problem.
+    @Test fun aDeclinedChargeKeepsItsCode() {
+        val declined = HttpApiClient.errorFor(422, null, """{"message":"Your card was declined.","code":"payment_declined"}""".toByteArray())
+        assertEquals("Your card was declined.", declined.paymentDeclinedMessage)
+        assertEquals("Your card was declined.", declined.userMessage)
+
+        val form = HttpApiClient.errorFor(422, null, """{"message":"x","errors":{"email":["Taken."]}}""".toByteArray())
+        assertEquals(null, form.paymentDeclinedMessage)
+        assertEquals("Taken.", form.first("email"))
     }
 
     @Test fun httpErrorsMapToTheirMeaning() {

@@ -11,7 +11,6 @@ import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -45,7 +44,6 @@ import com.zivett.app.app.NotificationsRoute
 import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.ProfileRoute
 import com.zivett.app.app.PropertiesRoute
-import com.zivett.app.app.MembershipRoute
 import com.zivett.app.app.TeamRoute
 import com.zivett.app.app.WarrantiesRoute
 import com.zivett.app.core.models.NotificationArea
@@ -56,7 +54,6 @@ import com.zivett.app.design.ZButtonStyle
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZDivider
-import com.zivett.app.design.ZPlanTag
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZTitle
@@ -137,11 +134,7 @@ fun BusinessAccountScreen() {
                 ZAvatar(user.initials, size = 56.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     ZTitle(user.name)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ZCaption(user.organization?.name ?: user.email)
-                        // The tier badge, same mark pros see.
-                        if (user.organization?.planBadge == "premium") ZPlanTag("PREMIUM")
-                    }
+                    ZCaption(user.organization?.name ?: user.email)
                 }
             }
             ZCard(padding = 0.dp) {
@@ -152,8 +145,6 @@ fun BusinessAccountScreen() {
                 if (user.organizationRole == OrganizationRole.ADMIN) {
                     ZDivider(Modifier.padding(start = 60.dp))
                     AccountLink("Team", "Invite and manage teammates", Icons.Outlined.Group) { nav.navigate(TeamRoute(Areas.BUSINESS)) }
-                    ZDivider(Modifier.padding(start = 60.dp))
-                    AccountLink("Membership", "Your current plan and term", Icons.Outlined.Star) { nav.navigate(MembershipRoute(Areas.BUSINESS)) }
                 }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Notifications", "Email and SMS preferences", Icons.Outlined.NotificationsActive) { nav.navigate(NotificationPrefsRoute(Areas.BUSINESS)) }

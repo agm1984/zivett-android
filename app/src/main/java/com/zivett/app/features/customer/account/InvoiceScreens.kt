@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.height
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Share
@@ -53,16 +55,18 @@ import com.zivett.app.core.Features
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.BillingContext
-import com.zivett.app.core.models.ConflictCode
 import com.zivett.app.core.models.CustomerEndpoints
 import com.zivett.app.core.models.Invoice
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.initialsOf
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
-import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.userMessage
-import com.zivett.app.core.payments.StripeBridge
+import com.zivett.app.core.payments.ChallengeOutcome
+import com.zivett.app.core.payments.PaymentCardModel
+import com.zivett.app.core.payments.PaymentCardSection
+import com.zivett.app.core.payments.PaymentChallenger
+import com.zivett.app.core.payments.StripeChallenger
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZAvatar
@@ -96,11 +100,12 @@ import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.math.BigDecimal
 
 @Composable
 fun InvoicesScreen(area: JobArea, onBack: () -> Unit) {
@@ -242,85 +247,89 @@ fun InvoiceDetailScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
 /// card on file — or add one right here (PaymentSheet on the billing
 /// context's SetupIntent → `POST /api/billing/card`), so a booker who
 /// never accepted a quote in the app isn't dead-ended.
-class PayInvoiceModel(val invoice: Invoice, private val client: ApiClient, private val area: JobArea = JobArea.customer, private val context: Context? = null) {
+class PayInvoiceModel(
+    val invoice: Invoice,
+    private val client: ApiClient,
+    private val area: JobArea = JobArea.customer,
+    private val context: Context? = null,
+    /// Runs the bank's confirmation on a 409 `payment_action_required`.
+    private val challenger: PaymentChallenger? = context?.let { StripeChallenger(it) },
+) {
     var couponCode by mutableStateOf("")
     var customTip by mutableStateOf("")
-    var billing by mutableStateOf<Loadable<BillingContext>>(Loadable.Loading)
     var paying by mutableStateOf(false)
-    var addingCard by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
+    /// The bank's message from a declined charge — the card section
+    /// leads with it and promotes "Use a different card".
+    var declined by mutableStateOf<String?>(null)
+    /// The card that will be charged, changeable on every pay surface.
+    val card = PaymentCardModel(client, context)
     var fieldErrors by mutableStateOf<Map<String, String>>(emptyMap())
+    /// The settled invoice — the screen swaps to its confirmation. It
+    /// used to navigate back without a word, which after a bank
+    /// challenge read as "did that work?".
+    var paid by mutableStateOf<Invoice?>(null)
 
     // One dollar input, strictly opt-in — no suggested amounts on
     // purpose: preset pills read as an expectation, and a tip isn't one
     // (mirrors the web's TipPicker). Clamped to the API's $1,000 ceiling.
-    val tipCents: Int
-        get() {
-            val dollars = customTip.toBigDecimalOrNull() ?: return 0
-            return minOf(100_000, maxOf(0, dollars.multiply(BigDecimal(100)).toInt()))
-        }
+    val tipCents: Int get() = Money.tipCents(customTip)
 
     val totalCents: Int get() = invoice.amountDueCents + tipCents
 
-    val canPay: Boolean get() = !paying && (billing.value?.canChargeWithoutCardForm ?: false) && tipCents <= 100_000
+    val canPay: Boolean get() = !paying && !card.blocksPay && tipCents <= 100_000
 
-    suspend fun load() { billing = billing.reloaded { client.send(CustomerEndpoints.billingContext()) } }
+    suspend fun load() { card.load() }
 
-    /// PaymentSheet on the billing context's SetupIntent, saved as the
-    /// booker's card — settle's charge then finds it (the server falls
-    /// back to the user's current card when no method was pinned).
-    suspend fun addCard() {
-        val context = context ?: return
-        val billingContext = billing.value ?: return
-        val secret = billingContext.clientSecret ?: return
-        val key = billingContext.publishableKey ?: return
-        if (addingCard) return
-        addingCard = true; error = null
-        try {
-            StripeBridge.configure(context, key)
-            val setupIntentId = StripeBridge.collectCard(secret) ?: return
-            client.send(CustomerEndpoints.saveCard(setupIntentId))
-            // Reload for the saved-card summary AND a fresh SetupIntent (each secret is single-use).
-            load()
-        } catch (apiError: ApiError) {
-            error = apiError.userMessage
-            load()
-        } catch (e: Exception) {
-            error = e.userMessage
-        } finally {
-            addingCard = false
-        }
-    }
-
+    /// NonCancellable: leaving the screen mid-charge used to cancel the
+    /// request and surface a failure about a card that may have been
+    /// charged. (`paying` doubles as the re-entrancy guard via `canPay`.)
     suspend fun pay(): Invoice? {
         if (!canPay) return null
-        paying = true; error = null; fieldErrors = emptyMap()
+        paying = true; error = null; declined = null; fieldErrors = emptyMap()
+        return withContext(NonCancellable) { payNow() }?.also { paid = it }
+    }
+
+    private suspend fun payNow(): Invoice? {
         try {
             return client.send(area.payInvoice(invoice.id, couponCode.ifEmpty { null }?.uppercase(), tipCents)).invoice
         } catch (apiError: ApiError) {
-            // 3DS challenge: run it in-app, then poll — the
+            // Bank confirmation: run it in-app, then poll — the
             // payment_intent.succeeded webhook settles asynchronously.
-            val conflict = (apiError as? ApiError.Conflict)?.let { runCatching { JsonCoding.json.decodeFromString<ConflictCode>(it.body.decodeToString()) }.getOrNull() }
-            if (conflict?.code == "payment_action_required") {
-                val secret = conflict.clientSecret
-                val key = billing.value?.publishableKey
-                val context = context
-                if (secret != null && key != null && context != null) {
-                    StripeBridge.configure(context, key)
-                    if (StripeBridge.handleNextAction(secret)) {
-                        pollUntilPaid()?.let { return it }
-                        error = "Payment confirmed — it can take a few seconds to settle. Check back in a moment."
-                    } else {
-                        error = "The bank confirmation wasn't completed — nothing was charged. Try again when you're ready."
-                    }
-                } else {
-                    error = "Your bank needs an extra confirmation for this payment. Please complete it from zivett.com for now."
+            val action = apiError.paymentAction
+            if (action != null) {
+                // The billing fetch may have failed earlier (Pay doesn't
+                // wait on it) — one more try before giving up on the key.
+                val key = card.publishableKey ?: run { card.load(); card.publishableKey }
+                val challenger = challenger
+                if (key == null || challenger == null) {
+                    error = ChallengeOutcome.UNAVAILABLE_COPY
+                } else when (val outcome = challenger.confirm(key, action)) {
+                    ChallengeOutcome.Succeeded -> { pollUntilPaid()?.let { return it }; error = ChallengeOutcome.SETTLING_COPY }
+                    ChallengeOutcome.Canceled -> error = ChallengeOutcome.CANCELED_COPY
+                    // The bank said no — same way out as a decline.
+                    is ChallengeOutcome.Failed -> declined = outcome.message ?: ChallengeOutcome.FAILED_COPY
+                    // The result never reached us: look before claiming
+                    // anything about whether the card was charged.
+                    ChallengeOutcome.Unknown -> { pollUntilPaid()?.let { return it }; error = ChallengeOutcome.UNKNOWN_COPY }
                 }
+            } else if (apiError.unconfirmedPaymentMessage != null) {
+                // A timeout, a 5xx or 503 `payment_provider_error`: the
+                // charge may have landed anyway — look before speaking.
+                val fresh = runCatching { client.send(area.invoiceDetail(invoice.id)).invoice }.getOrNull()
+                if (fresh?.isPaid == true) return fresh
+                error = apiError.unconfirmedPaymentMessage
+            } else if (apiError.paymentDeclinedMessage != null) {
+                // A declined card is not a dead end: keep the screen up
+                // and let them swap cards right here.
+                declined = apiError.paymentDeclinedMessage
             } else if (apiError is ApiError.Validation && apiError.errors.errors.isNotEmpty()) {
                 fieldErrors = apiError.errors.firstMessages
             } else {
                 error = apiError.userMessage
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error = e.userMessage
         } finally {
@@ -339,38 +348,6 @@ class PayInvoiceModel(val invoice: Invoice, private val client: ApiClient, priva
     }
 }
 
-/// The saved-card / add-card panel shared by the pay screen and the accept sheet.
-@Composable
-fun BillingCardPanel(billing: Loadable<BillingContext>, addingCard: Boolean, onAddCard: () -> Unit, addLabel: String = "Add a payment card") {
-    val colors = ZTheme.colors
-    ZCard {
-        when (billing) {
-            Loadable.Loading -> ZSpinner()
-            is Loadable.Failed -> ZCaption(billing.message)
-            is Loadable.Loaded -> {
-                val card = billing.loaded.savedCard
-                if (card != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
-                        ZBody("${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}")
-                    }
-                } else if (billing.loaded.driver != "stripe") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = colors.ink)
-                        ZBody("Test payments (simulated)")
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                        ZBodyStrong("No card on file")
-                        ZButton(if (addingCard) "Opening…" else addLabel, style = ZButtonStyle.OUTLINE, enabled = !addingCard, onClick = onAddCard)
-                        if (billing.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode — use card 4242 4242 4242 4242, any future expiry and CVC.", tone = ZTextTone.FAINT)
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
@@ -379,13 +356,21 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
     var invoiceState by remember { mutableStateOf<Loadable<Invoice>>(Loadable.Loading) }
     LaunchedEffect(invoiceId) { invoiceState = invoiceState.reloaded { environment.client.send(area.invoiceDetail(invoiceId)).invoice } }
 
+    // Nobody walks away from a charge in flight: back (gesture and
+    // arrow) waits for the answer.
+    var paying by remember { mutableStateOf(false) }
+    BackHandler(enabled = paying) {}
+
     Column {
-        ZTopBar("Pay", onBack = onBack)
+        ZTopBar("Pay", onBack = { if (!paying) onBack() })
         ZScreen {
             ZLoadable(invoiceState, retry = { scope.launch { invoiceState = invoiceState.reloaded { environment.client.send(area.invoiceDetail(invoiceId)).invoice } } }) { invoice ->
                 val model = remember(invoice.id) { PayInvoiceModel(invoice, environment.client, area, context) }
                 LaunchedEffect(model) { model.load() }
-                Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
+                paying = model.paying
+                val paid = model.paid
+                if (paid != null) PaymentReceived(paid, onDone = onBack)
+                else Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Pay invoice", invoice.job?.title)
                     model.error?.let { ZBanner(it, tone = ZTone.DANGER) }
                     InvoiceBreakdown(invoice)
@@ -393,14 +378,26 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
                         ZTextField("Coupon code", model.couponCode, { model.couponCode = it.uppercase() }, placeholder = "Optional", error = model.fieldErrors["coupon_code"], capitalization = KeyboardCapitalization.Characters)
                     }
                     ZTextField("Tip your pro (optional)", model.customTip, { model.customTip = it }, placeholder = "0.00", error = model.fieldErrors["tip_cents"], keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
-                    BillingCardPanel(model.billing, model.addingCard, onAddCard = { scope.launch { model.addCard() } })
+                    PaymentCardSection(model.card, declined = model.declined) { model.declined = null }
                     ZActionBand("Pay ${Money.format(model.totalCents)}", loading = model.paying, enabled = model.canPay) {
-                        scope.launch { if (model.pay() != null) onBack() }
+                        scope.launch { model.pay() }
                     }
                     Spacer(Modifier.padding(ZSpacing.lg))
                 }
             }
         }
+    }
+}
+
+/// What the pay screen becomes once the invoice settles.
+@Composable
+private fun PaymentReceived(invoice: Invoice, onDone: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
+        Icon(Icons.Filled.Verified, contentDescription = null, tint = ZTheme.colors.brandGold)
+        ZMono("Payment received")
+        ZPageTitle("Thanks — you're all paid up", invoice.job?.title)
+        ZBanner("${invoice.number ?: "Your invoice"} is paid. We've emailed your receipt, and you can share a PDF copy from the invoice any time.", tone = ZTone.SUCCESS)
+        ZButton("Done", onClick = onDone)
     }
 }
 
@@ -468,7 +465,7 @@ object InvoicePdf {
         canvas.drawLine(left, y - 10f, right, y - 10f, Paint().apply { color = AndroidColor.parseColor("#E3E1DA") })
         row("Service subtotal", invoice.totalCents, bold = true)
         val feeBps = invoice.customerFeeBps; val fee = invoice.customerFeeCents
-        if (feeBps != null && fee != null) row("Booking & support fee (${JobPresentation.percent(feeBps)})", fee)
+        if (feeBps != null && fee != null) row("${invoice.feeLabel} (${JobPresentation.percent(feeBps)})", fee)
         invoice.gstCents?.takeIf { invoice.gstBps != null }?.let { row("GST", it + (invoice.customerFeeGstCents ?: 0)) }
         invoice.pstCents?.takeIf { invoice.pstBps != null && it > 0 }?.let { row("PST", it) }
         invoice.tipCents?.takeIf { it > 0 }?.let { row("Tip", it) }

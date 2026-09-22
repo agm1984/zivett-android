@@ -82,8 +82,9 @@ class CompanyQuotesModel(private val client: ApiClient) {
             return null
         } catch (error: ApiError) {
             if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) return error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.message
-            toast = error.userMessage
-            return null
+            // Into the composer, which stays open: a toast + null closed it
+            // as though the revision had been sent, losing the edit.
+            return error.userMessage
         } catch (error: Exception) { return error.userMessage }
     }
 

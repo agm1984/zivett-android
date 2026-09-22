@@ -93,7 +93,7 @@ either). The "plan fee" bullet was removed 2026-09-15 for exactly this.
 | Privacy policy | `https://zivett.com/privacy` |
 | Countries | Canada only (same call as iOS) |
 | Ads | No ads |
-| In-app purchases | No — Play Billing is not used and the app sells nothing. The only in-app card entry pays a tradesperson for physical work done at the customer's home (Stripe is permitted for that). Pro/business memberships are purchased and managed on the ZiVETT website only; the app just reflects the account's current membership (read-only "Membership" row) |
+| In-app purchases | No — Play Billing is not used and the app sells nothing. The only in-app card entry pays a tradesperson for physical work done at the customer's home (Stripe is permitted for that). The app has no membership/plan screen and no paid content or features — every account of a role gets the same app |
 | Content rating | Complete the questionnaire; expect Everyone / PEGI 3. Answer "yes" to user-to-user communication (messaging) and to sharing location |
 | Target audience | 18+ |
 
@@ -117,12 +117,21 @@ Connect's App Review Information for iOS):
 > Payments run in Stripe test mode; use card 4242 4242 4242 4242 with any
 > future expiry and any CVC.
 >
-> The app contains no in-app purchases and sells no digital content or
-> subscriptions. The only card entry in the app is on the BOOKER accounts
-> (customer, business) and pays a tradesperson for physical work performed
-> at the home or property, after the job is done. The Pro (company) account
-> never enters a card — payouts run through Stripe Connect. Pro and
-> property-manager memberships are purchased and managed on the ZiVETT
-> website only; the app does not sell, price, or link to them — the
-> "Membership" screen (company: More tab; business: Account tab) is a
-> read-only reflection of the account.
+> The app contains no in-app purchases and no paid digital content,
+> features, or subscriptions: nothing in the app is unlocked by a purchase,
+> and every account of a given role has exactly the same app functionality.
+> ZiVETT is a marketplace for PHYSICAL services — plumbing, electrical,
+> cleaning and similar trade work performed at a home or property
+> (guideline 3.1.3(e)). The only card entry in the app is on the BOOKER
+> accounts (customer, business) and pays a tradesperson for that physical
+> work, after the job is done. The Pro (company) account never enters a
+> card — it is paid out through Stripe Connect, less a commission on each
+> completed job.
+>
+> Changed since the last review: the read-only "Membership" screen and the
+> membership tag on the account header have been removed. The app no
+> longer displays, reads, or references an account's membership anywhere.
+> A trade business's commercial terms with ZiVETT (its commission rate and
+> payout timing on physical jobs) are a business-to-business agreement made
+> outside the app; they are a fee schedule for real-world work, not digital
+> content or functionality consumed in the app.

@@ -113,7 +113,8 @@ class OpportunitiesModel(private val client: ApiClient) {
         } catch (_: Exception) { toast = "Could not decline ${job.code ?: "that job"}. Please try again." } finally { actingOnId = null }
     }
 
-    /// null = success (card removed); non-null = inline error for the composer.
+    /// null = the composer closes (sent, or the job is gone); non-null =
+    /// an inline error and the composer — with everything typed — stays.
     suspend fun submitQuote(job: Job, body: QuoteBody): String? {
         actingOnId = job.id
         try {
@@ -125,10 +126,17 @@ class OpportunitiesModel(private val client: ApiClient) {
             if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) {
                 return error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.first("message") ?: error.errors.message
             }
-            // 409 / bodyless 422: the job is gone — drop the card.
-            state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
-            toast = error.userMessage
-            return null
+            // Only a 409 (quotes closed / already quoted) or a 404 means
+            // the job is gone — drop the card. Everything else — offline,
+            // a 5xx, a 429, the bodyless 422s ("Set up payouts first", a
+            // feed cooldown, no rate for the trade) — used to drop it too,
+            // taking a quotable job and the drafted quote with it.
+            if (error is ApiError.Conflict || error is ApiError.NotFound) {
+                state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
+                toast = error.userMessage
+                return null
+            }
+            return error.userMessage
         } catch (error: Exception) {
             return error.userMessage
         } finally {
@@ -158,12 +166,12 @@ fun OpportunitiesScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Opportunities")
                     feed.cooldownUntil?.let { ZBanner("Your feed is paused after recent withdrawals. New opportunities reopen ${Dates.shortTime(it)}. Withdrawals also lower your ranking — completed jobs repair it.", tone = ZTone.DANGER) }
-                    // No tier ships capped today, so this never renders — and if one
-                    // ever does, it states the fact only: no "upgrade" nudge and no
-                    // link (the app never steers toward a plan).
+                    // Nothing ships capped today, so this never renders — and if a cap
+                    // ever does, it states the fact only: the app never mentions
+                    // memberships (see PARITY.md, App Store 3.1.1 / Play payments).
                     feed.leads.limit?.let { limit ->
                         val remaining = feed.leads.remaining ?: 0
-                        ZBanner(if (remaining == 0) "You've used all $limit of your plan's leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
+                        ZBanner(if (remaining == 0) "You've used all $limit of your leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
                     }
                     if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
                     for (job in feed.opportunities) {
@@ -180,7 +188,7 @@ fun OpportunitiesScreen() {
         QuoteComposerSheet(
             job = job, rateCents = feed?.hourlyRates?.get(job.category.id.toString()), commissionBps = feed?.commissionBps ?: 1500, existing = null,
             payoutsReady = feed?.payoutsReady ?: true,
-            setupPayouts = { quoting = null; scope.launch { model.payoutOnboardingUrl()?.let { sentToStripe = true; openUrl(context, it) } } },
+            setupPayouts = { quoting = null; scope.launch { model.payoutOnboardingUrl()?.let { sentToStripe = openUrl(context, it) } } },
             onDismiss = { quoting = null },
         ) { body -> model.submitQuote(job, body) }
     }
@@ -198,7 +206,8 @@ fun OpportunityCard(job: Job, commissionBps: Int, busy: Boolean, quote: () -> Un
                     ZFlowRow(spacing = 4.dp) {
                         val mode = JobPresentation.modeMeta(job.mode)
                         ZBadge(mode.label, mode.tone)
-                        // Business Premium's perk made visible: pinned to the top of the feed.
+                        // The feed pins some bookers' jobs first; the badge names the
+                        // ORDERING, never the plan behind it (PARITY.md "plan chips").
                         if (job.priority == true) ZPlanTag("PRIORITY")
                         CompanyPresentation.urgencyBadge(job.urgency)?.let { ZBadge(it.label, it.tone) }
                         if (job.bookerType == "business") ZBadge("Property manager", ZTone.INFO)

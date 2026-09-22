@@ -55,8 +55,6 @@ data class Organization(
     val submittedAt: Instant? = null,
     val setupCompletedAt: Instant? = null,
     val suspendedAt: Instant? = null,
-    /// 'pro' | 'elite' | 'premium' — the tier badge the org wears.
-    val planBadge: String? = null,
 ) {
     val isApproved: Boolean get() = approvedAt != null
     val isSuspended: Boolean get() = suspendedAt != null

@@ -149,11 +149,13 @@ class HomeHeroLogicTest {
     }
 
     @Test fun proLineFramesTheTierAndRating() {
-        assertEquals("Company 1 · ZiVETT Pro professional · ★ 4.7 (3 reviews)", HomeHeroLogic.proLine(quote(1, 4.7, 3)))
+        assertEquals("Company 1 · ZiVETT-verified professional · ★ 4.7 (3 reviews)", HomeHeroLogic.proLine(quote(1, 4.7, 3)))
         assertTrue(HomeHeroLogic.proLine(quote(2, 5.0, 1)).endsWith("★ 5.0 (1 review)"))
         assertTrue(HomeHeroLogic.proLine(quote(3, null)).endsWith("new to the platform"))
+        // Tier never shows, even for Elite (PARITY.md "plan chips").
         val elite = Quote(id = 1, amountCents = 1, status = QuoteStatus.PENDING, company = CompanySummary(id = 1, name = "Peak", plan = "elite"))
-        assertTrue(HomeHeroLogic.proLine(elite).contains("ZiVETT Elite professional"))
+        assertTrue(HomeHeroLogic.proLine(elite).contains("ZiVETT-verified professional"))
+        assertTrue(!HomeHeroLogic.proLine(elite).lowercase().contains("elite"))
     }
 
     @Test fun cancellationFeeInvoicesWearADifferentFace() {

@@ -177,7 +177,7 @@ fun InvoiceBreakdown(invoice: Invoice) {
         MoneyRow("Service subtotal", invoice.totalCents, strong = true)
         val feeBps = invoice.customerFeeBps
         val fee = invoice.customerFeeCents
-        if (feeBps != null && fee != null) MoneyRow("Booking & support fee (${JobPresentation.percent(feeBps)})", fee)
+        if (feeBps != null && fee != null) MoneyRow("${invoice.feeLabel} (${JobPresentation.percent(feeBps)})", fee)
         val gst = invoice.gstCents
         if (gst != null && invoice.gstBps != null) MoneyRow("GST", gst + (invoice.customerFeeGstCents ?: 0))
         val pst = invoice.pstCents
@@ -209,7 +209,8 @@ fun ProRow(company: com.zivett.app.core.models.CompanySummary, trailingLine: Str
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 ZBodyStrong(company.name)
-                company.plan?.takeIf { it.isNotEmpty() }?.let { com.zivett.app.design.ZPlanTag(it) }
+                // Plan chip pulled (PARITY.md "plan chips") — the web renders
+                // `ZPlanTag(company.plan)` here.
                 Icon(Icons.Filled.Check, contentDescription = "Verified", tint = colors.brandGold, modifier = Modifier.size(14.dp))
             }
             val rating = company.rating

@@ -34,6 +34,10 @@ import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.StripeBridge
+import com.zivett.app.core.payments.PaymentCardSection
+import com.zivett.app.core.payments.SavedCardLine
+import com.zivett.app.core.payments.billingCard
+import com.zivett.app.core.payments.PaymentCardModel
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZAvatar
@@ -65,7 +69,6 @@ import com.zivett.app.design.ZType
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.MoneyRow
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
 
 /// The accept modal: what you're agreeing to, the hold preview, the
 /// arrival, then confirm. Handles the 409 schedule-conflict fallback and
@@ -84,24 +87,36 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
     var collectingCard by remember { mutableStateOf(false) }
     var cardError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { billing = billing.reloaded { runCatching { environment.client.send(CustomerEndpoints.billingContext()) }.getOrElse { BillingContext(driver = "simulated") } } }
+    // A failed fetch is a FAILED state with a Retry. It used to fall back
+    // to a made-up simulated context — on a real Stripe backend that read
+    // "Test payments (simulated)" with Confirm enabled, and the accept
+    // then 422'd for want of a card.
+    // A READ: opening the sheet with a card on file mints nothing.
+    suspend fun loadBilling() { billing = billing.reloaded { environment.client.billingCard() } }
+    LaunchedEffect(Unit) { model.acceptError = null; loadBilling() }
 
     val stripe = billing.value?.driver == "stripe"
     val canConfirm = !model.busy && ((billing.value?.canChargeWithoutCardForm ?: false) || setupIntentId != null)
 
-    fun collectCard(billingContext: BillingContext) {
-        val key = billingContext.publishableKey; val secret = billingContext.clientSecret
-        if (key == null || secret == null) { cardError = "Card setup isn't available right now — try again in a moment."; return }
+    // The SetupIntent is minted HERE, when the booker actually needs the
+    // card form (no card on file, or they chose a different one) — one
+    // per attempt, never on sheet open.
+    fun collectCard() {
+        if (collectingCard) return
         collectingCard = true; cardError = null
         scope.launch {
             try {
+                val fresh = environment.client.send(CustomerEndpoints.cardSetupIntent())
+                val key = fresh.publishableKey; val secret = fresh.clientSecret
+                if (key == null || secret == null) { cardError = "Card setup isn't available right now — try again in a moment."; return@launch }
                 StripeBridge.configure(context, key)
                 setupIntentId = StripeBridge.collectCard(secret)
             } catch (error: Exception) { cardError = error.userMessage } finally { collectingCard = false }
         }
     }
 
-    ZSheet(onDismiss = onDismiss) {
+    // Pinned open while the accept is in flight — see `ZSheet`.
+    ZSheet(onDismiss = onDismiss, dismissable = !model.busy) {
         when (val current = outcome) {
             is JobDetailModel.AcceptOutcome.Accepted -> {
                 Icon(Icons.Filled.Verified, contentDescription = null, tint = colors.brandGold, modifier = Modifier.padding(0.dp))
@@ -120,6 +135,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                     ZButton("Not now", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
                 } else {
                     ZBody("${JobPresentation.quoteCompanyName(quote)} can no longer make the time they proposed. These windows from your original offer still work for them — pick one to accept the quote:", tone = ZTextTone.SOFT)
+                    model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
                     for (w in current.validWindows) {
                         ZButton(JobPresentation.windowSlot(w.date, w.window), style = ZButtonStyle.OUTLINE, loading = model.busy) {
                             scope.launch { outcome = model.acceptQuote(quote, w.date, w.window, setupIntentId) ?: outcome }
@@ -165,25 +181,49 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                 ZCard {
                     when (val state = billing) {
                         Loadable.Loading -> ZSpinner()
-                        is Loadable.Failed -> CardLine("Test payments (simulated)")
+                        is Loadable.Failed -> {
+                            ZBodyStrong("We couldn't load your payment details")
+                            ZCaption(state.message)
+                            ZButton("Retry", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { scope.launch { billing = Loadable.Loading; loadBilling() } }
+                        }
                         is Loadable.Loaded -> {
                             val card = state.loaded.savedCard
                             when {
-                                card != null -> CardLine("${(card.brand ?: "Card").replaceFirstChar { it.uppercase() }} •••• ${card.last4 ?: ""}")
                                 state.loaded.driver != "stripe" -> CardLine("Test payments (simulated)")
-                                setupIntentId != null -> CardLine("Card added — it's saved when you confirm")
+                                setupIntentId != null -> {
+                                    CardLine("Card added — it's saved when you confirm")
+                                    // The way out when the server couldn't save that card:
+                                    // a fresh SetupIntent (each secret is single-use).
+                                    if (model.acceptError != null) ZButton("Use a different card", style = ZButtonStyle.GHOST, compact = true, enabled = !model.busy, fullWidth = false) {
+                                        setupIntentId = null
+                                        scope.launch { loadBilling() }
+                                    }
+                                }
+                                card != null -> {
+                                    SavedCardLine(card)
+                                    // An expired card will most likely be refused at
+                                    // closure — offer the swap now (the accept pins it).
+                                    if (card.isExpired()) {
+                                        ZCaption("This card has expired — add a different one so closing the job goes through.", color = colors.danger)
+                                        cardError?.let { ZCaption(it, color = colors.danger) }
+                                        ZButton("Use a different card", style = ZButtonStyle.OUTLINE, compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
+                                    }
+                                }
                                 else -> {
                                     ZBodyStrong("Add a payment card to accept this quote")
                                     ZCaption("Nothing is charged now — the card is only billed when the job is done and you close it.")
                                     if (state.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode — use card 4242 4242 4242 4242 with any future expiry and CVC.", tone = ZTextTone.FAINT)
                                     cardError?.let { ZCaption(it, color = colors.danger) }
-                                    ZButton("Add a card", compact = true, loading = collectingCard, fullWidth = false) { collectCard(state.loaded) }
+                                    ZButton("Add a card", compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
                                 }
                             }
                         }
                     }
                 }
 
+                // Beside the button that caused it — never a toast, which
+                // renders under this sheet.
+                model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
                 ZButton("Confirm — ${Money.format(quote.amountCents)}", style = ZButtonStyle.SUCCESS, loading = model.busy, enabled = canConfirm) {
                     scope.launch { outcome = model.acceptQuote(quote, setupIntentId = setupIntentId) }
                 }
@@ -204,7 +244,7 @@ private fun CardLine(text: String) {
 fun CancelJobSheet(job: Job, model: JobDetailModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
-    ZSheet(onDismiss = onDismiss, title = "Cancel ${job.code ?: "this job"}?") {
+    ZSheet(onDismiss = onDismiss, title = "Cancel ${job.code ?: "this job"}?", dismissable = !model.busy) {
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) {
             ZCard { ZMono("Cancellation fee — charged now"); ZMonoLarge(Money.format(fee), color = colors.danger) }
@@ -284,14 +324,42 @@ fun ReviewSheet(model: JobDetailModel, onDismiss: () -> Unit) {
 @Composable
 fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val environment = LocalAppEnvironment.current
+    val context = LocalContext.current
     var tip by remember { mutableStateOf("") }
-    val tipCents = minOf(100_000, maxOf(0, (tip.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(100)).toInt()))
-    ZSheet(onDismiss = onDismiss, title = "Pay & close") {
+    // The card that will be charged, changeable right here. The sheet
+    // only leaves on success: it used to dismiss whatever happened, so a
+    // declined card was a toast on the job page with no way out.
+    val card = remember { PaymentCardModel(environment.client, context) }
+    var declined by remember { mutableStateOf<String?>(null) }
+    // The call ended without an answer and the job still reads unpaid.
+    var unconfirmed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { card.load() }
+    // The shared gate: only a loaded "no card" context blocks Pay — the
+    // server is the real gate, and a failed fetch must not strand a good card.
+    val canPay = !model.busy && !card.blocksPay
+    val tipCents = Money.tipCents(tip)
+    // Pinned open while the charge is in flight: swiping it away used to
+    // cancel the request and toast a failure the server never reported.
+    ZSheet(onDismiss = onDismiss, title = "Pay & close", dismissable = !model.busy) {
         ZBody("Paying closes the job and starts your workmanship warranty — or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
         InvoiceBreakdown(invoice)
         ZTextField("Tip your pro (optional)", tip, { tip = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
-        ZActionBand("Pay ${Money.format(invoice.amountDueCents + tipCents)}", loading = model.busy) {
-            scope.launch { model.close(tipCents); onDismiss() }
+        PaymentCardSection(card, declined = declined) { declined = null }
+        unconfirmed?.let { ZBanner(it, tone = ZTone.WARNING) }
+        ZActionBand("Pay ${Money.format(invoice.amountDueCents + tipCents)}", loading = model.busy, enabled = canPay) {
+            scope.launch {
+                declined = null; unconfirmed = null
+                when (val outcome = model.close(tipCents)) {
+                    JobDetailModel.CloseOutcome.Closed -> onDismiss()
+                    is JobDetailModel.CloseOutcome.Declined -> declined = outcome.message
+                    is JobDetailModel.CloseOutcome.Unconfirmed -> unconfirmed = outcome.message
+                    JobDetailModel.CloseOutcome.InFlight -> Unit
+                    // Anything else is explained by the job page's toast,
+                    // which this sheet would cover — so leave.
+                    JobDetailModel.CloseOutcome.Failed -> onDismiss()
+                }
+            }
         }
     }
 }

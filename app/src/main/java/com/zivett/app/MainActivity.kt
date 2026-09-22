@@ -16,7 +16,6 @@ import com.zivett.app.app.AppEvents
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.RootScreen
 import com.zivett.app.core.PendingReferral
-import com.zivett.app.core.payments.StripeBridge
 import com.zivett.app.core.push.PendingPushOpen
 import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.core.push.PushRouting
@@ -36,7 +35,7 @@ class MainActivity : ComponentActivity() {
             val current = environment ?: return@setContent
             ZivettTheme {
                 CompositionLocalProvider(LocalAppEnvironment provides current) {
-                    StripeHost(this)
+                    StripeHost()
                     RootScreen()
                 }
             }
@@ -62,8 +61,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /// Referral links (/r/{code} → hold the code so signup can attribute
-    /// it), team invitations (/invitations/{token}), and push taps (the
-    /// job reference the notification carried).
+    /// it), team invitations (/invitations/{token}), the return from
+    /// Stripe's Connect onboarding, and push taps (the job reference the
+    /// notification carried).
     private fun handleIntent(intent: Intent?) {
         intent ?: return
 
@@ -83,15 +83,16 @@ class MainActivity : ComponentActivity() {
         }
 
         val parts = uri.pathSegments.filter { it.isNotEmpty() }
+
+        // zivett://stripe-return (the return page's button) or the App
+        // Link https://…/app/stripe-return itself.
+        if ((uri.scheme == "zivett" && uri.host == "stripe-return") || parts.takeLast(2) == listOf("app", "stripe-return")) {
+            AppEvents.stripeReturned = true
+            return
+        }
+
         if (parts.size >= 2 && parts[parts.size - 2] == "invitations") {
             AppEvents.invitationToken = parts.last()
         }
-    }
-
-    @Deprecated("Stripe's 3DS result rides the legacy activity-result path")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (StripeBridge.onActivityResult(requestCode, data)) return
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
     }
 }

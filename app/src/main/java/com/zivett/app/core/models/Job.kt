@@ -74,6 +74,10 @@ data class JobCategory(
 data class CompanySummary(
     val id: Int? = null,
     val name: String,
+    /// 'pro' | 'elite' | null. DECODED BUT NEVER RENDERED in the app — the
+    /// PRO/ELITE chips and "ZiVETT Elite professional" lines were pulled
+    /// 2026-09-21 so nothing plan-shaped is on screen for store review
+    /// (see PARITY.md "plan chips"). The web keeps them.
     val plan: String? = null,
     val rating: Double? = null,
     val count: Int? = null,
@@ -276,6 +280,9 @@ data class Invoice(
     val totalCents: Int,
     val customerFeeBps: Int? = null,
     val customerFeeCents: Int? = null,
+    /// The server's name for the booker-side fee, when it sends one —
+    /// see `feeLabel`.
+    val customerFeeLabel: String? = null,
     val gstBps: Int? = null,
     val gstCents: Int? = null,
     val customerFeeGstCents: Int? = null,
@@ -333,6 +340,12 @@ data class Invoice(
     }
 
     val amountDueCents: Int get() = customerTotalCents ?: totalCents
+
+    /// What every surface calls the booker-side fee. The server's label
+    /// wins when present (an invoice issued under an older fee can name
+    /// itself); otherwise today's name — it was renamed from "Booking &
+    /// support fee", which the invoice screen and PDF still printed.
+    val feeLabel: String get() = customerFeeLabel?.takeIf { it.isNotBlank() } ?: "Trust & support fee"
     val isPaid: Boolean get() = paidAt != null
 }
 

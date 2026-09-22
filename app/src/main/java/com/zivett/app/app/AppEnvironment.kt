@@ -77,6 +77,12 @@ object AppEvents {
     /// Set (to the token) when a team-invitation link opens the app; the
     /// signed-out flow pushes the accept screen (web: /invitations/{token}).
     var invitationToken: String? by mutableStateOf(null)
+
+    /// Set when Stripe's hosted Connect onboarding hands the browser back
+    /// to the app (`zivett://stripe-return`, or the verified
+    /// `https://…/app/stripe-return` page). The company shell lands on
+    /// the dashboard, which consumes it and re-checks payout status.
+    var stripeReturned: Boolean by mutableStateOf(false)
 }
 
 @Suppress("unused")

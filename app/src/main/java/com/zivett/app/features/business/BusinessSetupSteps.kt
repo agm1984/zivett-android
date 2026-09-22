@@ -9,7 +9,7 @@ import com.zivett.app.core.models.BusinessSetup
 /// unit-testable.
 object BusinessSetupSteps {
     /// Three steps, not the web's four: the plan pick is web-only (the
-    /// app never offers a plan — store policy, see MembershipScreen). The
+    /// app never offers a plan — store policy, see PARITY.md). The
     /// server treats an unpicked business plan as free Basic.
     enum class Step(val title: String) {
         PROFILE("Business profile"), PROPERTIES("Properties"), TEAM("Team");

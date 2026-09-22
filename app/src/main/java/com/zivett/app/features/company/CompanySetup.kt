@@ -100,7 +100,7 @@ class CompanySetupModel(private val client: ApiClient) {
 /// review & submit. Each step is a screen it links out to; this page is
 /// the checklist + submit, like the web's review step. The web wizard's
 /// plan step is deliberately absent here — the app never offers a plan
-/// (store policy, see MembershipScreen); the server's "finish later" path
+/// (store policy, see PARITY.md); the server's "finish later" path
 /// already submits without one, and the approval email covers the pick.
 @Composable
 fun CompanySetupScreen(onBack: (() -> Unit)?) {

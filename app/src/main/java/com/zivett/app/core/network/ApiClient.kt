@@ -99,7 +99,8 @@ class HttpApiClient(
         /// Maps a non-2xx response to the matching `ApiError`.
         fun errorFor(status: Int, retryAfter: String?, data: ByteArray): ApiError {
             val text = data.decodeToString()
-            val message = runCatching { JsonCoding.json.decodeFromString<ServerMessage>(text).message }.getOrNull()
+            val body = runCatching { JsonCoding.json.decodeFromString<ServerMessage>(text) }.getOrNull()
+            val message = body?.message
 
             return when (status) {
                 401 -> ApiError.Unauthenticated
@@ -110,7 +111,7 @@ class HttpApiClient(
                     ?.let { ApiError.Validation(it) }
                     ?: ApiError.Validation(ValidationErrors(message ?: "The given data was invalid."))
                 429 -> ApiError.RateLimited(retryAfter?.toIntOrNull())
-                else -> ApiError.Server(status, message)
+                else -> ApiError.Server(status, message, body?.code)
             }
         }
     }

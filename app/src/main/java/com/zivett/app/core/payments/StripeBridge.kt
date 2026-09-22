@@ -1,45 +1,55 @@
 package com.zivett.app.core.payments
 
-import androidx.activity.ComponentActivity
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.stripe.android.ApiResultCallback
+import androidx.compose.runtime.setValue
 import com.stripe.android.PaymentConfiguration
-import com.stripe.android.PaymentIntentResult
-import com.stripe.android.Stripe
-import com.stripe.android.model.StripeIntent
+import com.stripe.android.core.exception.LocalStripeException
+import com.stripe.android.core.exception.StripeException
+import com.stripe.android.model.ConfirmPaymentIntentParams
+import com.stripe.android.payments.paymentlauncher.PaymentLauncher
+import com.stripe.android.payments.paymentlauncher.PaymentResult
+import com.stripe.android.payments.paymentlauncher.rememberPaymentLauncher
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
 import com.stripe.android.paymentsheet.rememberPaymentSheet
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /// The ONE file that imports the Stripe SDK — the app-side mirror of the
 /// web's `lib/stripe.js` and the server's `StripeGateway` seam. Keyed at
 /// runtime from the billing payload's publishable key, never build-time.
 ///
-/// PaymentSheet needs an activity-result registration made during
-/// composition, so `StripeHost()` is mounted once at the root of
-/// MainActivity and the models call the suspend functions here.
+/// PaymentSheet and PaymentLauncher both need an activity-result
+/// registration made during composition, so `StripeHost()` is mounted
+/// once at the root of MainActivity and the models call the suspend
+/// functions here. (The bank challenge used to ride
+/// `Stripe.handleNextActionForPayment` + MainActivity's deprecated
+/// `onActivityResult`; the launcher owns its own result route, and the
+/// SDK supplies its own return URL — the app declares none.)
 object StripeBridge {
-    /// The 3DS/redirect return URL — the `zivett` scheme in the manifest.
-    const val returnUrl = "zivett://stripe-redirect"
-
-    private var publishableKey: String? = null
+    /// Compose state: the launcher is keyed by it, so `StripeHost`
+    /// (re)builds one the moment a billing payload hands us the key.
+    internal var publishableKey by mutableStateOf<String?>(null)
+        private set
     private var sheet: PaymentSheet? = null
-    private var activity: ComponentActivity? = null
-    private var stripe: Stripe? = null
+    private val launcher = MutableStateFlow<PaymentLauncher?>(null)
     private var pendingCard: CompletableDeferred<String?>? = null
     private var pendingCardSecret: String? = null
-    private var pendingAction: CompletableDeferred<Boolean>? = null
+    private var pendingPayment: CompletableDeferred<ChallengeOutcome>? = null
 
     fun configure(context: Context, key: String) {
         if (publishableKey != key) {
             PaymentConfiguration.init(context.applicationContext, key)
             publishableKey = key
-            stripe = Stripe(context.applicationContext, key)
         }
     }
 
@@ -59,17 +69,28 @@ object StripeBridge {
         return deferred.await()
     }
 
-    /// Run the bank's 3DS challenge for a PaymentIntent the server left
-    /// in `requires_action` (409 `payment_action_required` +
-    /// `client_secret`). The `payment_intent.succeeded` webhook finishes
-    /// settlement server-side — callers re-poll after a true return.
-    suspend fun handleNextAction(paymentIntentClientSecret: String): Boolean {
-        val activity = activity ?: return false
-        val stripe = stripe ?: return false
-        pendingAction?.cancel()
-        val deferred = CompletableDeferred<Boolean>()
-        pendingAction = deferred
-        stripe.handleNextActionForPayment(activity, paymentIntentClientSecret)
+    /// Get the bank's confirmation for a pay-time charge (409
+    /// `payment_action_required`). The server charges OFF-session, so the
+    /// PaymentIntent it hands back is in `requires_payment_method`, not
+    /// `requires_action` — a bare next-action call fails on it. Stripe's
+    /// documented recovery is to CONFIRM it again on-session with the
+    /// same payment method, which is what presents the 3DS challenge.
+    /// Without a `paymentMethodId` (an older server) the next-action
+    /// route is all we have. The `payment_intent.succeeded` webhook
+    /// finishes settlement server-side — callers re-poll after success.
+    suspend fun confirmPayment(paymentIntentClientSecret: String, paymentMethodId: String?): ChallengeOutcome {
+        // `configure` has only just published the key; the launcher
+        // arrives with the next composition.
+        val launcher = withTimeoutOrNull(3_000) { launcher.filterNotNull().first() }
+            ?: return ChallengeOutcome.Failed("Bank confirmation isn't available right now — try again in a moment.")
+        pendingPayment?.cancel()
+        val deferred = CompletableDeferred<ChallengeOutcome>()
+        pendingPayment = deferred
+        if (paymentMethodId != null) {
+            launcher.confirm(ConfirmPaymentIntentParams.createWithPaymentMethodId(paymentMethodId, paymentIntentClientSecret))
+        } else {
+            launcher.handleNextActionForPaymentIntent(paymentIntentClientSecret)
+        }
         return deferred.await()
     }
 
@@ -93,42 +114,58 @@ object StripeBridge {
         pendingCardSecret = null
     }
 
-    /// Forward MainActivity's onActivityResult; true when Stripe consumed it.
-    fun onActivityResult(requestCode: Int, data: Intent?): Boolean {
-        val stripe = stripe ?: return false
-        if (!stripe.isPaymentResult(requestCode, data)) return false
-        stripe.onPaymentResult(requestCode, data, object : ApiResultCallback<PaymentIntentResult> {
-            override fun onSuccess(result: PaymentIntentResult) {
-                pendingAction?.complete(result.intent.status == StripeIntent.Status.Succeeded || result.intent.status == StripeIntent.Status.RequiresCapture || result.intent.status == StripeIntent.Status.Processing)
-                pendingAction = null
-            }
-
-            override fun onError(e: Exception) {
-                pendingAction?.complete(false)
-                pendingAction = null
-            }
-        })
-        return true
+    internal fun onPaymentResult(result: PaymentResult) {
+        val deferred = pendingPayment ?: return
+        pendingPayment = null
+        deferred.complete(
+            when (result) {
+                is PaymentResult.Completed -> ChallengeOutcome.Succeeded
+                is PaymentResult.Canceled -> ChallengeOutcome.Canceled
+                is PaymentResult.Failed -> outcomeFor(result.throwable)
+            },
+        )
     }
 
-    internal fun attach(activity: ComponentActivity, sheet: PaymentSheet) {
-        this.activity = activity
-        this.sheet = sheet
+    /// Only a refusal Stripe actually answered (a 4xx, or the SDK's own
+    /// "authentication failed") proves nothing was charged. A dropped
+    /// connection or a 5xx while fetching the result proves nothing.
+    private fun outcomeFor(error: Throwable): ChallengeOutcome = when {
+        error is LocalStripeException -> ChallengeOutcome.Failed(error.displayMessage ?: error.localizedMessage)
+        error is StripeException && error.isClientError -> ChallengeOutcome.Failed(error.stripeError?.message ?: error.localizedMessage)
+        else -> ChallengeOutcome.Unknown
     }
+
+    internal fun attach(sheet: PaymentSheet) { this.sheet = sheet }
 
     internal fun detach(sheet: PaymentSheet) {
-        if (this.sheet === sheet) { this.sheet = null; this.activity = null }
+        if (this.sheet === sheet) this.sheet = null
+    }
+
+    internal fun attach(launcher: PaymentLauncher) { this.launcher.value = launcher }
+
+    internal fun detach(launcher: PaymentLauncher) {
+        if (this.launcher.value === launcher) this.launcher.value = null
     }
 }
 
 /// Mount once at the root of MainActivity's content: registers the
-/// PaymentSheet launcher for the bridge above.
+/// PaymentSheet and (once a publishable key is known) PaymentLauncher
+/// result routes for the bridge above.
 @Composable
-fun StripeHost(activity: ComponentActivity) {
+fun StripeHost() {
     val sheet = rememberPaymentSheet { result -> StripeBridge.onSheetResult(result) }
     val handle = remember(sheet) { sheet }
     DisposableEffect(handle) {
-        StripeBridge.attach(activity, handle)
+        StripeBridge.attach(handle)
         onDispose { StripeBridge.detach(handle) }
+    }
+
+    val publishableKey = StripeBridge.publishableKey ?: return
+    key(publishableKey) {
+        val launcher = rememberPaymentLauncher(publishableKey, null) { result -> StripeBridge.onPaymentResult(result) }
+        DisposableEffect(launcher) {
+            StripeBridge.attach(launcher)
+            onDispose { StripeBridge.detach(launcher) }
+        }
     }
 }

@@ -36,17 +36,64 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   `JobRefEndpoints`). The google-services plugin is applied only when
   `app/google-services.json` exists (gitignored), so builds never depend
   on it. Backend: `FCM_PROJECT_ID` + `FCM_SERVICE_ACCOUNT` env.
-- **Links**: `zivett://` scheme plus App Links for `zivett.com/r/*` and
-  `/invitations/*` (manifest, `autoVerify`). The backend serves
+- **Links**: `zivett://` scheme plus App Links for `zivett.com/r/*`,
+  `/invitations/*` and `/app/stripe-return` (manifest, `autoVerify`).
+  The last is the way back from Stripe's hosted Connect onboarding: the
+  onboarding-link request sends `return_to: "app"`, the server's return
+  page opens the app (App Link, or its `zivett://stripe-return` button),
+  `MainActivity` sets `AppEvents.stripeReturned`, the approved-company
+  shell lands on the dashboard, and the dashboard consumes the flag and
+  re-checks payout status. The backend serves
   `/.well-known/assetlinks.json` when `ANDROID_APP_FINGERPRINTS` is set.
 - **Stripe**: `core/payments/StripeBridge.kt` is the ONE file that
   imports the Stripe SDK. Keyed at runtime from the billing payload's
   `publishable_key`. PaymentSheet in setup mode for card capture;
-  `Stripe.handleNextActionForPayment` for a 409 `payment_action_required`
-  + `client_secret` on pay/close, after which the webhook settles
-  server-side and the models poll briefly. Return URL
-  `zivett://stripe-redirect`. `StripeHost` is mounted in `MainActivity`.
-  Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS).
+  `PaymentLauncher` (Activity Result based — no `onActivityResult`, no
+  app return URL) for a 409 `payment_action_required` on pay/close. The
+  server charges OFF-session, so that PaymentIntent is in
+  `requires_payment_method`: `StripeBridge.confirmPayment` CONFIRMS it
+  again with the 409's `payment_method_id` (next-action only when an
+  older server omits the id), then the webhook settles server-side and
+  the models poll briefly. The result is a `ChallengeOutcome`
+  (`core/payments/PaymentChallenge.kt`, SDK-free; models take a
+  `PaymentChallenger` so tests can drive it): canceled and a bank
+  refusal mean nothing was charged, `Unknown` (the result never reached
+  us) must NEVER be worded that way — poll first. `StripeHost` is
+  mounted in `MainActivity`.
+  Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS),
+  4000 0000 0000 0341 (saves fine, DECLINES at charge — the one to test
+  the card-change flow with).
+- **Every pay surface shows the card and lets it be changed**
+  (`core/payments/PaymentCard.kt` — `PaymentCardModel` +
+  `PaymentCardSection`, which go through `StripeBridge`, never the SDK):
+  pay invoice, Pay & close, the home invoice hero. A declined charge is a
+  422 `{ message, code: "payment_declined" }` with NO `errors` key
+  (`ApiError.paymentDeclinedMessage`) — keep the surface open, show the
+  bank's message in the section, and let them swap cards; never
+  toast-and-dismiss. `POST /api/billing/card` also re-pins the new card
+  on the booker's live holds server-side. The Pay gate is
+  `PaymentCardModel.blocksPay` on all three — only a LOADED "Stripe, no
+  card" context disables Pay; loading or a failed fetch (which shows a
+  Retry) never does, because the server is the real gate. There is no
+  The card itself always renders through `SavedCardLine` (brand ••••
+  last4, "exp MM/YY", a danger EXPIRED badge + a promoted "Use a
+  different card"); `saved_card.exp_month/exp_year` are nullable, and
+  the server's `saved_card.expired` wins over the local month maths
+  when present.
+- **Reading the card never mints a SetupIntent.** Display / `canCharge`
+  / the 3DS publishable key all go through `ApiClient.billingCard()` →
+  `GET /api/billing/card` (no Stripe call; falls back to the POST only
+  when an older server 404/405s). `POST /api/billing/setup-intent`
+  (`CustomerEndpoints.cardSetupIntent()`) is called ONLY when a card
+  form is about to open — `PaymentCardModel.changeCard` and the accept
+  sheet's `collectCard()` — one fresh intent per attempt.
+
+- **Money calls are never abandoned.** `JobDetailModel.close` /
+  `acceptQuote` / `cancel` and `PayInvoiceModel.pay` run
+  `withContext(NonCancellable)` (their callers' scopes belong to sheets),
+  the sheets pin themselves with `ZSheet(dismissable = !busy)`, and every
+  `catch (Exception)` on a money path rethrows `CancellationException`
+  first — a cancelled call says nothing about what the server did.
 
 ## Layout
 
@@ -111,5 +158,7 @@ app/src/test/java/com/zivett/app/   JUnit 4; Fixtures + PreviewApiClient stand i
 - osmdroid's `MapView` in `AndroidView` draws past its bounds; wrap it in
   a clipping `FrameLayout` and add `Modifier.clipToBounds()` (see
   `design/Maps.kt`).
-- `Stripe.handleNextActionForPayment` needs a `ComponentActivity`, not a
-  plain `Activity`.
+- `rememberPaymentLauncher` needs the publishable key at composition
+  time, but the key only arrives with a billing payload — so
+  `StripeBridge.publishableKey` is Compose state and `confirmPayment`
+  waits (briefly) for `StripeHost` to build the launcher.
