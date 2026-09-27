@@ -56,7 +56,9 @@ import kotlinx.serialization.Serializable
 @Serializable object PropertiesRoute
 
 // Company.
-@Serializable data class CompanyJobRoute(val jobId: Int)
+/// `openAssign`: land on the assign picker (the Jobs list's "Mark en
+/// route" on an unassigned job the user can't self-assign).
+@Serializable data class CompanyJobRoute(val jobId: Int, val openAssign: Boolean = false)
 @Serializable object CompanyCalendarRoute
 @Serializable object CompanyInvoicesRoute
 @Serializable data class CompanyInvoiceRoute(val invoiceId: Int)

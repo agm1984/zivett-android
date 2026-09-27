@@ -140,7 +140,7 @@ fun CompanyShell(approved: Boolean) {
         composable<CompanyTeamTab> { TeamScreen(TeamArea.company, onBack = null) }
         composable<CompanyAccountTab> { ProfileScreen(ProfileArea.company) { } }
 
-        composable<CompanyJobRoute> { entry -> CompanyJobDetailScreen(entry.toRoute<CompanyJobRoute>().jobId) { nav.popBackStack() } }
+        composable<CompanyJobRoute> { entry -> entry.toRoute<CompanyJobRoute>().let { route -> CompanyJobDetailScreen(route.jobId, route.openAssign) { nav.popBackStack() } } }
         composable<OpportunitiesRoute> { BellScreen("Opportunities", onBack = { nav.popBackStack() }) { OpportunitiesScreen() } }
         composable<CompanyQuotesRoute> { BellScreen("My quotes", onBack = { nav.popBackStack() }) { CompanyQuotesScreen() } }
         composable<CompanyCalendarRoute> { CompanyCalendarScreen { nav.popBackStack() } }

@@ -77,6 +77,10 @@ data class User(
     val phoneVerifiedAt: Instant? = null,
     val deactivatedAt: Instant? = null,
     val suspendedAt: Instant? = null,
+    /// Appended on every serialized user server-side. For company users
+    /// it's the assigned-tech face: without one they can't self-assign,
+    /// so going en route on an unassigned job opens the picker instead.
+    val photoUrl: String? = null,
 ) {
     val isEmailVerified: Boolean get() = emailVerifiedAt != null
     val isPhoneVerified: Boolean get() = phoneVerifiedAt != null
