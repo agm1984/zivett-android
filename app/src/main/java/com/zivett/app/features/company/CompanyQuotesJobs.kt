@@ -243,12 +243,18 @@ fun CompanyActiveJobsScreen() {
                                 when {
                                     job.isAssigned(myId) -> ZCaption("Assigned to you", color = colors.success)
                                     job.assignedTech != null -> ZCaption("Assigned to ${job.assignedTech.name}")
-                                    else -> ZCaption("Unassigned", color = colors.warning)
+                                    // Acceptance normally assigns a field tech; this is the exception.
+                                    else -> ZBadge("No tech", ZTone.WARNING)
                                 }
                                 // Withdraw deliberately does NOT ride these rows — a destructive act never
                                 // sits beside the button techs tap all day. It lives on the job detail screen.
                                 val next = CompanyPresentation.nextStage(job.status)
-                                if (next != null) ZButton("Mark ${next.label.lowercase()}", compact = true, loading = model.busyId == job.id, fullWidth = false) { scope.launch { model.advance(job) } }
+                                // Unassigned + no photo to self-assign with = the server would refuse
+                                // en route; open the job on its assign picker instead.
+                                if (next != null) ZButton("Mark ${next.label.lowercase()}", compact = true, loading = model.busyId == job.id, fullWidth = false) {
+                                    if (CompanyPresentation.needsTechBeforeEnRoute(job, environment.session.user)) nav.navigate(CompanyJobRoute(job.id, openAssign = true))
+                                    else scope.launch { model.advance(job) }
+                                }
                                 else if (job.status == JobStatus.INVOICED) ZCaption("Awaiting payment")
                             }
                         }

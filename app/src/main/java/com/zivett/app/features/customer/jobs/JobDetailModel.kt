@@ -58,6 +58,11 @@ class JobDetailModel(
 
     suspend fun load() { state = state.reloaded { client.send(area.job(jobId)).job } }
 
+    /// A live ping's refetch. Skipped while an action is in flight — its
+    /// response swaps the whole job anyway, and a GET that raced it could
+    /// land after and paint the older state.
+    suspend fun refresh() { if (!busy) load() }
+
     // Actions
 
     /// NonCancellable like the other money calls — a cancellation past
@@ -253,7 +258,7 @@ class JobDetailModel(
         busy = true
         try {
             val dispute = client.send(area.report(jobId, kind, body)).dispute
-            job?.let { state = Loadable.Loaded(it.copy(disputes = (it.disputes ?: emptyList()) + dispute)) }
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
             return dispute
         } catch (error: ApiError) {
             toast = error.first("body") ?: error.userMessage
@@ -269,7 +274,7 @@ class JobDetailModel(
         busy = true
         try {
             val dispute = client.send(area.warrantyClaim(jobId, body)).dispute
-            job?.let { state = Loadable.Loaded(it.copy(disputes = (it.disputes ?: emptyList()) + dispute)) }
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
             return dispute
         } catch (error: ApiError) {
             toast = error.first("body") ?: error.userMessage

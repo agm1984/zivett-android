@@ -106,6 +106,11 @@ data class Team(val organization: OrgRef, val canManage: Boolean = false, val me
         /// A photo-less company member can't be assigned jobs.
         val photoUrl: String? = null,
         val hasPhoto: Boolean? = null,
+        /// Company orgs: field tech (true) vs office staff (false). Off
+        /// = skipped by automatic assignment (quote acceptance, "Auto-
+        /// assign next") but still pickable by hand. Defaults on so an
+        /// older server that omits it reads as everyone taking jobs.
+        val takesJobs: Boolean = true,
     )
     @Serializable
     data class Invitation(val id: Int, val email: String, val invitedBy: String? = null, val expiresAt: Instant? = null, val status: String)
@@ -125,6 +130,18 @@ data class PropertyBody(
 )
 
 @Serializable data class MemberResponse(val member: Team.Member)
+
+/// `PATCH /api/{company|business}/team/members/{id}` (UpdateMemberRequest).
+/// `takes_jobs` is a JSON BOOLEAN and company-only: null is omitted by
+/// the default coder, so the business body never carries it.
+@Serializable
+data class MemberBody(
+    val firstName: String,
+    val lastName: String,
+    val role: String,
+    val status: String,
+    val takesJobs: Boolean? = null,
+)
 @Serializable data class LogoResponse(val logoUrl: String? = null)
 
 object BusinessEndpoints {
@@ -186,5 +203,6 @@ object BusinessEndpoints {
     fun team() = ApiRequest.get<Team>("api/business/team")
     fun invite(email: String) = ApiRequest.empty(Method.POST, "api/business/team/invitations", mapOf("email" to email))
     fun revoke(invitationId: Int) = ApiRequest.empty(Method.DELETE, "api/business/team/invitations/$invitationId")
-    fun updateMember(id: Int, firstName: String, lastName: String, role: String, status: String) = ApiRequest.patch<MemberResponse, Map<String, String>>("api/business/team/members/$id", mapOf("first_name" to firstName, "last_name" to lastName, "role" to role, "status" to status))
+    // Business orgs don't assign jobs — `takes_jobs` is stripped here.
+    fun updateMember(id: Int, body: MemberBody) = ApiRequest.patch<MemberResponse, MemberBody>("api/business/team/members/$id", body.copy(takesJobs = null))
 }

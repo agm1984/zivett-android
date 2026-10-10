@@ -162,6 +162,8 @@ data class Review(
 )
 
 /// `DisputeResource` — warranty claims and reports share the table.
+/// `body` rides only for the case's author (the other party sees that a
+/// case exists and its kind, never the words), so it's absent otherwise.
 @Serializable
 data class Dispute(
     val id: Int,
@@ -169,6 +171,8 @@ data class Dispute(
     val kind: String,
     val status: String,
     val body: String? = null,
+    /// The signed-in user (or their org) opened it. Absent on older servers.
+    val mine: Boolean = false,
     val resolution: String? = null,
     val createdAt: Instant? = null,
     val resolvedAt: Instant? = null,

@@ -142,7 +142,9 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
     var photoBusy by mutableStateOf(false)
     val hasPhotoUI: Boolean get() = area.uploadPhoto != null
 
-    suspend fun uploadPhoto(jpeg: ByteArray?) {
+    /// `session` refreshes the signed-in user so its `photoUrl` (the
+    /// en-route self-assign check) follows the change.
+    suspend fun uploadPhoto(jpeg: ByteArray?, session: AuthSession? = null) {
         val upload = area.uploadPhoto ?: return
         photoBusy = true; error = null
         try {
@@ -150,6 +152,7 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
             val response = client.send(upload(jpeg))
             state.value?.let { state = Loadable.Loaded(it.copy(profile = it.profile.copy(photoUrl = response.photoUrl))) }
             notice = "Profile photo saved."
+            session?.let { runCatching { it.refreshUser() } }
         } catch (apiError: ApiError) {
             error = apiError.userMessage
         } catch (_: Exception) {
@@ -159,12 +162,13 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
         }
     }
 
-    suspend fun removePhoto() {
+    suspend fun removePhoto(session: AuthSession? = null) {
         val remove = area.deletePhoto ?: return
         photoBusy = true; error = null
         try {
             client.send(remove())
             state.value?.let { state = Loadable.Loaded(it.copy(profile = it.profile.copy(photoUrl = null))) }
+            session?.let { runCatching { it.refreshUser() } }
         } catch (_: Exception) {
             error = "Could not remove the photo. Please try again."
         } finally {
@@ -182,7 +186,7 @@ fun ProfileScreen(area: ProfileArea, onBack: () -> Unit) {
     LaunchedEffect(model) { model.load() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch { model.uploadPhoto(PhotoImport.jpegData(context, listOf(uri), 1024).firstOrNull()) }
+        if (uri != null) scope.launch { model.uploadPhoto(PhotoImport.jpegData(context, listOf(uri), 1024).firstOrNull(), environment.session) }
     }
 
     Column {

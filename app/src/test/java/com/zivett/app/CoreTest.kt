@@ -4,6 +4,14 @@ import com.zivett.app.core.AddressParts
 import com.zivett.app.core.Money
 import com.zivett.app.core.PhoneFormatter
 import com.zivett.app.core.models.AppNotification
+import com.zivett.app.core.models.AssignmentRoster
+import com.zivett.app.core.models.MemberBody
+import com.zivett.app.core.models.Team
+import com.zivett.app.core.models.TeamArea
+import com.zivett.app.core.models.UserRole
+import com.zivett.app.core.models.nextUp
+import com.zivett.app.core.models.noFieldTechs
+import com.zivett.app.core.models.nobodyAssignable
 import com.zivett.app.core.models.BusinessSetup
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
@@ -17,6 +25,7 @@ import com.zivett.app.core.realtime.PusherProtocol
 import com.zivett.app.core.realtime.RealtimeBackoff
 import com.zivett.app.core.realtime.RealtimeEvents
 import com.zivett.app.features.business.BusinessSetupSteps
+import com.zivett.app.features.company.CompanyPresentation
 import com.zivett.app.features.customer.book.BookingDraftPayload
 import com.zivett.app.features.customer.book.BookingDraftResponse
 import org.junit.Assert.assertEquals
@@ -218,6 +227,22 @@ class PusherProtocolTest {
         assertEquals("Illuminate\\Notifications\\Events\\BroadcastNotificationCreated", RealtimeEvents.notificationCreated)
     }
 
+    @Test fun jobPingsAreRecognisedButNeverRendered() {
+        val raw = """{"event":"job.updated","channel":"private-job.7","data":"{\"id\":7,\"status\":\"en_route\"}"}"""
+        val frame = PusherProtocol.decodeFrame(raw)!!
+        assertEquals("private-job.7", frame.channel)
+        assertTrue(RealtimeEvents.isJobPing(frame.event, frame.payload, 7))
+        // Another job's ping, another event, or the location stream: no refetch.
+        assertFalse(RealtimeEvents.isJobPing("job.updated", """{"id":8,"status":"arrived"}""", 7))
+        assertFalse(RealtimeEvents.isJobPing(RealtimeEvents.locationUpdated, """{"id":7}""", 7))
+        // A body we can't read (or a status this build doesn't know) is still a ping.
+        assertTrue(RealtimeEvents.isJobPing("job.updated", "{}", 7))
+        assertTrue(RealtimeEvents.isJobPing("job.updated", "not json", 7))
+        assertTrue(RealtimeEvents.isJobPing("job.updated", """{"id":7,"status":"some_future_status"}""", 7))
+        assertEquals("job.7", RealtimeEvents.jobChannel(7))
+        assertEquals("job.7.location", RealtimeEvents.jobLocationChannel(7))
+    }
+
     @Test fun pushTapsResolveTheJobRef() {
         assertEquals("Z-93U4H3", PushRouting.jobRef(mapOf("route_name" to "customer.jobs.show", "route_id" to "Z-93U4H3")))
         assertEquals("Z-93U4H3", PushRouting.jobRef(mapOf("route_name" to "company.jobs.show", "route_params" to """{"id":"Z-93U4H3"}""")))
@@ -264,5 +289,71 @@ class BusinessSetupStepsTest {
         assertEquals(BusinessSetupSteps.Status.TODO, BusinessSetupSteps.status(BusinessSetupSteps.Step.PROPERTIES, BusinessSetupSteps.Step.PROFILE, setup(properties = false)))
         assertEquals("Business profile: phone · Properties: add at least one property", BusinessSetupSteps.whatsLeft(BusinessSetupSteps.Step.TEAM, setup(profileComplete = false, profileMissing = listOf("phone"), properties = false)))
         assertNull(BusinessSetupSteps.whatsLeft(BusinessSetupSteps.Step.PROFILE, setup(profileComplete = false)))
+    }
+}
+
+/// Auto-assignment at acceptance (web 93729d2): the `takes_jobs` flag,
+/// the roster's `auto_pickable`, and the en-route guard.
+class TechAssignmentTest {
+    private fun roster(json: String) = JsonCoding.json.decodeFromString<AssignmentRoster>(json)
+    private fun job(json: String) = JsonCoding.json.decodeFromString<Job>(json)
+
+    @Test fun rosterDecodesTheNewFlagsAndFallsBackOnAnOlderServer() {
+        val current = roster("""{"assigned_user_id":null,"members":[{"id":1,"name":"Office Olu","assignable":true,"takes_jobs":false,"auto_pickable":false},{"id":2,"name":"Tech Tam","assignable":true,"takes_jobs":true,"auto_pickable":true}]}""")
+        assertFalse(current.members[0].isAutoPickable)
+        assertEquals(2, current.nextUp()?.id) // "Auto-assign next" skips office staff
+        // Older server: no takes_jobs / auto_pickable — everyone assignable is a field tech.
+        val older = roster("""{"members":[{"id":3,"name":"Sam","assignable":true},{"id":4,"name":"Nia","assignable":false,"needs_photo":true}]}""")
+        assertTrue(older.members[0].takesJobs)
+        assertTrue(older.members[0].isAutoPickable)
+        assertFalse(older.members[1].isAutoPickable)
+        assertEquals(3, older.nextUp()?.id)
+    }
+
+    @Test fun pickerNoticesTellNobodyAssignableFromNoFieldTechs() {
+        val noPhotos = roster("""{"members":[{"id":1,"name":"A","assignable":false,"needs_photo":true}]}""")
+        assertTrue(noPhotos.nobodyAssignable)
+        assertFalse(noPhotos.noFieldTechs)
+        assertNull(noPhotos.nextUp())
+        val officeOnly = roster("""{"members":[{"id":1,"name":"A","assignable":true,"takes_jobs":false,"auto_pickable":false}]}""")
+        assertFalse(officeOnly.nobodyAssignable)
+        assertTrue(officeOnly.noFieldTechs)
+        assertNull(officeOnly.nextUp())
+        // The assigned head is never offered again.
+        val assigned = roster("""{"members":[{"id":1,"name":"A","assignable":true,"auto_pickable":true,"assigned":true},{"id":2,"name":"B","assignable":true,"auto_pickable":true}]}""")
+        assertEquals(2, assigned.nextUp()?.id)
+    }
+
+    @Test fun teamMembersDefaultToTakingJobs() {
+        val team = JsonCoding.json.decodeFromString<Team>("""{"organization":{"id":1,"name":"R","type":"company"},"members":[{"id":1,"name":"A","email":"a@b.c","role":"admin","status":"active"},{"id":2,"name":"B","email":"b@b.c","role":"member","status":"active","takes_jobs":false}]}""")
+        assertTrue(team.members[0].takesJobs)
+        assertFalse(team.members[1].takesJobs)
+    }
+
+    @Test fun takesJobsIsAJsonBooleanOnTheCompanyPatchOnly() {
+        val body = MemberBody("Amara", "Okafor", "member", "active", takesJobs = false)
+        val company = String(TeamArea.company.updateMember(7, body).body!!)
+        assertTrue(company.contains("\"takes_jobs\":false"))
+        assertTrue(company.contains("\"first_name\":\"Amara\""))
+        assertFalse(String(TeamArea.business.updateMember(7, body).body!!).contains("takes_jobs"))
+        // Null = leave it unchanged (omitted, not written as null).
+        assertFalse(String(TeamArea.company.updateMember(7, body.copy(takesJobs = null)).body!!).contains("takes_jobs"))
+    }
+
+    @Test fun enRouteNeedsATechWhenTheUserCantSelfAssign() {
+        val unassigned = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
+        val withTech = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"assigned_tech":{"id":5,"name":"Mike R."}}""")
+        val photoless = Fixtures.user(role = UserRole.COMPANY)
+        val withPhoto = photoless.copy(photoUrl = "https://example.test/me.jpg")
+        assertTrue(CompanyPresentation.needsTechBeforeEnRoute(unassigned, photoless))
+        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned, withPhoto)) // server self-assigns
+        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(withTech, photoless))
+        // Only the en-route step needs it.
+        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned.copy(status = JobStatus.EN_ROUTE), photoless))
+    }
+
+    @Test fun theSessionUserCarriesItsPhoto() {
+        val user = JsonCoding.json.decodeFromString<User>("""{"id":2,"first_name":"A","last_name":"B","name":"A B","email":"a@b.c","role":"company","photo_url":"https://example.test/p.jpg"}""")
+        assertEquals("https://example.test/p.jpg", user.photoUrl)
     }
 }

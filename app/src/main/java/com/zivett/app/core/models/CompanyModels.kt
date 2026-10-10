@@ -228,9 +228,11 @@ data class QuoteBody(
 @Serializable data class ProfilePhotoResponse(val photoUrl: String? = null)
 
 /// `GET/POST /api/company/jobs/{job}/assignment` — the dispatcher's
-/// picker. Members arrive in suggested-fairness order (fewest open
-/// jobs, longest since last assignment), so "Auto-assign next" is just
-/// the head of the list.
+/// picker. Members arrive auto-pickable first (field techs with a
+/// photo), then assignable office staff, then the unassignable — each
+/// group in suggested-fairness order (fewest open jobs, longest since
+/// last assignment). Accepting a quote already auto-assigns that head,
+/// so the picker is mostly for reassigning.
 @Serializable
 data class AssignmentRoster(val assignedUserId: Int? = null, val members: List<RosterMember> = emptyList())
 
@@ -243,7 +245,26 @@ data class RosterMember(
     val needsPhoto: Boolean = false,
     val openJobs: Int = 0,
     val assigned: Boolean = false,
-)
+    /// Office staff (false) are skipped by automatic picks but can still
+    /// be chosen by hand. Defaults on for an older server.
+    val takesJobs: Boolean = true,
+    /// Server-computed `assignable && takes_jobs`; absent on an older
+    /// server, where it falls back to that same rule.
+    val autoPickable: Boolean? = null,
+) {
+    /// Who "Auto-assign next" (and acceptance) may pick.
+    val isAutoPickable: Boolean get() = autoPickable ?: (assignable && takesJobs)
+}
+
+/// The picker's head: the first field tech who isn't already on the job.
+fun AssignmentRoster.nextUp(): RosterMember? = members.firstOrNull { it.isAutoPickable && !it.assigned }
+
+/// Nobody could be assigned at all — almost always nobody has a photo yet.
+val AssignmentRoster.nobodyAssignable: Boolean get() = members.none { it.assignable }
+
+/// Photos exist, but everyone who has one is marked as office staff — so
+/// acceptance assigned nobody and "Auto-assign next" has no one to offer.
+val AssignmentRoster.noFieldTechs: Boolean get() = members.any { it.assignable } && members.none { it.isAutoPickable }
 
 @Serializable data class AssignmentResult(val job: Job, val members: List<RosterMember> = emptyList())
 
@@ -371,5 +392,5 @@ object CompanyEndpoints {
     fun team() = ApiRequest.get<Team>("api/company/team")
     fun invite(email: String) = ApiRequest.empty(Method.POST, "api/company/team/invitations", mapOf("email" to email))
     fun revoke(invitationId: Int) = ApiRequest.empty(Method.DELETE, "api/company/team/invitations/$invitationId")
-    fun updateMember(id: Int, firstName: String, lastName: String, role: String, status: String) = ApiRequest.patch<MemberResponse, Map<String, String>>("api/company/team/members/$id", mapOf("first_name" to firstName, "last_name" to lastName, "role" to role, "status" to status))
+    fun updateMember(id: Int, body: MemberBody) = ApiRequest.patch<MemberResponse, MemberBody>("api/company/team/members/$id", body)
 }

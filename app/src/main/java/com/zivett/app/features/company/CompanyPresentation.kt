@@ -1,6 +1,8 @@
 package com.zivett.app.features.company
 
+import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
+import com.zivett.app.core.models.User
 import com.zivett.app.design.ZTone
 import com.zivett.app.features.customer.jobs.JobPresentation
 import java.time.Instant
@@ -25,6 +27,13 @@ object CompanyPresentation {
 
     /// Statuses a dispatcher can (re)assign in — `Assignments::ASSIGNABLE_STATUSES`.
     val assignable: Set<JobStatus> = setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
+
+    /// Going en route needs a face on the job: the server self-assigns an
+    /// unassigned job to the advancing user, but 422s when they have no
+    /// photo. In that case the job page opens the assign picker (and the
+    /// Jobs list routes there) instead of firing a doomed request.
+    fun needsTechBeforeEnRoute(job: Job, user: User?): Boolean =
+        nextStage(job.status) == JobStatus.EN_ROUTE && job.assignedTech == null && user?.photoUrl == null
 
     fun urgencyBadge(urgency: String?): JobPresentation.Meta? = when (urgency) {
         "asap" -> JobPresentation.Meta("URGENT", ZTone.DANGER)

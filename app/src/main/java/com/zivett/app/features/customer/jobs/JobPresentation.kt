@@ -2,11 +2,13 @@ package com.zivett.app.features.customer.jobs
 
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.CompanySummary
+import com.zivett.app.core.models.Dispute
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.design.ZTone
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -75,19 +77,77 @@ object JobPresentation {
 
     fun disputeKindLabel(kind: String): String = when (kind) {
         "warranty_claim" -> "Warranty claim"
-        "rework" -> "Rework"
-        "billing" -> "Billing"
+        "rework" -> "Rework requested"
+        "billing" -> "Billing query"
         "quality" -> "Work quality"
         "conduct" -> "Conduct or behaviour"
         "safety" -> "Safety concern"
         else -> kind.replaceFirstChar { it.uppercase() }
     }
 
+    // Support cases (`SupportCaseCard.vue`)
+
+    /// Whose job page the case card is on — the reporter line and the
+    /// "what's paused" sentence differ.
+    enum class CaseSide { BOOKER, COMPANY }
+
+    private val caseClosed = setOf("resolved", "declined")
+
+    /// The job's unresolved cases. The server only sends those, but a
+    /// grafted or stale row can carry a verdict — never show it as open.
+    fun openCases(job: Job): List<Dispute> = (job.disputes ?: emptyList()).filter { it.resolvedAt == null && it.status !in caseClosed }
+
+    /// "Support case DSP-Y82AAK" — codes are nullable on old rows.
+    private fun caseName(dispute: Dispute): String = "Support case${dispute.code?.let { " $it" } ?: ""}"
+
+    fun caseTitle(dispute: Dispute): String = "${caseName(dispute)} — ${disputeKindLabel(dispute.kind)}"
+
+    private val caseDay = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
+
+    fun caseReporterLine(dispute: Dispute, side: CaseSide, zone: ZoneId = ZoneId.systemDefault()): String {
+        val who = when {
+            dispute.mine -> "You reported this"
+            side == CaseSide.BOOKER -> "Your pro reported a problem"
+            else -> "The customer reported a problem"
+        }
+        val day = dispute.createdAt?.let { caseDay.withZone(zone).format(it) } ?: return "$who."
+        return "$who on $day."
+    }
+
+    /// Reported → with support → resolved. Awaiting evidence is the
+    /// middle step in a warning state, renamed for what it asks.
+    fun caseSteps(dispute: Dispute): List<Pair<String, StepState>> {
+        val middle = when (dispute.status) {
+            "awaiting_evidence" -> "More details needed" to StepState.WARN
+            "under_review" -> "Under review" to StepState.CURRENT
+            else -> "Under review" to StepState.TODO
+        }
+        return listOf("Reported" to StepState.DONE, middle, "Resolved" to StepState.TODO)
+    }
+
+    /// What happens next, then what's paused. Never "held" — no card
+    /// hold exists.
+    fun caseNextStep(dispute: Dispute, side: CaseSide): String {
+        if (dispute.status == "awaiting_evidence") {
+            return if (dispute.mine) "Support needs more from you — check your notifications and reply with photos or details."
+            else "Support has asked for more details and may reach out to you."
+        }
+        val next = if (dispute.mine) "We'll notify you when support starts reviewing it and when it's resolved." else "Support may reach out to you while they look into it."
+        val paused = if (side == CaseSide.BOOKER) "Payment and closing the job are paused while the case is open." else "Your payout and closing the job are paused while the case is open."
+        return "$next $paused"
+    }
+
+    /// Replaces Pay & close while a case is open — the server won't close
+    /// or charge (JobClosure::held), so the button would do nothing.
+    fun paymentPausedCopy(dispute: Dispute): String =
+        "Payment is paused while support case${dispute.code?.let { " $it" } ?: ""} is open — your card isn't charged until it's resolved."
+
     val reportKinds: List<Pair<String, String>> = listOf("quality" to "Work quality", "conduct" to "Conduct or behaviour", "safety" to "Safety concern")
 
     // Timeline
 
-    enum class StepState { DONE, CURRENT, TODO }
+    /// WARN is the support-case stepper's "more details needed".
+    enum class StepState { DONE, CURRENT, WARN, TODO }
 
     data class Step(val status: JobStatus, val title: String, val state: StepState)
 
@@ -186,7 +246,10 @@ object JobPresentation {
     // Cancel copy (`JobDetailView.vue` manage row + modal)
 
     fun cancelManageCopy(job: Job): String {
-        if (!job.isCancellable) return "Something wrong? Reporting a problem brings support in, and any pending payment stays held until it's resolved."
+        if (!job.isCancellable) {
+            openCases(job).firstOrNull()?.let { return "${caseName(it)} is ${disputeStatusMeta(it.status).label.lowercase()} — payment and closing are paused until it's resolved." }
+            return "Something wrong? Reporting a problem brings support in, and any pending payment is paused until it's resolved."
+        }
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) return "Cancelling now has a ${Money.format(fee)} cancellation fee — your pro has already committed to this job."
         return "Free to cancel right now — once a pro is committed, a cancellation fee applies."

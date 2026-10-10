@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +45,8 @@ import com.zivett.app.app.Areas
 import com.zivett.app.app.CompanyInvoiceRoute
 import com.zivett.app.app.ConversationRoute
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.app.ProfileRoute
+import com.zivett.app.app.TeamRoute
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
@@ -55,6 +58,9 @@ import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.JobPhoto
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.OrganizationRole
+import com.zivett.app.core.models.noFieldTechs
+import com.zivett.app.core.models.nobodyAssignable
+import com.zivett.app.core.models.nextUp
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.userMessage
@@ -99,8 +105,10 @@ import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.IntakeChips
 import com.zivett.app.features.shared.JobStatusBadge
 import com.zivett.app.features.shared.JobTrackingMap
+import com.zivett.app.features.shared.LiveJobEffect
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
+import com.zivett.app.features.shared.SupportCaseCards
 import com.zivett.app.features.shared.TimelineStepper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,12 +120,17 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
     var toast by mutableStateOf<String?>(null)
     var busy by mutableStateOf(false)
     // The dispatcher's assign/reassign picker (org admins only — the
-    // server enforces it; members take jobs via the EnRoute self-assign).
+    // server enforces it). Accepting a quote auto-assigns a field tech,
+    // so this is mostly for reassigning or for teams nobody could be
+    // auto-picked from.
     var roster by mutableStateOf<Loadable<AssignmentRoster>>(Loadable.Loading)
 
     val job: Job? get() = state.value
 
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.job(jobId)).job } }
+
+    /// A live ping's refetch; skipped mid-action (the response wins).
+    suspend fun refresh() { if (!busy) load() }
 
     suspend fun advance() {
         busy = true
@@ -178,9 +191,15 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         return false
     }
 
+    /// Grafts the new case into the job so its card shows straight away
+    /// (the live ping's refetch would get there, but not instantly).
     suspend fun report(kind: String, body: String): Dispute? {
         busy = true
-        try { return client.send(CompanyEndpoints.report(jobId, kind, body)).dispute } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
+        try {
+            val dispute = client.send(CompanyEndpoints.report(jobId, kind, body)).dispute
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
+            return dispute
+        } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
         return null
     }
 
@@ -235,7 +254,7 @@ class LiveLocationSharer(private val context: Context) {
 sealed interface CompanyJobSheet { object ChangeOrder : CompanyJobSheet; object Report : CompanyJobSheet; object Withdraw : CompanyJobSheet; object Assign : CompanyJobSheet }
 
 @Composable
-fun CompanyJobDetailScreen(jobId: Int, onBack: () -> Unit) {
+fun CompanyJobDetailScreen(jobId: Int, openAssign: Boolean = false, onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val nav = LocalNav.current
     val context = LocalContext.current
@@ -247,8 +266,18 @@ fun CompanyJobDetailScreen(jobId: Int, onBack: () -> Unit) {
     val myId = environment.session.user?.id
     val isAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
 
-    LaunchedEffect(model) { model.load() }
+    // The Jobs list opens the job with `openAssign` when its "Mark en
+    // route" needed a tech — land straight on the picker.
+    LaunchedEffect(model) {
+        model.load()
+        if (openAssign && isAdmin && model.job?.let { it.assignedTech == null && it.status in CompanyPresentation.assignable } == true) sheet = CompanyJobSheet.Assign
+    }
     DisposableEffect(Unit) { onDispose { sharer.stop() } }
+    LiveJobEffect(jobId) { model.refresh() }
+    // A live refetch can move the job off EnRoute (arrived from another
+    // device, cancelled by the booker) — stop broadcasting with it.
+    val status = model.job?.status
+    LaunchedEffect(status) { if (status != null && status != JobStatus.EN_ROUTE && sharer.sharing) sharer.stop() }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) sharer.start { lat, lng -> model.reportLocation(lat, lng) } else sharer.notice = "Location permission denied — sharing stopped."
@@ -261,6 +290,13 @@ fun CompanyJobDetailScreen(jobId: Int, onBack: () -> Unit) {
     /// EnRoute auto-starts the loop — but ONLY when the signed-in user IS
     /// the assigned tech. Leaving EnRoute stops it.
     fun advance() {
+        // Going en route needs a face on the job. With none, and no photo
+        // to self-assign with, the server would refuse — open the picker.
+        val current = model.job
+        if (current != null && CompanyPresentation.needsTechBeforeEnRoute(current, environment.session.user)) {
+            sheet = CompanyJobSheet.Assign
+            return
+        }
         scope.launch {
             model.advance()
             val job = model.job ?: return@launch
@@ -284,6 +320,9 @@ fun CompanyJobDetailScreen(jobId: Int, onBack: () -> Unit) {
                             Text(listOfNotNull(job.code, JobPresentation.modeMeta(job.mode).label, job.address, job.unit, job.scheduledDate?.let { JobPresentation.windowSlot(it, job.scheduledWindow) }).joinToString(" · "), style = ZType.caption, color = Color.White.copy(alpha = 0.75f))
                         }
 
+                        // Open support cases lead — they're why the payout is frozen.
+                        SupportCaseCards(job, JobPresentation.CaseSide.COMPANY)
+
                         // Who's on it — the tech the customer is told to expect.
                         ZCard {
                             ZMono("Assigned tech")
@@ -296,9 +335,25 @@ fun CompanyJobDetailScreen(jobId: Int, onBack: () -> Unit) {
                                         ZCaption("The customer sees this name and photo.")
                                     }
                                 }
-                            } else ZCaption("Nobody yet — marking the job on the way assigns it to you.")
-                            if (isAdmin && job.status in CompanyPresentation.assignable) {
-                                ZButton(if (job.assignedTech == null) "Assign a tech" else "Reassign", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { sheet = CompanyJobSheet.Assign }
+                                if (isAdmin && job.status in CompanyPresentation.assignable) {
+                                    ZButton("Reassign", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { sheet = CompanyJobSheet.Assign }
+                                }
+                            } else {
+                                // Acceptance usually assigns someone — when it couldn't, say so loudly.
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.tile)).background(colors.tone(ZTone.WARNING).let { (_, bg) -> bg }).padding(ZSpacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(ZSpacing.xs),
+                                ) {
+                                    ZBodyStrong("No tech assigned yet")
+                                    ZCaption(
+                                        "The customer sees the name and photo of who's coming, so this job needs a tech before it can go en route." +
+                                            if (!isAdmin) " Going en route assigns it to you." else "",
+                                        tone = ZTextTone.SOFT,
+                                    )
+                                    if (isAdmin && job.status in CompanyPresentation.assignable) {
+                                        ZButton("Assign a tech", compact = true, fullWidth = false) { sheet = CompanyJobSheet.Assign }
+                                    }
+                                }
                             }
                         }
 
@@ -494,12 +549,14 @@ private fun CompanyWithdrawSheet(job: Job, model: CompanyJobDetailModel, onDismi
     }
 }
 
-/// The dispatcher's picker: the roster in suggested-fairness order
+/// The dispatcher's picker: field techs first, then office staff, then
+/// teammates who can't be assigned, each in suggested-fairness order
 /// (fewest open jobs, longest since last assignment) — "Auto-assign
-/// next" takes the head, but the dispatcher always chooses.
+/// next" takes the first field tech, but the dispatcher always chooses.
 @Composable
 private fun AssignTechSheet(model: CompanyJobDetailModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val nav = LocalNav.current
     var assigning by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(model) { model.loadRoster() }
     fun assign(userId: Int) {
@@ -511,7 +568,19 @@ private fun AssignTechSheet(model: CompanyJobDetailModel, onDismiss: () -> Unit)
         ZBody("Suggested order — fewest open jobs first, then longest since their last one. The booker sees the assigned tech's name and photo.", tone = ZTextTone.SOFT)
         ZLoadable(model.roster, retry = { scope.launch { model.loadRoster() } }) { roster ->
             Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-                roster.members.firstOrNull { it.assignable && !it.assigned }?.let { next -> ZButton("Auto-assign next — ${next.name}", loading = assigning == next.id) { assign(next.id) } }
+                roster.nextUp()?.let { next -> ZButton("Auto-assign next — ${next.name}", loading = assigning == next.id) { assign(next.id) } }
+                // Nobody pickable is almost always "nobody has a photo yet"
+                // — usually a solo owner who signed up without one.
+                if (roster.nobodyAssignable) {
+                    ZBanner("Nobody on your team has a profile photo yet, and customers see the photo of who's coming. Add your photo (My account) to take this job yourself, or add teammates' photos from the Team page.", tone = ZTone.WARNING)
+                    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
+                        ZTextAction("My account") { onDismiss(); nav.navigate(ProfileRoute(Areas.COMPANY)) }
+                        ZTextAction("Team page") { onDismiss(); nav.navigate(TeamRoute(Areas.COMPANY)) }
+                    }
+                } else if (roster.noFieldTechs) {
+                    ZBanner("Nobody is set to take jobs, so nothing is auto-assigned. Pick someone below, or turn on “Takes jobs” for your techs on the Team page.", tone = ZTone.WARNING)
+                    ZTextAction("Team page") { onDismiss(); nav.navigate(TeamRoute(Areas.COMPANY)) }
+                }
                 for (member in roster.members) {
                     ZSelectableRow(selected = member.assigned, enabled = member.assignable && !member.assigned && assigning == null, onClick = { assign(member.id) }) {
                         ZPhotoAvatar(member.photoUrl, member.name.take(1), 40.dp)
@@ -519,7 +588,9 @@ private fun AssignTechSheet(model: CompanyJobDetailModel, onDismiss: () -> Unit)
                             ZBodyStrong(member.name)
                             ZCaption(if (member.needsPhoto) "Needs a profile photo before they can be assigned" else "${member.openJobs} open ${if (member.openJobs == 1) "job" else "jobs"}")
                         }
-                        if (member.assigned) ZBadge("Assigned", ZTone.SUCCESS) else if (assigning == member.id) ZSpinner(size = 18.dp)
+                        if (member.assigned) ZBadge("Assigned", ZTone.SUCCESS)
+                        else if (assigning == member.id) ZSpinner(size = 18.dp)
+                        else if (member.assignable && !member.takesJobs) ZBadge("Office")
                     }
                 }
             }

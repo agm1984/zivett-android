@@ -73,8 +73,10 @@ import com.zivett.app.features.company.Dates
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.IntakeChips
 import com.zivett.app.features.shared.JobTrackingMap
+import com.zivett.app.features.shared.LiveJobEffect
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
+import com.zivett.app.features.shared.SupportCaseCards
 import com.zivett.app.features.shared.TimelineStepper
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -99,6 +101,7 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
     var reviewNudged by remember { mutableStateOf(false) }
 
     LaunchedEffect(model) { model.load() }
+    LiveJobEffect(jobId) { model.refresh() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { uris ->
         if (uris.isNotEmpty()) scope.launch { model.upload(PhotoImport.jpegData(context, uris)) }
@@ -146,13 +149,13 @@ private fun JobDetailContent(job: Job, model: JobDetailModel, area: JobArea, onS
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
         JobHeader(job, area)
 
+        // Open support cases lead everything (web's order -1 card) —
+        // they're why "Pay & close" would refuse.
+        SupportCaseCards(job, JobPresentation.CaseSide.BOOKER)
+
         if (job.lat != null && job.status in setOf(JobStatus.EN_ROUTE, JobStatus.ARRIVED)) {
             JobTrackingMap(job, area, modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(ZRadius.panel)))
         }
-
-        // Open support cases lead everything (web's order -1 card) —
-        // they're why "Pay & close" would refuse.
-        SupportCases(job)
 
         // Ordering mirrors `mainOrder` on the web: what matters most
         // for this phase leads.
@@ -360,27 +363,15 @@ private fun InvoiceCard(job: Job, model: JobDetailModel, area: JobArea, onSheet:
         }
         InvoiceBreakdown(invoice)
         ZTextAction(invoice.number ?: "View invoice") { nav.navigate(InvoiceDetailRoute(invoice.id, if (area.kind == JobArea.Kind.BUSINESS) Areas.BUSINESS else Areas.CUSTOMER)) }
-        if (!invoice.isPaid && job.status != JobStatus.CANCELLED) {
+        // An open case freezes closure server-side (JobClosure::held):
+        // Pay & close would do nothing and the auto-release date isn't
+        // coming, so say what IS happening instead.
+        val openCase = JobPresentation.openCases(job).firstOrNull()
+        if (!invoice.isPaid && job.status != JobStatus.CANCELLED && openCase != null) {
+            ZBanner(JobPresentation.paymentPausedCopy(openCase), tone = ZTone.WARNING)
+        } else if (!invoice.isPaid && job.status != JobStatus.CANCELLED) {
             ZActionBand("Pay & close — ${Money.format(invoice.amountDueCents)}", loading = model.busy) { onSheet(JobSheet.Pay) }
             job.autoCloseAt?.let { ZCaption("Payment releases automatically on ${Dates.shortTime(it)} unless you report an issue first.") }
-        }
-    }
-}
-
-private val caseKindLabels = mapOf("quality" to "Work quality", "conduct" to "Conduct or behaviour", "safety" to "Safety concern", "warranty_claim" to "Warranty claim", "rework" to "Rework request", "billing" to "Billing issue")
-private val caseStatusLabels = mapOf("open" to "Open", "under_review" to "Under review", "awaiting_evidence" to "Waiting on evidence")
-
-/// Every unresolved case, as the web's warning card.
-@Composable
-private fun SupportCases(job: Job) {
-    for (dispute in (job.disputes ?: emptyList()).filter { it.resolvedAt == null }) {
-        ZCard {
-            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                ZBadge(caseStatusLabels[dispute.status] ?: dispute.status, ZTone.WARNING)
-                ZHeadline("Support case${dispute.code?.let { " $it" } ?: ""} — ${caseKindLabels[dispute.kind] ?: dispute.kind}")
-            }
-            dispute.body?.takeIf { it.isNotEmpty() }?.let { ZBody("“$it”", tone = ZTextTone.SOFT) }
-            ZCaption("Our support team is on it — payment and closure stay on hold while the case is open.")
         }
     }
 }
@@ -432,7 +423,7 @@ private fun ManageRow(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm), modifier = Modifier.padding(top = ZSpacing.sm)) {
         ZCaption(JobPresentation.cancelManageCopy(job))
         com.zivett.app.design.ZFlowRow(spacing = ZSpacing.xs) {
-            if (job.company != null) ZButton("Report a problem", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onSheet(JobSheet.Report) }
+            if (job.company != null) ZButton(if (JobPresentation.openCases(job).isNotEmpty()) "Report another problem" else "Report a problem", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onSheet(JobSheet.Report) }
             if (job.status == JobStatus.WARRANTY_ACTIVE && (job.disputes ?: emptyList()).none { it.kind == "warranty_claim" && it.status !in setOf("resolved", "declined") }) {
                 ZButton("Open a warranty claim", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onSheet(JobSheet.Claim) }
             }
