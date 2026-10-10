@@ -108,6 +108,7 @@ import com.zivett.app.features.shared.JobTrackingMap
 import com.zivett.app.features.shared.LiveJobEffect
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
+import com.zivett.app.features.shared.SupportCaseCards
 import com.zivett.app.features.shared.TimelineStepper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -190,9 +191,15 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         return false
     }
 
+    /// Grafts the new case into the job so its card shows straight away
+    /// (the live ping's refetch would get there, but not instantly).
     suspend fun report(kind: String, body: String): Dispute? {
         busy = true
-        try { return client.send(CompanyEndpoints.report(jobId, kind, body)).dispute } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
+        try {
+            val dispute = client.send(CompanyEndpoints.report(jobId, kind, body)).dispute
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
+            return dispute
+        } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
         return null
     }
 
@@ -312,6 +319,9 @@ fun CompanyJobDetailScreen(jobId: Int, openAssign: Boolean = false, onBack: () -
                             Text(job.title, style = ZType.title, color = Color.White)
                             Text(listOfNotNull(job.code, JobPresentation.modeMeta(job.mode).label, job.address, job.unit, job.scheduledDate?.let { JobPresentation.windowSlot(it, job.scheduledWindow) }).joinToString(" · "), style = ZType.caption, color = Color.White.copy(alpha = 0.75f))
                         }
+
+                        // Open support cases lead — they're why the payout is frozen.
+                        SupportCaseCards(job, JobPresentation.CaseSide.COMPANY)
 
                         // Who's on it — the tech the customer is told to expect.
                         ZCard {

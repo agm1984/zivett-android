@@ -56,6 +56,7 @@ import com.zivett.app.design.ZMonoLarge
 import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZTextTone
 import com.zivett.app.design.ZTheme
+import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZType
 import com.zivett.app.features.customer.jobs.JobPresentation
 import androidx.compose.ui.text.font.FontWeight
@@ -63,34 +64,45 @@ import com.zivett.app.features.customer.jobs.oneDecimal
 
 /// The 9-stage vertical stepper on job pages.
 @Composable
-fun TimelineStepper(steps: List<JobPresentation.Step>) {
+fun TimelineStepper(steps: List<JobPresentation.Step>) = StepperRows(steps.map { it.title to it.state })
+
+/// The stepper itself, for any list of titled steps (the job timeline,
+/// the support-case progress).
+@Composable
+fun StepperRows(steps: List<Pair<String, JobPresentation.StepState>>) {
     val colors = ZTheme.colors
+    val warning = colors.tone(ZTone.WARNING).first
     Column {
-        steps.forEachIndexed { i, step ->
+        steps.forEachIndexed { i, (title, state) ->
             Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.Top) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier.size(22.dp).clip(CircleShape).background(
-                            when (step.state) {
+                            when (state) {
                                 JobPresentation.StepState.DONE -> colors.brandGold
                                 JobPresentation.StepState.CURRENT -> colors.navy
+                                JobPresentation.StepState.WARN -> warning
                                 JobPresentation.StepState.TODO -> colors.surfaceSunken
                             },
                         ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        when (step.state) {
+                        when (state) {
                             JobPresentation.StepState.DONE -> Icon(Icons.Filled.Check, contentDescription = null, tint = colors.navyDeep, modifier = Modifier.size(12.dp))
-                            JobPresentation.StepState.CURRENT -> Box(Modifier.size(7.dp).clip(CircleShape).background(colors.onBrand))
+                            JobPresentation.StepState.CURRENT, JobPresentation.StepState.WARN -> Box(Modifier.size(7.dp).clip(CircleShape).background(colors.onBrand))
                             JobPresentation.StepState.TODO -> Unit
                         }
                     }
-                    if (i < steps.size - 1) Box(Modifier.width(2.dp).height(18.dp).background(if (step.state == JobPresentation.StepState.DONE) colors.brandGold else colors.border))
+                    if (i < steps.size - 1) Box(Modifier.width(2.dp).height(18.dp).background(if (state == JobPresentation.StepState.DONE) colors.brandGold else colors.border))
                 }
                 Text(
-                    step.title,
-                    style = if (step.state == JobPresentation.StepState.CURRENT) ZType.bodyStrong else ZType.body,
-                    color = if (step.state == JobPresentation.StepState.TODO) colors.inkFaint else colors.ink,
+                    title,
+                    style = if (state == JobPresentation.StepState.CURRENT || state == JobPresentation.StepState.WARN) ZType.bodyStrong else ZType.body,
+                    color = when (state) {
+                        JobPresentation.StepState.TODO -> colors.inkFaint
+                        JobPresentation.StepState.WARN -> warning
+                        else -> colors.ink
+                    },
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }

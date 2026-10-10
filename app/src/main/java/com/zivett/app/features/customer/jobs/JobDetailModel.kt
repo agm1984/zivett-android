@@ -258,7 +258,7 @@ class JobDetailModel(
         busy = true
         try {
             val dispute = client.send(area.report(jobId, kind, body)).dispute
-            job?.let { state = Loadable.Loaded(it.copy(disputes = (it.disputes ?: emptyList()) + dispute)) }
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
             return dispute
         } catch (error: ApiError) {
             toast = error.first("body") ?: error.userMessage
@@ -274,7 +274,7 @@ class JobDetailModel(
         busy = true
         try {
             val dispute = client.send(area.warrantyClaim(jobId, body)).dispute
-            job?.let { state = Loadable.Loaded(it.copy(disputes = (it.disputes ?: emptyList()) + dispute)) }
+            job?.let { state = Loadable.Loaded(it.copy(disputes = it.disputes.orEmpty().filter { d -> d.id != dispute.id } + dispute)) }
             return dispute
         } catch (error: ApiError) {
             toast = error.first("body") ?: error.userMessage
