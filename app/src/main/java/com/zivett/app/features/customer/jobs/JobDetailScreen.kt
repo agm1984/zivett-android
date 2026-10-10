@@ -73,6 +73,7 @@ import com.zivett.app.features.company.Dates
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.IntakeChips
 import com.zivett.app.features.shared.JobTrackingMap
+import com.zivett.app.features.shared.LiveJobEffect
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
 import com.zivett.app.features.shared.TimelineStepper
@@ -99,6 +100,7 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
     var reviewNudged by remember { mutableStateOf(false) }
 
     LaunchedEffect(model) { model.load() }
+    LiveJobEffect(jobId) { model.refresh() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { uris ->
         if (uris.isNotEmpty()) scope.launch { model.upload(PhotoImport.jpegData(context, uris)) }

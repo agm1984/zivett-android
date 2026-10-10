@@ -58,6 +58,11 @@ class JobDetailModel(
 
     suspend fun load() { state = state.reloaded { client.send(area.job(jobId)).job } }
 
+    /// A live ping's refetch. Skipped while an action is in flight — its
+    /// response swaps the whole job anyway, and a GET that raced it could
+    /// land after and paint the older state.
+    suspend fun refresh() { if (!busy) load() }
+
     // Actions
 
     /// NonCancellable like the other money calls — a cancellation past

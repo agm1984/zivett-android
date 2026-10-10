@@ -105,6 +105,7 @@ import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.IntakeChips
 import com.zivett.app.features.shared.JobStatusBadge
 import com.zivett.app.features.shared.JobTrackingMap
+import com.zivett.app.features.shared.LiveJobEffect
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
 import com.zivett.app.features.shared.TimelineStepper
@@ -126,6 +127,9 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
     val job: Job? get() = state.value
 
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.job(jobId)).job } }
+
+    /// A live ping's refetch; skipped mid-action (the response wins).
+    suspend fun refresh() { if (!busy) load() }
 
     suspend fun advance() {
         busy = true
@@ -262,6 +266,11 @@ fun CompanyJobDetailScreen(jobId: Int, openAssign: Boolean = false, onBack: () -
         if (openAssign && isAdmin && model.job?.let { it.assignedTech == null && it.status in CompanyPresentation.assignable } == true) sheet = CompanyJobSheet.Assign
     }
     DisposableEffect(Unit) { onDispose { sharer.stop() } }
+    LiveJobEffect(jobId) { model.refresh() }
+    // A live refetch can move the job off EnRoute (arrived from another
+    // device, cancelled by the booker) — stop broadcasting with it.
+    val status = model.job?.status
+    LaunchedEffect(status) { if (status != null && status != JobStatus.EN_ROUTE && sharer.sharing) sharer.stop() }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) sharer.start { lat, lng -> model.reportLocation(lat, lng) } else sharer.notice = "Location permission denied — sharing stopped."

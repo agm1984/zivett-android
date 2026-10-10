@@ -99,7 +99,7 @@ fun JobTrackingMap(job: Job, area: JobArea = JobArea.customer, locationRequest: 
         }
     }
     DisposableEffect(job.id) {
-        val live = environment.realtime.subscribe("job.${job.id}.location") { event, payload ->
+        val live = environment.realtime.subscribe(RealtimeEvents.jobLocationChannel(job.id)) { event, payload ->
             if (event != RealtimeEvents.locationUpdated) return@subscribe
             val point = RealtimeEvents.point(payload) ?: return@subscribe
             val current = location ?: JobLocation()

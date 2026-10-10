@@ -227,6 +227,22 @@ class PusherProtocolTest {
         assertEquals("Illuminate\\Notifications\\Events\\BroadcastNotificationCreated", RealtimeEvents.notificationCreated)
     }
 
+    @Test fun jobPingsAreRecognisedButNeverRendered() {
+        val raw = """{"event":"job.updated","channel":"private-job.7","data":"{\"id\":7,\"status\":\"en_route\"}"}"""
+        val frame = PusherProtocol.decodeFrame(raw)!!
+        assertEquals("private-job.7", frame.channel)
+        assertTrue(RealtimeEvents.isJobPing(frame.event, frame.payload, 7))
+        // Another job's ping, another event, or the location stream: no refetch.
+        assertFalse(RealtimeEvents.isJobPing("job.updated", """{"id":8,"status":"arrived"}""", 7))
+        assertFalse(RealtimeEvents.isJobPing(RealtimeEvents.locationUpdated, """{"id":7}""", 7))
+        // A body we can't read (or a status this build doesn't know) is still a ping.
+        assertTrue(RealtimeEvents.isJobPing("job.updated", "{}", 7))
+        assertTrue(RealtimeEvents.isJobPing("job.updated", "not json", 7))
+        assertTrue(RealtimeEvents.isJobPing("job.updated", """{"id":7,"status":"some_future_status"}""", 7))
+        assertEquals("job.7", RealtimeEvents.jobChannel(7))
+        assertEquals("job.7.location", RealtimeEvents.jobLocationChannel(7))
+    }
+
     @Test fun pushTapsResolveTheJobRef() {
         assertEquals("Z-93U4H3", PushRouting.jobRef(mapOf("route_name" to "customer.jobs.show", "route_id" to "Z-93U4H3")))
         assertEquals("Z-93U4H3", PushRouting.jobRef(mapOf("route_name" to "company.jobs.show", "route_params" to """{"id":"Z-93U4H3"}""")))

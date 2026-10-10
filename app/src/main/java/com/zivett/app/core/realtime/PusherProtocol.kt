@@ -62,16 +62,22 @@ object RealtimeBackoff {
     fun delayMillis(attempt: Int): Long = minOf(30, 1 shl minOf(attempt, 5)).toLong() * 1000
 }
 
-/// The three live payloads the app consumes, decoded from a frame's
-/// inner JSON. Names verified against the Laravel side:
+/// The live payloads the app consumes, decoded from a frame's inner
+/// JSON. Names verified against the Laravel side:
 /// - notifications: Laravel's default class-name event on
 ///   `App.Models.User.{id}` with `MarketplaceEvent::toArray` + id/type
 /// - `message.sent` on `conversation.{id}` (`App\Events\MessageSent`)
 /// - `location.updated` on `job.{id}.location` (`App\Events\LocationUpdated`)
+/// - `job.updated` on `job.{id}` (`App\Events\JobUpdated`) — a PING
 object RealtimeEvents {
     const val notificationCreated = """Illuminate\Notifications\Events\BroadcastNotificationCreated"""
     const val messageSent = "message.sent"
     const val locationUpdated = "location.updated"
+    const val jobUpdated = "job.updated"
+
+    /// The bare channel names (the client adds `private-`).
+    fun jobChannel(jobId: Int) = "job.$jobId"
+    fun jobLocationChannel(jobId: Int) = "job.$jobId.location"
 
     /// The bell-row shape a broadcast carries (no read/created_at — the
     /// row is new by definition).
@@ -93,6 +99,20 @@ object RealtimeEvents {
     /// `LocationUpdated::broadcastWith`.
     @Serializable
     data class PushedPoint(val lat: Double, val lng: Double, @Serializable(with = LaravelInstantSerializer::class) val at: Instant? = null)
+
+    /// `JobUpdated::broadcastWith`. Status stays a string so a status
+    /// this build doesn't know can't break the ping.
+    @Serializable
+    data class PushedJobPing(val id: Int? = null, val status: String? = null)
+
+    /// Whether a frame on `job.{id}` means "refetch the job". The payload
+    /// is never rendered — the detail is masked per viewer — so a body
+    /// that won't decode still counts; only a DIFFERENT job id doesn't.
+    fun isJobPing(event: String, payload: String, jobId: Int): Boolean {
+        if (event != jobUpdated) return false
+        val ping = runCatching { JsonCoding.json.decodeFromString<PushedJobPing>(payload) }.getOrNull()
+        return ping?.id == null || ping.id == jobId
+    }
 
     fun notification(payload: String): AppNotification? {
         val pushed = runCatching { JsonCoding.json.decodeFromString<PushedNotification>(payload) }.getOrNull() ?: return null
