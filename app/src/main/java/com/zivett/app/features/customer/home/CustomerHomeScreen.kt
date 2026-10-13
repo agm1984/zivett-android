@@ -31,7 +31,7 @@ import androidx.compose.material.icons.outlined.HomeRepairService
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -138,7 +138,15 @@ fun CustomerHomeScreen(model: CustomerHomeModel) {
     val greeting = hero?.let { CustomerHomeLogic.greeting(it, user?.firstName ?: "there") }
     val dark = hero?.let { CustomerHomeLogic.usesDarkHeader(it) } ?: false
 
-    LaunchedEffect(model) { model.load() }
+    // Refetch on EVERY arrival and every return to the foreground: the
+    // model is shell-owned and outlives this screen, so a job booked (or
+    // quotes released) since the last load would otherwise leave the old
+    // hero up — the web's "Book your first job" right after booking
+    // (field audit #4). The cached screen stays up meanwhile.
+    LifecycleResumeEffect(model) {
+        scope.launch { model.load() }
+        onPauseOrDispose { }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // The dark/light top bar: avatar, kicker + heading, notification bell.
