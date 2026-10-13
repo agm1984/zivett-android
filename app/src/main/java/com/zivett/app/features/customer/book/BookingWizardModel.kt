@@ -376,7 +376,7 @@ class BookingWizardModel(
                 fieldErrors = error.errors.firstMessages
                 error.errors.errors.keys.sorted().firstOrNull()?.let { first ->
                     if (first == "mode") form = form.copy(modePreset = false)
-                    jump(BookingWizardEngine.step(first, questions))
+                    jump(BookingWizardEngine.step(first, questions, area))
                 }
                 generalError = if (fieldErrors.isEmpty()) error.errors.message else null
             } else generalError = error.userMessage
