@@ -230,13 +230,17 @@ private fun QuotesCard(job: Job, onSheet: (JobSheet) -> Unit) {
 private fun PriceCard(job: Job) {
     if (job.invoice != null) return
     ZCard {
-        ZMono("Price")
         val accepted = job.acceptedQuote
+        // Labelled for what it holds (field audit #21: a bare "Price"
+        // over "ZiVETT is on it" read as broken).
+        ZMono(if (accepted != null) "Your agreed price" else "Quotes")
         val label = JobPresentation.priceLabel(job)
         when {
             accepted != null -> {
                 ZMonoLarge(Money.format(accepted.amountCents))
                 ZCaption("Quoted price, agreed with your pro", tone = ZTextTone.SOFT)
+                val rate = accepted.hourlyRateCents; val hours = accepted.estimatedHours; val crew = accepted.crewSize
+                if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()} h × ${Money.format(rate)}/hr")
                 ZCaption("The invoice adds the trust & support fee and applicable taxes.")
             }
             label != null && job.quotesReleasedAt != null -> {
