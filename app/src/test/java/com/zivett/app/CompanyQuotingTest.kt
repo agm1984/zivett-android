@@ -6,6 +6,8 @@ import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.HttpApiClient
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.network.ValidationErrors
+import com.zivett.app.core.models.RatesResponse
+import com.zivett.app.features.company.CompanyRates
 import com.zivett.app.features.company.OpportunitiesModel
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -49,5 +51,33 @@ class CompanyQuotingTest {
         assertNull(model.submitQuote(job, body))
         assertTrue(model.state.value!!.opportunities.isEmpty())
         assertEquals("Quotes for this job have closed.", model.toast)
+    }
+
+    @Test fun changingARateInTheComposerRepricesTheFeed() = runTest {
+        val client = client()
+        client.responses["api/company/rates/${job.category.id}"] = RatesResponse(mapOf(job.category.id.toString() to 14500))
+        val model = OpportunitiesModel(client)
+        model.load()
+
+        assertNull(model.saveRate(job.category.id, 14500))
+        assertEquals(14500, model.state.value!!.hourlyRates[job.category.id.toString()])
+        assertTrue("PATCH api/company/rates/${job.category.id}" in client.sent)
+    }
+
+    @Test fun aRefusedRateKeepsTheOldOneAndSaysWhy() = runTest {
+        val client = client()
+        client.errors["api/company/rates/${job.category.id}"] = HttpApiClient.errorFor(422, null, """{"message":"Too high.","errors":{"hourly_rate_cents":["The rate must be at most $1,000."]}}""".toByteArray())
+        val model = OpportunitiesModel(client)
+        model.load()
+
+        assertEquals("The rate must be at most $1,000.", model.saveRate(job.category.id, 500000))
+        assertTrue(model.state.value!!.hourlyRates.isEmpty())
+    }
+
+    @Test fun rateDraftsParseAsDollars() {
+        assertEquals(12000, CompanyRates.parseDollars("120"))
+        assertEquals(12050, CompanyRates.parseDollars("120,50"))
+        assertNull(CompanyRates.parseDollars("0"))
+        assertNull(CompanyRates.parseDollars("abc"))
     }
 }
