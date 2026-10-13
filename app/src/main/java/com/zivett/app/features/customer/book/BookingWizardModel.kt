@@ -3,6 +3,8 @@ package com.zivett.app.features.customer.book
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.zivett.app.core.AddressLookup
+import com.zivett.app.core.AddressParts
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.AddressBody
@@ -142,6 +144,19 @@ class BookingWizardModel(
     }
 
     fun useNewAddress() { form = form.copy(savedAddressId = null, address = "") }
+
+    /// Set once the street lookup filled something — the Where step says so.
+    var addressAutoFilled by mutableStateOf(false)
+
+    /// Finishing the street line (focus leaves it) fills the blank city /
+    /// province / postcode — typed values always win (`AddressLookup`).
+    suspend fun lookUpStreet() {
+        fun typed() = AddressParts(form.line1, form.city, form.region, form.postal)
+        AddressLookup.fill(client, typed(), ::typed)?.let {
+            form = form.copy(city = it.city, region = it.region, postal = it.postal)
+            addressAutoFilled = true
+        }
+    }
 
     fun next() { if (canContinue && stepIndex < steps.size - 1) stepIndex += 1 }
     fun back() { stepIndex = maxOf(0, stepIndex - 1) }

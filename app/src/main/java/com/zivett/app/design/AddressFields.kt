@@ -17,20 +17,28 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.zivett.app.core.AddressLookup
 import com.zivett.app.core.AddressParts
+import com.zivett.app.core.network.ApiClient
+import kotlinx.coroutines.launch
 
 /// Structured address entry (street / city / province picker / postcode)
 /// for a value the API stores as ONE string — the Android twin of the web's
 /// `AddressFields.vue`, shared by every form that takes an address. The
 /// caller holds the composed string; seeding it (an edit form) splits it
-/// back into the fields best-effort via `AddressParts`.
+/// back into the fields best-effort via `AddressParts`. With a
+/// `lookupClient`, finishing the street fills the blank city / province /
+/// postcode (`AddressLookup`) and says so.
 @Composable
-fun ZAddressFields(address: String, onAddressChange: (String) -> Unit, error: String? = null) {
+fun ZAddressFields(address: String, onAddressChange: (String) -> Unit, error: String? = null, lookupClient: ApiClient? = null) {
     var parts by remember { mutableStateOf(AddressParts.parse(address)) }
+    var autoFilled by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // A parent seeding/resetting the value re-splits the fields; our own
     // compositions round-trip identically, so this never fights typing.
@@ -44,7 +52,12 @@ fun ZAddressFields(address: String, onAddressChange: (String) -> Unit, error: St
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-        ZTextField("Street address", parts.line1, { update(parts.copy(line1 = it)) }, placeholder = "14 Alder Court", error = error, capitalization = KeyboardCapitalization.Words)
+        ZTextField("Street address", parts.line1, { update(parts.copy(line1 = it)) }, placeholder = "14 Alder Court", error = error, capitalization = KeyboardCapitalization.Words,
+            onFocusLost = lookupClient?.let { client -> {
+                val asked = parts
+                scope.launch { AddressLookup.fill(client, asked) { parts }?.let { update(it); autoFilled = true } }
+            } })
+        if (autoFilled) ZCaption(AddressLookup.filledNotice)
         ZTextField("City", parts.city, { update(parts.copy(city = it)) }, placeholder = "Nanaimo", capitalization = KeyboardCapitalization.Words)
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {

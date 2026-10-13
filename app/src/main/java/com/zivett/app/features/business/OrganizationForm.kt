@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zivett.app.app.Areas
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.core.AddressLookup
+import com.zivett.app.core.AddressParts
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.BusinessEndpoints
@@ -75,6 +77,19 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
 
     fun field(key: String): String = fields[key] ?: ""
     fun set(key: String, value: String) { fields = fields + (key to value) }
+
+    /// Set once the street lookup filled something — the form says so.
+    var addressAutoFilled by mutableStateOf(false)
+
+    /// Finishing the street line fills the blank city / province /
+    /// postcode — typed values always win (`AddressLookup`).
+    suspend fun lookUpStreet() {
+        fun typed() = AddressParts(field("address_line1"), field("city"), field("region"), field("postal_code"))
+        AddressLookup.fill(client, typed(), ::typed)?.let {
+            fields = fields + mapOf("city" to it.city, "region" to it.region, "postal_code" to it.postal)
+            addressAutoFilled = true
+        }
+    }
 
     suspend fun load() {
         state = state.reloaded {
@@ -155,9 +170,9 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
     }
 
     @Composable
-    fun Field(key: String, label: String, placeholder: String, keyboard: KeyboardType = KeyboardType.Text, prefixHint: String? = null, modifier: Modifier = Modifier) {
+    fun Field(key: String, label: String, placeholder: String, keyboard: KeyboardType = KeyboardType.Text, prefixHint: String? = null, modifier: Modifier = Modifier, onFocusLost: (() -> Unit)? = null) {
         ZTextField(label, model.field(key), { model.set(key, it) }, modifier = modifier, placeholder = placeholder, error = model.fieldErrors[key], keyboardType = keyboard, capitalization = KeyboardCapitalization.Words,
-            corner = prefixHint?.let { { ZCaption(it, tone = ZTextTone.FAINT) } })
+            corner = prefixHint?.let { { ZCaption(it, tone = ZTextTone.FAINT) } }, onFocusLost = onFocusLost)
     }
 
     Column {
@@ -182,7 +197,8 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
                             }
                         }
                         Field("name", "Business name", "Ravensworth Plumbing")
-                        Field("address_line1", "Address", "14 Alder Court")
+                        Field("address_line1", "Address", "14 Alder Court", onFocusLost = { scope.launch { model.lookUpStreet() } })
+                        if (model.addressAutoFilled) ZCaption(AddressLookup.filledNotice)
                         Field("address_line2", "Address line 2", "")
                         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                             Field("city", "City", "Nanaimo", modifier = Modifier.weight(1.4f))

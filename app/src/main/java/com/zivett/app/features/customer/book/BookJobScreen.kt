@@ -52,6 +52,7 @@ import coil3.compose.AsyncImage
 import com.zivett.app.app.Areas
 import com.zivett.app.app.JobDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.core.AddressLookup
 import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.BookingOptions
@@ -367,7 +368,10 @@ private fun WhereStep(model: BookingWizardModel, options: BookingOptions) {
         ZButton("Use a different address", style = ZButtonStyle.GHOST, fullWidth = false) { model.useNewAddress() }
     } else {
         if (!(options.addresses ?: emptyList()).isEmpty()) ZLabel("Or a different address")
-        ZTextField("Street address", model.form.line1, { model.form = model.form.copy(line1 = it) }, placeholder = "14 Alder Court", capitalization = KeyboardCapitalization.Words)
+        val scope = rememberCoroutineScope()
+        ZTextField("Street address", model.form.line1, { model.form = model.form.copy(line1 = it) }, placeholder = "14 Alder Court", capitalization = KeyboardCapitalization.Words,
+            onFocusLost = { scope.launch { model.lookUpStreet() } })
+        if (model.addressAutoFilled) ZCaption(AddressLookup.filledNotice)
         ZTextField("Unit (optional)", model.form.unit, { model.form = model.form.copy(unit = it) }, placeholder = "Suite 201", error = model.fieldErrors["unit"])
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             ZTextField("City", model.form.city, { model.form = model.form.copy(city = it) }, Modifier.weight(1.4f), "Nanaimo", capitalization = KeyboardCapitalization.Words)
