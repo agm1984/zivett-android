@@ -71,7 +71,20 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
     var industryOptions by mutableStateOf<List<IndustryOption>>(emptyList())
     var logoBusy by mutableStateOf(false)
 
+    /// Website, socials and the bio are optional extras — folded behind one
+    /// toggle so the first screen is only what's needed (field audit #7:
+    /// 14 fields up front lost pros signing up from a phone). Open whenever
+    /// any of them has a value, or the server rejected one.
+    var extrasOpen by mutableStateOf(false)
+
     companion object {
+        val extraKeys = listOf("website", "social_x", "social_instagram", "social_facebook", "about")
+
+        /// The no-logo placeholder: the business's initials (first letter of
+        /// the first two words) — the monogram the invoice letterhead uses.
+        fun initials(name: String): String =
+            name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "—" }
+
         val fieldKeys = listOf("name", "address_line1", "address_line2", "city", "region", "postal_code", "phone", "website", "social_x", "social_instagram", "social_facebook", "gst_number", "about", "industry")
     }
 
@@ -109,6 +122,7 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
             "social_x" to (org.socialX ?: "").replace("@", ""), "social_instagram" to (org.socialInstagram ?: "").replace("@", ""),
             "social_facebook" to (org.socialFacebook ?: ""), "gst_number" to (org.gstNumber ?: ""), "about" to (org.about ?: ""), "industry" to (org.industry ?: ""),
         )
+        if (extraKeys.any { field(it).isNotBlank() }) extrasOpen = true
     }
 
     suspend fun save() {
@@ -129,7 +143,11 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
             seed()
             toast = "Business profile saved"
         } catch (e: ApiError) {
-            if (e is ApiError.Validation) fieldErrors = e.errors.firstMessages else toast = e.userMessage
+            if (e is ApiError.Validation) {
+                fieldErrors = e.errors.firstMessages
+                // A rejected extra (a malformed website) must be visible to fix.
+                if (extraKeys.any { it in fieldErrors }) extrasOpen = true
+            } else toast = e.userMessage
         } catch (e: Exception) { toast = e.userMessage } finally { saving = false }
     }
 
@@ -184,9 +202,12 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
                         ZPageTitle("Business profile", "This is the business ${if (company) "customers see across ZiVETT — on quotes, jobs, and your Verified Pro Passport." else "pros see on each request."}")
                         // Logo: rounded square (brand avatar convention).
                         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                            if (org.logoUrl != null) ZPhotoAvatar(org.logoUrl, org.name.take(2).uppercase(), 56.dp, ZAvatarShape.COMPANY) else ZAvatar(org.name.take(2).uppercase(), ZAvatarShape.COMPANY, 56.dp)
+                            // No logo yet → the initials monogram, so skipping it never looks broken.
+                            val initials = OrganizationFormModel.initials(model.field("name").ifBlank { org.name })
+                            if (org.logoUrl != null) ZPhotoAvatar(org.logoUrl, initials, 56.dp, ZAvatarShape.COMPANY) else ZAvatar(initials, ZAvatarShape.COMPANY, 56.dp, onDark = true)
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                ZLabel("Logo")
+                                // Optional for companies too since 2026-10-12 (server no longer lists it missing).
+                                ZLabel(if (company) "Logo (optional — add it any time)" else "Logo (optional)")
                                 ZCaption(if (company) "Shown on your quotes and invoices." else "Shown to pros on your requests.")
                             }
                             if (canManage) {
@@ -206,20 +227,25 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
                             Field("postal_code", "Postal", "V9R 2K1", modifier = Modifier.weight(1f))
                         }
                         Field("phone", "Phone", "(555) 012-3456", keyboard = KeyboardType.Phone)
-                        Field("website", "Website", "www.example.com", prefixHint = "https://")
-                        // Bare handles behind a fixed @ prefix, like the web form.
-                        Field("social_x", "X / Twitter (optional)", "yourbusiness", prefixHint = "@")
-                        Field("social_instagram", "Instagram (optional)", "yourbusiness", prefixHint = "@")
-                        Field("social_facebook", "Facebook (optional)", "facebook.com/yourbusiness")
                         if (company) {
-                            Field("gst_number", "GST number", "123456789RT0001")
+                            Field("gst_number", "GST number (if registered)", "123456789RT0001")
                             ZCaption("If your business is GST-registered, your invoices will add 5% GST and show this number. Leave blank if you're a small supplier.")
                         } else {
                             // Businesses declare their industry (required — the server refuses a save without one).
                             ZDropdown("Industry", model.field("industry"), model.industryOptions.map { it.value to it.label }, placeholder = "Pick your industry…", error = model.fieldErrors["industry"]) { model.set("industry", it) }
                             ZCaption("What kind of business you run — it helps us route the right pros and support to you.")
                         }
-                        ZTextArea("About", model.field("about"), { model.set("about", it) }, placeholder = "What you do, how long you've been at it…", error = model.fieldErrors["about"])
+                        // Optional extras, folded away until asked for.
+                        if (model.extrasOpen) {
+                            Field("website", "Website (optional)", "www.example.com", prefixHint = "https://")
+                            // Bare handles behind a fixed @ prefix, like the web form.
+                            Field("social_x", "X / Twitter (optional)", "yourbusiness", prefixHint = "@")
+                            Field("social_instagram", "Instagram (optional)", "yourbusiness", prefixHint = "@")
+                            Field("social_facebook", "Facebook (optional)", "facebook.com/yourbusiness")
+                            ZTextArea("About your business (optional)", model.field("about"), { model.set("about", it) }, placeholder = "What you do, how long you've been at it…", error = model.fieldErrors["about"])
+                        } else {
+                            ZTextAction("+ Add your website, social profiles and a short bio (optional)") { model.extrasOpen = true }
+                        }
                         if (canManage) ZButton("Save changes", loading = model.saving) { scope.launch { model.save() } }
                         else ZCaption("Only organization admins can change the business profile.")
                         Spacer(Modifier.padding(ZSpacing.lg))
