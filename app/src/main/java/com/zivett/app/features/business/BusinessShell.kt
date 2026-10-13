@@ -32,6 +32,7 @@ import com.zivett.app.app.Areas
 import com.zivett.app.app.BusinessAccountTab
 import com.zivett.app.app.BusinessBookTab
 import com.zivett.app.app.BusinessInvoicesRoute
+import com.zivett.app.app.BusinessMessagesRoute
 import com.zivett.app.app.BusinessOverviewTab
 import com.zivett.app.app.BusinessPropertiesTab
 import com.zivett.app.app.BusinessRequestsTab
@@ -102,6 +103,7 @@ fun BusinessShell() {
         composable<BusinessSetupRoute> { BusinessSetupScreen { nav.popBackStack() } }
         composable<BusinessInvoicesRoute> { com.zivett.app.features.customer.account.InvoicesScreen(com.zivett.app.core.models.JobArea.business) { nav.popBackStack() } }
         composable<PropertiesRoute> { PropertiesScreen { nav.popBackStack() } }
+        composable<BusinessMessagesRoute> { com.zivett.app.features.customer.messages.MessagesScreen(Areas.BUSINESS) { nav.popBackStack() } }
         bookerDestinations(nav)
     }
 }

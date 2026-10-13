@@ -179,6 +179,10 @@ object BusinessEndpoints {
     fun updateReview(reviewId: Int, rating: Int, comment: String?) = ApiRequest.patch<ReviewResponse, ReviewBody>("api/business/reviews/$reviewId", ReviewBody(rating, comment))
     fun warrantyClaim(jobId: Int, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/business/requests/$jobId/claim", mapOf("body" to body))
     fun report(jobId: Int, kind: String, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/business/requests/$jobId/report", mapOf("kind" to kind, "body" to body))
+    /// The property manager's inbox: every thread on the ORG's requests
+    /// (teammates share it; a teammate's message is never unread), each
+    /// row carrying its `property` name.
+    fun conversations() = ApiRequest.get<ConversationsResponse>("api/business/conversations")
     fun conversation(jobId: Int) = ApiRequest.get<ConversationResponse>("api/business/requests/$jobId/conversation")
     fun sendMessage(jobId: Int, body: String) = ApiRequest.post<MessageResponse, Map<String, String>>("api/business/requests/$jobId/conversation/messages", mapOf("body" to body))
     fun blockUser(jobId: Int, userId: Int) = ApiRequest.post<BlockResponse, Map<String, Int>>("api/business/requests/$jobId/conversation/block", mapOf("user_id" to userId))

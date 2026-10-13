@@ -55,6 +55,7 @@ import kotlinx.serialization.Serializable
 // Business.
 @Serializable object BusinessSetupRoute
 @Serializable object BusinessInvoicesRoute
+@Serializable object BusinessMessagesRoute
 @Serializable object PropertiesRoute
 
 // Company.

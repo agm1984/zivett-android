@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zivett.app.app.Areas
 import com.zivett.app.app.BookRoute
+import com.zivett.app.app.BusinessMessagesRoute
 import com.zivett.app.app.BusinessSetupRoute
 import com.zivett.app.app.JobDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
@@ -44,6 +45,9 @@ import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBodyStrong
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
+import com.zivett.app.design.ZIconTile
+import com.zivett.app.design.ZNavRow
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import com.zivett.app.design.ZEmptyState
 import com.zivett.app.design.ZLoadable
 import com.zivett.app.design.ZMonoBody
@@ -177,7 +181,13 @@ fun BusinessRequestsScreen() {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<Loadable<List<Job>>>(Loadable.Loading) }
-    suspend fun load() { state = state.reloaded { environment.client.send(BusinessEndpoints.requests()).jobs } }
+    // The org's Messages inbox lives under Requests (the tab bar is full) —
+    // its unread total rides the entry row.
+    var unreadMessages by remember { mutableStateOf(0) }
+    suspend fun load() {
+        state = state.reloaded { environment.client.send(BusinessEndpoints.requests()).jobs }
+        runCatching { environment.client.send(BusinessEndpoints.conversations()).conversations.sumOf { it.unreadCount } }.getOrNull()?.let { unreadMessages = it }
+    }
     LaunchedEffect(Unit) { load() }
 
     ZScreen(onRefresh = { load() }) {
@@ -187,6 +197,11 @@ fun BusinessRequestsScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) { ZPageTitle("Requests") }
                     ZTextAction("+ New") { nav.navigate(BookRoute(Areas.BUSINESS)) }
+                }
+                ZCard(padding = 0.dp) {
+                    ZNavRow("Messages", if (unreadMessages > 0) "$unreadMessages unread — threads with your pros, by property" else "Threads with your pros, by property", onClick = { nav.navigate(BusinessMessagesRoute) }) {
+                        ZIconTile(Icons.AutoMirrored.Outlined.Chat)
+                    }
                 }
                 if (jobs.isEmpty()) ZEmptyState(Icons.Outlined.Work, "No requests yet", "Book your first repair and it will show up here.")
                 for (job in jobs) BusinessRequestRow(job) { nav.navigate(JobDetailRoute(job.id, Areas.BUSINESS)) }
