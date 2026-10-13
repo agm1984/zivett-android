@@ -8,6 +8,7 @@ import com.zivett.app.features.business.OrganizationFormModel
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,5 +35,24 @@ class OrganizationFormTest {
     @Test fun theOptionalExtrasStayFoldedUntilOneHasAValue() = runTest {
         assertFalse(loaded(OrganizationProfile(id = 1, name = "Harbour Strata")).extrasOpen)
         assertTrue(loaded(OrganizationProfile(id = 1, name = "Harbour Strata", website = "https://harbour.example")).extrasOpen)
+    }
+
+    @Test fun aBlockedContinueMarksEachMissingFieldAndNamesTheFirst() = runTest {
+        val model = loaded(OrganizationProfile(id = 1, name = "Harbour Strata"))
+        // Form order, not label order; unknown labels are ignored.
+        assertEquals("address_line1", model.flagMissing(listOf("phone", "postcode", "address", "something new")))
+        assertEquals(setOf("address_line1", "postal_code", "phone"), model.fieldErrors.keys)
+        assertEquals("Needed to continue.", model.fieldErrors["phone"])
+        assertNull(model.flagMissing(listOf("something new")))
+    }
+
+    @Test fun editingAFlaggedFieldClearsItsError() = runTest {
+        val model = loaded(OrganizationProfile(id = 1, name = "Harbour Strata"))
+        model.flagMissing(listOf("city", "phone"))
+        model.set("city", "Nanaimo")
+        assertEquals(setOf("phone"), model.fieldErrors.keys)
+        // Re-setting the same value is not an edit.
+        model.set("phone", "")
+        assertEquals(setOf("phone"), model.fieldErrors.keys)
     }
 }

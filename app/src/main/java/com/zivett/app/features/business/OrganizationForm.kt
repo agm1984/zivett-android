@@ -17,6 +17,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -38,6 +41,7 @@ import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZAvatar
 import com.zivett.app.design.ZAvatarShape
+import com.zivett.app.design.ZBanner
 import com.zivett.app.design.ZButton
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZDropdown
@@ -55,6 +59,7 @@ import com.zivett.app.design.ZTextField
 import com.zivett.app.design.ZTextTone
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZToastBox
+import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import kotlinx.coroutines.launch
 
@@ -78,6 +83,12 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
     var extrasOpen by mutableStateOf(false)
 
     companion object {
+        /// OnboardingState's missing-field labels → this form's keys.
+        val missingFields = mapOf(
+            "business name" to "name", "address" to "address_line1", "city" to "city", "province" to "region",
+            "postcode" to "postal_code", "phone" to "phone", "industry" to "industry",
+        )
+
         val extraKeys = listOf("website", "social_x", "social_instagram", "social_facebook", "about")
 
         /// The no-logo placeholder: the business's initials (first letter of
@@ -89,7 +100,23 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
     }
 
     fun field(key: String): String = fields[key] ?: ""
-    fun set(key: String, value: String) { fields = fields + (key to value) }
+
+    /// Editing a flagged field clears its error — the red border shouldn't
+    /// outlive the fix.
+    fun set(key: String, value: String) {
+        if (value != field(key)) fieldErrors = fieldErrors - key
+        fields = fields + (key to value)
+    }
+
+    /// A blocked setup Continue: mark each of the server's missing-field
+    /// labels (`setup.steps.profile.missing`) on its field in place and
+    /// return the first one in form order, for the screen to focus.
+    fun flagMissing(labels: List<String>): String? {
+        val keys = labels.mapNotNull { missingFields[it] }.toSet()
+        if (keys.isEmpty()) return null
+        fieldErrors = keys.associateWith { "Needed to continue." }
+        return fieldKeys.firstOrNull { it in keys }
+    }
 
     /// Set once the street lookup filled something — the form says so.
     var addressAutoFilled by mutableStateOf(false)
@@ -99,7 +126,7 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
     suspend fun lookUpStreet() {
         fun typed() = AddressParts(field("address_line1"), field("city"), field("region"), field("postal_code"))
         AddressLookup.fill(client, typed(), ::typed)?.let {
-            fields = fields + mapOf("city" to it.city, "region" to it.region, "postal_code" to it.postal)
+            for ((key, value) in mapOf("city" to it.city, "region" to it.region, "postal_code" to it.postal)) set(key, value)
             addressAutoFilled = true
         }
     }
@@ -173,7 +200,7 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
 }
 
 @Composable
-fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
+fun OrganizationFormScreen(area: String, missing: List<String> = emptyList(), onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -181,7 +208,21 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
     val company = area == Areas.COMPANY
     val model = remember(company) { OrganizationFormModel(environment.client, company) }
     val canManage = environment.session.user?.organizationRole == OrganizationRole.ADMIN
-    LaunchedEffect(model) { model.load() }
+    // Opened from a blocked setup Continue: mark the gaps in place and put
+    // the cursor in the first one (focus also scrolls it into view).
+    val focus = remember { mutableMapOf<String, FocusRequester>() }
+    fun requester(key: String) = focus.getOrPut(key) { FocusRequester() }
+    var flagged by remember { mutableStateOf(false) }
+    LaunchedEffect(model) {
+        model.load()
+        if (!flagged && missing.isNotEmpty() && model.state.value != null) {
+            flagged = true
+            model.flagMissing(missing)?.let { first ->
+                withFrameNanos { }
+                runCatching { focus[first]?.requestFocus() }
+            }
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) scope.launch { model.uploadLogo(PhotoImport.jpegData(context, listOf(uri), 1024).firstOrNull()) }
@@ -190,7 +231,7 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
     @Composable
     fun Field(key: String, label: String, placeholder: String, keyboard: KeyboardType = KeyboardType.Text, prefixHint: String? = null, modifier: Modifier = Modifier, onFocusLost: (() -> Unit)? = null) {
         ZTextField(label, model.field(key), { model.set(key, it) }, modifier = modifier, placeholder = placeholder, error = model.fieldErrors[key], keyboardType = keyboard, capitalization = KeyboardCapitalization.Words,
-            corner = prefixHint?.let { { ZCaption(it, tone = ZTextTone.FAINT) } }, onFocusLost = onFocusLost)
+            corner = prefixHint?.let { { ZCaption(it, tone = ZTextTone.FAINT) } }, onFocusLost = onFocusLost, fieldModifier = Modifier.focusRequester(requester(key)))
     }
 
     Column {
@@ -200,6 +241,7 @@ fun OrganizationFormScreen(area: String, onBack: () -> Unit) {
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { org ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                         ZPageTitle("Business profile", "This is the business ${if (company) "customers see across ZiVETT — on quotes, jobs, and your Verified Pro Passport." else "pros see on each request."}")
+                        if (flagged && model.fieldErrors.values.any { it == "Needed to continue." }) ZBanner("Fill in the marked fields to continue setup.", tone = ZTone.DANGER)
                         // Logo: rounded square (brand avatar convention).
                         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                             // No logo yet → the initials monogram, so skipping it never looks broken.

@@ -121,7 +121,10 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     composable<AddressesRoute> { AddressesScreen { nav.popBackStack() } }
     composable<ReferralRoute> { ReferralScreen { nav.popBackStack() } }
     composable<TeamRoute> { entry -> TeamScreen(Areas.teamArea(entry.toRoute<TeamRoute>().area)) { nav.popBackStack() } }
-    composable<OrgProfileRoute> { entry -> OrganizationFormScreen(entry.toRoute<OrgProfileRoute>().area) { nav.popBackStack() } }
+    composable<OrgProfileRoute> { entry ->
+        val route = entry.toRoute<OrgProfileRoute>()
+        OrganizationFormScreen(route.area, missing = route.missing.split("|").filter { it.isNotBlank() }) { nav.popBackStack() }
+    }
     composable<BookRoute> { entry ->
         val route = entry.toRoute<BookRoute>()
         BookJobScreen(
