@@ -108,6 +108,14 @@ object BookingWizardEngine {
         Step.Details, Step.Availability, Step.Review -> true
     }
 
+    /// Arriving on a step can pre-answer it: the timing screen reached
+    /// with no mode picked pre-selects Instant when it's offered (the
+    /// fast path — its fee is disclosed on the card and at Review), so
+    /// most bookers just press Next. A mode preset on entry never shows
+    /// the screen at all.
+    fun arriving(step: Step, form: Form, instantOffered: Boolean): Form =
+        if (step == Step.Mode && form.mode == null && instantOffered) form.copy(mode = "instant") else form
+
     /// `derivedUrgency`.
     fun derivedUrgency(form: Form, today: String): String = when (form.mode) {
         "instant" -> "asap"

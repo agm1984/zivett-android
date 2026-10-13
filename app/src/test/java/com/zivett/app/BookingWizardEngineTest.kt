@@ -49,6 +49,15 @@ class BookingWizardEngineTest {
         assertFalse(Step.Details in BookingWizardEngine.steps(BookingWizardEngine.Form(), emptyList()))
     }
 
+    @Test fun reachingTheTimingScreenPreselectsInstant() {
+        val form = BookingWizardEngine.Form()
+        assertEquals("instant", BookingWizardEngine.arriving(Step.Mode, form, instantOffered = true).mode)
+        // Not offered, already chosen, or another screen: untouched.
+        assertNull(BookingWizardEngine.arriving(Step.Mode, form, instantOffered = false).mode)
+        assertEquals("quote", BookingWizardEngine.arriving(Step.Mode, form.copy(mode = "quote"), instantOffered = true).mode)
+        assertNull(BookingWizardEngine.arriving(Step.Where, form, instantOffered = true).mode)
+    }
+
     @Test fun photosAreTheHardGate() {
         var form = BookingWizardEngine.Form()
         assertFalse(BookingWizardEngine.canContinue(Step.Photos, form))
@@ -166,6 +175,15 @@ class BookingWizardModelTest {
         model.form = model.form.copy(intakeAnswers = mapOf(1 to listOf("Faucet")))
         model.selectCategory(model.options.value!!.categories[1])
         assertTrue(model.form.intakeAnswers.isEmpty())
+    }
+
+    @Test fun walkingOntoTheTimingScreenPreselectsInstant() = runTest(dispatcher) {
+        val client = PreviewApiClient(mapOf("api/customer/booking-options" to Fixtures.bookingOptions()))
+        val model = BookingWizardModel(client)
+        model.load()
+        model.jump(Step.Mode)
+        assertEquals(Step.Mode, model.step)
+        assertEquals("instant", model.form.mode)
     }
 
     @Test fun submitRefusesWithoutPhotos() = runTest(dispatcher) {

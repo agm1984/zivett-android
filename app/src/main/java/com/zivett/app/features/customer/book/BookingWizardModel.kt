@@ -41,7 +41,16 @@ class BookingWizardModel(
 
     var options by mutableStateOf<Loadable<BookingOptions>>(Loadable.Loading)
     var form by mutableStateOf(BookingWizardEngine.Form(area = area, mode = presetMode, modePreset = presetMode != null))
-    var stepIndex by mutableStateOf(0)
+    private var currentStep by mutableStateOf(0)
+    /// Every step change goes through here so arriving can pre-answer
+    /// (the timing screen pre-selects Instant — `BookingWizardEngine.arriving`).
+    var stepIndex: Int
+        get() = currentStep
+        set(value) {
+            currentStep = value
+            val arrived = BookingWizardEngine.arriving(step, form, options.value?.modes?.any { it.key == "instant" } == true)
+            if (arrived != form) form = arrived
+        }
     var submitting by mutableStateOf(false)
     var fieldErrors by mutableStateOf<Map<String, String>>(emptyMap())
     var generalError by mutableStateOf<String?>(null)
