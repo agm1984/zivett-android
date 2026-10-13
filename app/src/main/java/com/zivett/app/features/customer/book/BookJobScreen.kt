@@ -52,6 +52,7 @@ import coil3.compose.AsyncImage
 import com.zivett.app.app.Areas
 import com.zivett.app.app.JobDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.core.AddressLookup
 import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.BookingOptions
@@ -200,10 +201,6 @@ private fun WizardBody(model: BookingWizardModel, options: BookingOptions) {
                 }
                 BookingWizardEngine.Step.Photos -> PhotosStep(model) { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                 BookingWizardEngine.Step.Where -> if (model.area == BookingWizardEngine.Area.BUSINESS) PropertyStep(model, ::autoAdvance) { addingProperty = true } else WhereStep(model, options)
-                BookingWizardEngine.Step.Access -> {
-                    StepHeading("Anything for getting in?", "Optional.")
-                    ZTextArea("Access notes", model.form.accessNotes, { model.form = model.form.copy(accessNotes = it) }, placeholder = "Gate code, parking, pets…", error = model.fieldErrors["access_notes"], minLines = 3)
-                }
                 BookingWizardEngine.Step.Details -> {
                     StepHeading("Unit, tenant & access", "Optional — helps the pro find the right door.")
                     ZTextField("Unit / floor", model.form.unit, { model.form = model.form.copy(unit = it) }, placeholder = "Unit 4", error = model.fieldErrors["unit"])
@@ -367,13 +364,26 @@ private fun WhereStep(model: BookingWizardModel, options: BookingOptions) {
         ZButton("Use a different address", style = ZButtonStyle.GHOST, fullWidth = false) { model.useNewAddress() }
     } else {
         if (!(options.addresses ?: emptyList()).isEmpty()) ZLabel("Or a different address")
-        ZTextField("Street address", model.form.line1, { model.form = model.form.copy(line1 = it) }, placeholder = "14 Alder Court", capitalization = KeyboardCapitalization.Words)
+        val scope = rememberCoroutineScope()
+        ZTextField("Street address", model.form.line1, { model.form = model.form.copy(line1 = it) }, placeholder = "14 Alder Court", capitalization = KeyboardCapitalization.Words,
+            onFocusLost = { scope.launch { model.lookUpStreet() } })
+        if (model.addressAutoFilled) ZCaption(AddressLookup.filledNotice)
         ZTextField("Unit (optional)", model.form.unit, { model.form = model.form.copy(unit = it) }, placeholder = "Suite 201", error = model.fieldErrors["unit"])
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             ZTextField("City", model.form.city, { model.form = model.form.copy(city = it) }, Modifier.weight(1.4f), "Nanaimo", capitalization = KeyboardCapitalization.Words)
             ZTextField("Province", model.form.region, { model.form = model.form.copy(region = it.uppercase()) }, Modifier.weight(0.8f), "BC", capitalization = KeyboardCapitalization.Characters)
             ZTextField("Postal", model.form.postal, { model.form = model.form.copy(postal = it.uppercase()) }, Modifier.weight(1f), "V9R 2K1", capitalization = KeyboardCapitalization.Characters)
         }
+    }
+    // Access notes — optional, so folded away unless there's something in
+    // them already (a saved place's notes included). They used to be a
+    // whole screen of their own for one field.
+    var accessOpen by remember { mutableStateOf(false) }
+    if (accessOpen || model.form.accessNotes.isNotBlank()) {
+        ZTextArea("Access notes (optional)", model.form.accessNotes, { model.form = model.form.copy(accessNotes = it) }, placeholder = "Gate code, parking, pets…", error = model.fieldErrors["access_notes"], minLines = 3)
+        ZCaption("Saved with this place for next time.", tone = ZTextTone.FAINT)
+    } else {
+        ZTextAction("+ Add entry instructions or gate codes") { accessOpen = true }
     }
 }
 
@@ -466,7 +476,7 @@ private fun ReviewStep(model: BookingWizardModel, options: BookingOptions) {
         } else {
             ReviewRow(model, "Address", (if (form.savedAddressId != null) form.address else BookingWizardEngine.composedAddress(form)) + (if (form.unit.isEmpty()) "" else " · Unit ${form.unit}"), BookingWizardEngine.Step.Where)
         }
-        if (form.accessNotes.isNotEmpty()) ReviewRow(model, "Access notes", form.accessNotes, if (model.area == BookingWizardEngine.Area.BUSINESS) BookingWizardEngine.Step.Details else BookingWizardEngine.Step.Access)
+        if (form.accessNotes.isNotEmpty()) ReviewRow(model, "Access notes", form.accessNotes, if (model.area == BookingWizardEngine.Area.BUSINESS) BookingWizardEngine.Step.Details else BookingWizardEngine.Step.Where)
         for (q in model.questions.filter { (form.intakeAnswers[it.id] ?: emptyList()).isNotEmpty() }) {
             ReviewRow(model, q.prompt, (form.intakeAnswers[q.id] ?: emptyList()).joinToString(", "), BookingWizardEngine.Step.Question(q.id))
         }

@@ -53,6 +53,7 @@ import com.zivett.app.app.ConversationRoute
 import com.zivett.app.app.JobDetailRoute
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.Loadable
+import com.zivett.app.core.models.BusinessEndpoints
 import com.zivett.app.core.models.ConversationParticipant
 import com.zivett.app.core.models.ConversationSummary
 import com.zivett.app.core.models.CustomerEndpoints
@@ -70,6 +71,7 @@ import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZEmptyState
 import com.zivett.app.design.ZLoadable
+import com.zivett.app.design.ZMono
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZTextAction
@@ -86,9 +88,21 @@ import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/// Inbox: one thread per job.
+/// Inbox grouping for the business inbox: threads grouped by property in
+/// the API's order (newest first), so properties order by their newest
+/// thread; a request with no property lands under "Other requests".
+object MessagesInbox {
+    const val otherRequests = "Other requests"
+
+    fun groupByProperty(threads: List<ConversationSummary>): List<Pair<String, List<ConversationSummary>>> =
+        threads.groupBy { it.property ?: otherRequests }.toList()
+}
+
+/// Inbox: one thread per job. `area` BUSINESS is the property manager's
+/// org-wide inbox (web `pages/business/Messages.vue`), grouped by property
+/// and pushed from Requests (so it has a back button).
 @Composable
-fun MessagesScreen() {
+fun MessagesScreen(area: String = Areas.CUSTOMER, onBack: (() -> Unit)? = null) {
     val environment = LocalAppEnvironment.current
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
@@ -98,11 +112,14 @@ fun MessagesScreen() {
     // settles — history stays readable, out of the way.
     var showingPast by remember { mutableStateOf(false) }
 
-    suspend fun load() { state = state.reloaded { environment.client.send(CustomerEndpoints.conversations()).conversations } }
+    val business = area == Areas.BUSINESS
+    suspend fun load() {
+        state = state.reloaded { environment.client.send(if (business) BusinessEndpoints.conversations() else CustomerEndpoints.conversations()).conversations }
+    }
     LaunchedEffect(Unit) { load() }
 
     Column {
-        ZTopBar("Messages")
+        ZTopBar("Messages", onBack = onBack)
         ZScreen(onRefresh = { load() }) {
             ZLoadable(state, retry = { scope.launch { load() } }) { threads ->
                 val active = threads.filter { !it.readOnly }
@@ -117,23 +134,27 @@ fun MessagesScreen() {
                     }
                     if (shown.isEmpty()) {
                         if (showingPast) ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No past conversations", "Threads move here once their job settles.")
+                        else if (business) ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No active conversations", "Threads live here while a request is under way — messaging opens once a pro is assigned.")
                         else ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No messages yet", "Once a pro takes your job, you can message them here.")
                     }
-                    for (thread in shown) {
-                        ZCard(padding = ZSpacing.sm, onClick = {
-                            nav.navigate(ConversationRoute(thread.job.id, Areas.CUSTOMER, thread.company ?: thread.job.title, thread.job.title, thread.readOnly, showJobLink = true))
-                        }) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                                ZAvatar(initialsOf(thread.company ?: "?"), ZAvatarShape.COMPANY, 44.dp)
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(thread.company ?: thread.job.title, style = if (thread.unreadCount > 0) ZType.bodyStrong else ZType.body, color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
-                                        thread.lastMessageAt?.let { ZCaption(Dates.relative(it), tone = ZTextTone.FAINT) }
+                    for ((property, group) in if (business) MessagesInbox.groupByProperty(shown) else listOf("" to shown)) {
+                        if (business) ZMono(property, modifier = Modifier.padding(top = ZSpacing.xs))
+                        for (thread in group) {
+                            ZCard(padding = ZSpacing.sm, onClick = {
+                                nav.navigate(ConversationRoute(thread.job.id, area, thread.company ?: thread.job.title, if (business) listOfNotNull(thread.job.code, thread.job.title).joinToString(" · ") else thread.job.title, thread.readOnly, showJobLink = true))
+                            }) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                                    ZAvatar(initialsOf(thread.company ?: "?"), ZAvatarShape.COMPANY, 44.dp)
+                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(thread.company ?: thread.job.title, style = if (thread.unreadCount > 0) ZType.bodyStrong else ZType.body, color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                                            thread.lastMessageAt?.let { ZCaption(Dates.relative(it), tone = ZTextTone.FAINT) }
+                                        }
+                                        ZCaption(thread.lastMessage ?: thread.job.title, maxLines = 1)
                                     }
-                                    ZCaption(thread.lastMessage ?: thread.job.title, maxLines = 1)
-                                }
-                                if (thread.unreadCount > 0) {
-                                    Text(thread.unreadCount.toString(), style = ZType.label, color = colors.navyDeep, modifier = Modifier.clip(CircleShape).background(colors.brandGold).padding(horizontal = 7.dp, vertical = 2.dp))
+                                    if (thread.unreadCount > 0) {
+                                        Text(thread.unreadCount.toString(), style = ZType.label, color = colors.navyDeep, modifier = Modifier.clip(CircleShape).background(colors.brandGold).padding(horizontal = 7.dp, vertical = 2.dp))
+                                    }
                                 }
                             }
                         }

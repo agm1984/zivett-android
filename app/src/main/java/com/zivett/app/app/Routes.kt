@@ -48,11 +48,14 @@ import kotlinx.serialization.Serializable
 @Serializable data class NotificationsRoute(val area: String)
 @Serializable data class BookRoute(val area: String, val presetMode: String? = null, val presetCategorySlug: String? = null, val presetPropertyId: Int? = null, val resume: Boolean = false)
 @Serializable data class TeamRoute(val area: String)
-@Serializable data class OrgProfileRoute(val area: String)
+/// `missing`: the setup's `steps.profile.missing` labels joined with "|" —
+/// a blocked Continue opens the form with those fields marked in place.
+@Serializable data class OrgProfileRoute(val area: String, val missing: String = "")
 
 // Business.
 @Serializable object BusinessSetupRoute
 @Serializable object BusinessInvoicesRoute
+@Serializable object BusinessMessagesRoute
 @Serializable object PropertiesRoute
 
 // Company.

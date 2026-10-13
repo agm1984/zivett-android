@@ -65,7 +65,7 @@ import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PinPickerMap
 import kotlinx.coroutines.launch
 
-class PropertiesModel(private val client: ApiClient) {
+class PropertiesModel(val client: ApiClient) {
     var state by mutableStateOf<Loadable<List<Property>>>(Loadable.Loading)
     var toast by mutableStateOf<String?>(null)
 
@@ -151,7 +151,7 @@ fun PropertyFormSheet(model: PropertiesModel, existing: Property?, onDismiss: ()
         error?.let { ZBanner(it, tone = ZTone.DANGER) }
         ZTextField("Property name", name, { name = it }, placeholder = "Alder Court", error = fieldErrors["name"], capitalization = KeyboardCapitalization.Words)
         ZTextField("Property type", kind, { kind = it }, placeholder = "12-unit residential", error = fieldErrors["kind"], capitalization = KeyboardCapitalization.Sentences)
-        ZAddressFields(address, { address = it }, error = fieldErrors["address"])
+        ZAddressFields(address, { address = it }, error = fieldErrors["address"], lookupClient = model.client)
         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                 ZLabel("Map pin")

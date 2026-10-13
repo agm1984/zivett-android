@@ -21,7 +21,6 @@ object BookingWizardEngine {
         object Issue : Step
         object Photos : Step
         object Where : Step
-        object Access : Step
         object Details : Step
         object Mode : Step
         object Schedule : Step
@@ -32,16 +31,16 @@ object BookingWizardEngine {
         val phase: String
             get() = when (this) {
                 Category, is Question, Issue, Photos -> "About the job"
-                Where, Access, Details -> "Where"
+                Where, Details -> "Where"
                 Mode, Schedule, Urgency, Availability -> "When"
                 Review -> "Review"
             }
 
-        val isOptional: Boolean get() = this is Question || this == Access || this == Details || this == Availability
+        val isOptional: Boolean get() = this is Question || this == Details || this == Availability
 
-        /// Optional steps get a Skip button — except access/details,
-        /// where "Next" already reads as skip.
-        val showsSkip: Boolean get() = isOptional && this != Access && this != Details
+        /// Optional steps get a Skip button — except details, where
+        /// "Next" already reads as skip.
+        val showsSkip: Boolean get() = isOptional && this != Details
     }
 
     data class Form(
@@ -75,7 +74,11 @@ object BookingWizardEngine {
     fun steps(form: Form, questions: List<BookingOptions.Question>): List<Step> {
         val steps = mutableListOf<Step>(Step.Category)
         steps += questions.map { Step.Question(it.id) }
-        steps += listOf(Step.Issue, Step.Photos, Step.Where, if (form.area == Area.BUSINESS) Step.Details else Step.Access)
+        steps += listOf(Step.Issue, Step.Photos, Step.Where)
+        // Business bookers keep their unit / tenant / access screen; a
+        // homeowner's access notes sit at the bottom of Where behind a
+        // toggle (they lost their own screen 2026-10-12, web 5c8a020).
+        if (form.area == Area.BUSINESS) steps += Step.Details
         if (!form.modePreset) steps += Step.Mode
         when (form.mode) {
             "scheduled" -> steps += Step.Schedule
@@ -102,8 +105,16 @@ object BookingWizardEngine {
         Step.Schedule -> form.selectedWindows.isNotEmpty()
         is Step.Question -> (form.intakeAnswers[step.id] ?: emptyList()).any { it.isNotEmpty() }
         Step.Urgency -> form.urgency != null
-        Step.Access, Step.Details, Step.Availability, Step.Review -> true
+        Step.Details, Step.Availability, Step.Review -> true
     }
+
+    /// Arriving on a step can pre-answer it: the timing screen reached
+    /// with no mode picked pre-selects Instant when it's offered (the
+    /// fast path — its fee is disclosed on the card and at Review), so
+    /// most bookers just press Next. A mode preset on entry never shows
+    /// the screen at all.
+    fun arriving(step: Step, form: Form, instantOffered: Boolean): Form =
+        if (step == Step.Mode && form.mode == null && instantOffered) form.copy(mode = "instant") else form
 
     /// `derivedUrgency`.
     fun derivedUrgency(form: Form, today: String): String = when (form.mode) {
@@ -155,13 +166,13 @@ object BookingWizardEngine {
         return now.hour >= end
     }
 
-    /// Which step a 422 field error belongs to.
-    fun step(forField: String, questions: List<BookingOptions.Question>): Step = when {
+    /// Which step a 422 field error belongs to. A homeowner's unit and
+    /// access notes live on Where; a business's on Details.
+    fun step(forField: String, questions: List<BookingOptions.Question>, area: Area = Area.CUSTOMER): Step = when {
         forField == "service_category_id" -> Step.Category
         forField == "issue" -> Step.Issue
         forField in setOf("address", "customer_address_id", "property_id") -> Step.Where
-        forField in setOf("unit", "tenant") -> Step.Details
-        forField == "access_notes" -> Step.Access
+        forField in setOf("unit", "tenant", "access_notes") -> if (area == Area.BUSINESS) Step.Details else Step.Where
         forField == "mode" -> Step.Mode
         forField == "availability_windows" -> Step.Schedule
         forField == "urgency" -> Step.Urgency

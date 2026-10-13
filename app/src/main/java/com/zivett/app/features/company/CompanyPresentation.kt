@@ -61,6 +61,8 @@ object CompanyPresentation {
         "submitted" -> JobPresentation.Meta("Submitted", ZTone.INFO)
         "rejected" -> JobPresentation.Meta("Needs another look", ZTone.DANGER)
         "expired" -> JobPresentation.Meta("Expired", ZTone.DANGER)
+        // An optional extra (WSBC, background check) not on file — never a red gap.
+        "optional" -> JobPresentation.Meta("Optional", ZTone.NEUTRAL)
         else -> JobPresentation.Meta("Missing", ZTone.DANGER)
     }
 

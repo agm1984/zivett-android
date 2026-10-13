@@ -75,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -361,8 +362,13 @@ fun ZTextField(
     minLines: Int = 1,
     enabled: Boolean = true,
     corner: (@Composable () -> Unit)? = null,
+    /// Fires when the field had focus and loses it — the web's `@blur`
+    /// (the address auto-fill looks the street up then).
+    onFocusLost: (() -> Unit)? = null,
+    fieldModifier: Modifier = Modifier,
 ) {
     val colors = ZTheme.colors
+    var hadFocus by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         if (label.isNotEmpty() || corner != null) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -374,7 +380,10 @@ fun ZTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = fieldModifier.fillMaxWidth().onFocusChanged { state ->
+                if (hadFocus && !state.isFocused) onFocusLost?.invoke()
+                hadFocus = state.isFocused
+            },
             placeholder = if (placeholder.isEmpty()) null else ({ Text(placeholder, style = ZType.body, color = colors.inkFaint) }),
             isError = error != null,
             singleLine = singleLine,

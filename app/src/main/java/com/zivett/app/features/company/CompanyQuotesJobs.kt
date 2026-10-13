@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.zivett.app.app.CompanyInvoiceRoute
 import com.zivett.app.app.CompanyJobRoute
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.core.models.OrganizationRole
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.CompanyEndpoints
@@ -86,6 +87,12 @@ class CompanyQuotesModel(private val client: ApiClient) {
             // as though the revision had been sent, losing the edit.
             return error.userMessage
         } catch (error: Exception) { return error.userMessage }
+    }
+
+    /// The composer's in-place rate change; null = saved (the rate map is swapped).
+    suspend fun saveRate(categoryId: Int, cents: Int): String? = when (val outcome = CompanyRates.save(client, categoryId, cents)) {
+        is CompanyRates.Outcome.Saved -> { state.value?.let { state = Loadable.Loaded(it.copy(hourlyRates = outcome.rates)) }; null }
+        is CompanyRates.Outcome.Failed -> outcome.message
     }
 
     suspend fun withdraw(quote: Quote) {
@@ -153,7 +160,10 @@ fun CompanyQuotesScreen() {
 
     revising?.let { quote ->
         quoteJobAsJob(quote)?.let { job ->
-            QuoteComposerSheet(job, model.state.value?.hourlyRates?.get(job.category.id.toString()), model.state.value?.commissionBps ?: 1500, quote, onDismiss = { revising = null }) { body -> model.revise(quote, body) }
+            val isAdmin = LocalAppEnvironment.current.session.user?.organizationRole == OrganizationRole.ADMIN
+            QuoteComposerSheet(job, model.state.value?.hourlyRates?.get(job.category.id.toString()), model.state.value?.commissionBps ?: 1500, quote,
+                saveRate = if (isAdmin) ({ cents -> model.saveRate(job.category.id, cents) }) else null,
+                onDismiss = { revising = null }) { body -> model.revise(quote, body) }
         }
     }
     withdrawing?.let { quote ->

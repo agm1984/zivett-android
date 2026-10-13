@@ -104,6 +104,9 @@ object CustomerEndpoints {
     /// method outside quote acceptance (the invoice-pay path).
     fun saveCard(setupIntentId: String) = ApiRequest.post<SavedCardResponse, Map<String, String>>("api/billing/card", mapOf("stripe_setup_intent_id" to setupIntentId))
     fun geocode(address: String) = ApiRequest.post<Geocode, Map<String, String>>("api/geocode", mapOf("address" to address))
+    /// The address forms' auto-fill: a finished street line comes back
+    /// with `parts` (city, 2-letter region, postcode) — `AddressLookup`.
+    fun geocodeDetails(address: String) = ApiRequest.post<GeocodeDetails, GeocodeDetailsBody>("api/geocode", GeocodeDetailsBody(address, details = true))
 }
 
 // MARK: - Request bodies
@@ -260,6 +263,14 @@ data class BillingContext(
 }
 
 @Serializable data class Geocode(val lat: Double? = null, val lng: Double? = null)
+
+@Serializable data class GeocodeDetailsBody(val address: String, val details: Boolean)
+
+/// `POST /api/geocode` with `details: true` — both null when nothing matched.
+@Serializable
+data class GeocodeDetails(val coords: Geocode? = null, val parts: Parts? = null) {
+    @Serializable data class Parts(val city: String? = null, val region: String? = null, val postalCode: String? = null)
+}
 
 /// `GET /api/companies/{org}/reviews` — summary over every review, list
 /// capped at the latest 50 server-side.

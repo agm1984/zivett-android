@@ -66,6 +66,15 @@ class CompanySetupModel(private val client: ApiClient) {
     var toast by mutableStateOf<String?>(null)
     var submitting by mutableStateOf(false)
     var justSubmitted by mutableStateOf(false)
+    /// Set once the profile form has been opened from here: coming back
+    /// to it with the step still incomplete is this flow's "blocked
+    /// Continue" (there is no Continue — Submit stays disabled), so the
+    /// second visit opens with the gaps marked in place.
+    var profileVisited by mutableStateOf(false)
+
+    /// The labels to mark when the form opens (`OrgProfileRoute.missing`).
+    fun profileMissingRoute(): String =
+        if (profileVisited) state.value?.setup?.steps?.profile?.missing.orEmpty().joinToString("|") else ""
 
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.organization()) } }
 
@@ -127,7 +136,7 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                             ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the three steps and submit — our team takes it from there.")
                             SetupChecklist(response.setup)
                             ZCard(padding = 0.dp) {
-                                ZNavRow("Business profile", "Name, address, phone — what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.Business) }
+                                ZNavRow("Business profile", "Name, address, phone — what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY, model.profileMissingRoute())); model.profileVisited = true }) { ZIconTile(Icons.Outlined.Business) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Services & rates", "Trades, hourly rates, radius, availability", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.Build) }
                                 ZDivider(Modifier.padding(start = 60.dp))

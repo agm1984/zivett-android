@@ -8,6 +8,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import com.zivett.app.design.ZRadius
+import com.zivett.app.features.customer.home.CategoryIcon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -366,6 +382,54 @@ private fun renderPdf(file: File): List<android.graphics.Bitmap> = runCatching {
     }
 }.getOrDefault(emptyList())
 
+/// One trade as a big tap target (web `PassportDetailsFields.vue`, field
+/// audit #9 — pros set this up from a phone): the category badge, the
+/// name, and a check; picked, it wears the gold selected state and opens
+/// its hourly-rate input inside the tile, outlined red until it has a rate.
+@Composable
+private fun TradeTile(option: CompanyDetails.CategoryOption, picked: Boolean, rate: String, onToggle: () -> Unit, onRate: (String) -> Unit) {
+    val colors = ZTheme.colors
+    val shape = RoundedCornerShape(ZRadius.card)
+    Column(Modifier.fillMaxWidth().clip(shape).background(colors.surface).border(if (picked) 2.dp else 1.dp, if (picked) colors.brandGold else colors.border, shape)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(value = picked, role = Role.Checkbox, onValueChange = { onToggle() }).padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (option.icon != null || option.code != null) {
+                Box(Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(ZColors.parse(option.bgColor) ?: colors.infoSoft), contentAlignment = Alignment.Center) {
+                    val tint = ZColors.parse(option.fgColor) ?: colors.info
+                    if (option.icon != null) Icon(CategoryIcon.icon(option.icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                    else Text(option.code ?: "", style = ZType.label.copy(fontFamily = FontFamily.Monospace), color = tint)
+                }
+            }
+            ZBodyStrong(option.name, modifier = Modifier.weight(1f))
+            Box(
+                Modifier.size(24.dp).clip(CircleShape).background(if (picked) colors.brandGold else Color.Transparent).border(1.dp, if (picked) colors.brandGold else colors.borderStrong, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { if (picked) Icon(Icons.Filled.Check, contentDescription = null, tint = ZColors.fixedNavy, modifier = Modifier.size(15.dp)) }
+        }
+        if (picked) {
+            HorizontalDivider(color = colors.border)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ZCaption("Your hourly rate", tone = ZTextTone.SOFT, modifier = Modifier.weight(1f))
+                ZCaption("$", tone = ZTextTone.SOFT)
+                val missing = (rate.toIntOrNull() ?: 0) <= 0
+                BasicTextField(
+                    value = rate, onValueChange = onRate, singleLine = true,
+                    textStyle = ZType.body.copy(color = colors.ink, fontFamily = FontFamily.Monospace, textAlign = TextAlign.End),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    cursorBrush = SolidColor(colors.navy),
+                    modifier = Modifier.width(84.dp).clip(RoundedCornerShape(8.dp)).background(colors.surface)
+                        .border(1.dp, if (missing) colors.danger else colors.borderStrong, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 7.dp)
+                        .semantics { contentDescription = "${option.name} hourly rate in dollars" },
+                    decorationBox = { inner -> Box { if (rate.isEmpty()) Text("120", style = ZType.body.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.End), color = colors.inkFaint, modifier = Modifier.fillMaxWidth()); inner() } },
+                )
+                ZCaption("/hr", tone = ZTextTone.SOFT)
+            }
+        }
+    }
+}
+
 enum class DetailsSection(val title: String) {
     TRADES("Trade categories"), RADIUS("Service radius"), AVAILABILITY("Availability"), ALERT_EMAILS("Job alert emails");
 
@@ -402,8 +466,9 @@ fun DetailsEditorSheet(section: DetailsSection, details: CompanyDetails, onDismi
             DetailsSection.TRADES -> {
                 ZCaption("The trades you work in, each with your hourly rate — quotes are priced from it.")
                 for (option in details.categoryOptions) {
-                    ZCheckbox(option.id in selected, { on -> selected = if (on) selected + option.id else selected - option.id }, text = option.name)
-                    if (option.id in selected) ZTextField("Rate ($/hr)", rates[option.id] ?: "", { rates = rates + (option.id to it) }, placeholder = "120", keyboardType = KeyboardType.Number)
+                    TradeTile(option, option.id in selected, rates[option.id] ?: "",
+                        onToggle = { selected = if (option.id in selected) selected - option.id else selected + option.id },
+                        onRate = { rates = rates + (option.id to it.filter(Char::isDigit).take(4)) })
                 }
                 if (rateMissing) ZCaption("Set an hourly rate for every selected trade.", color = colors.danger)
             }

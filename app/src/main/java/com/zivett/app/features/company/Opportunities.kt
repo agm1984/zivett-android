@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.input.KeyboardType
+import com.zivett.app.core.models.OrganizationRole
+import com.zivett.app.design.ZTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -98,6 +102,12 @@ class OpportunitiesModel(private val client: ApiClient) {
 
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.opportunities()) } }
 
+    /// The composer's in-place rate change; null = saved (the feed's rate map is swapped).
+    suspend fun saveRate(categoryId: Int, cents: Int): String? = when (val outcome = CompanyRates.save(client, categoryId, cents)) {
+        is CompanyRates.Outcome.Saved -> { state.value?.let { state = Loadable.Loaded(it.copy(hourlyRates = outcome.rates)) }; null }
+        is CompanyRates.Outcome.Failed -> outcome.message
+    }
+
     /// Stripe-hosted Connect onboarding — the composer's "Set up payouts" road.
     suspend fun payoutOnboardingUrl(): String? {
         startingPayoutSetup = true
@@ -183,12 +193,15 @@ fun OpportunitiesScreen() {
         }
     }
 
+    // Rates are an org-admin edit (the endpoint's gate) — members see no Change.
+    val isAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
     quoting?.let { job ->
         val feed = model.state.value
         QuoteComposerSheet(
             job = job, rateCents = feed?.hourlyRates?.get(job.category.id.toString()), commissionBps = feed?.commissionBps ?: 1500, existing = null,
             payoutsReady = feed?.payoutsReady ?: true,
             setupPayouts = { quoting = null; scope.launch { model.payoutOnboardingUrl()?.let { sentToStripe = openUrl(context, it) } } },
+            saveRate = if (isAdmin) ({ cents -> model.saveRate(job.category.id, cents) }) else null,
             onDismiss = { quoting = null },
         ) { body -> model.submitQuote(job, body) }
     }
@@ -235,6 +248,29 @@ fun OpportunityCard(job: Job, commissionBps: Int, busy: Boolean, quote: () -> Un
     }
 }
 
+/// The composer's in-place rate change (`PATCH /api/company/rates/{id}`):
+/// the refreshed rate map on success, else the message to show beside the
+/// input. The host model swaps the map into its state, so the composer's
+/// total reprices live.
+object CompanyRates {
+    sealed interface Outcome {
+        data class Saved(val rates: Map<String, Int>) : Outcome
+        data class Failed(val message: String) : Outcome
+    }
+
+    /// "120", "120.50", "120,50" → cents; null when it isn't a positive amount.
+    fun parseDollars(text: String): Int? = text.trim().replace(',', '.').toDoubleOrNull()?.let { (it * 100).roundToInt() }?.takeIf { it > 0 }
+
+    suspend fun save(client: ApiClient, categoryId: Int, cents: Int): Outcome = try {
+        Outcome.Saved(client.send(CompanyEndpoints.updateRate(categoryId, cents)).hourlyRates)
+    } catch (error: ApiError) {
+        Outcome.Failed(if (error is ApiError.Validation) error.errors.first("hourly_rate_cents") ?: error.errors.message else error.userMessage)
+    } catch (error: Exception) {
+        if (error is kotlinx.coroutines.CancellationException) throw error
+        Outcome.Failed(error.userMessage)
+    }
+}
+
 /// The quote composer (`QuoteComposer.vue`): hours × crew × your rate,
 /// live money box, proposed arrival from the booker's windows.
 @Composable
@@ -243,6 +279,9 @@ fun QuoteComposerSheet(
     /// False only on the stripe driver before Connect onboarding — the
     /// primary action becomes going to set payouts up.
     payoutsReady: Boolean = true, setupPayouts: (() -> Unit)? = null,
+    /// Changes this trade's rate in place (null = saved, else the error);
+    /// null hides "Change" — members can't edit rates (org admins only).
+    saveRate: (suspend (Int) -> String?)? = null,
     onDismiss: () -> Unit, submit: suspend (QuoteBody) -> String?,
 ) {
     val scope = rememberCoroutineScope()
@@ -261,6 +300,16 @@ fun QuoteComposerSheet(
     }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // "Change" edits the rate RIGHT HERE instead of sending the pro to the
+    // Passport and losing the quote (field audit #13).
+    var editingRate by remember { mutableStateOf(false) }
+    var rateDraft by remember { mutableStateOf("") }
+    var rateError by remember { mutableStateOf<String?>(null) }
+    var savingRate by remember { mutableStateOf(false) }
+    fun startRateEdit() {
+        rateDraft = rateCents?.let { if (it % 100 == 0) (it / 100).toString() else "%.2f".format(java.util.Locale.US, it / 100.0) } ?: ""
+        rateError = null; editingRate = true
+    }
 
     val offeredWindows: List<CompanyWindow> = job.companyWindows ?: (job.availabilityWindows ?: emptyList()).map { CompanyWindow(it.date, it.window, true, 0) }
     val needsProposal = job.mode == "scheduled" && offeredWindows.isNotEmpty()
@@ -285,8 +334,40 @@ fun QuoteComposerSheet(
             }
         }
 
+        if (editingRate && saveRate != null) {
+            // In-place rate edit: the quote below stays as typed.
+            ZCard(padding = ZSpacing.sm) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ZBodyStrong("Your ${job.category.name} rate", modifier = Modifier.weight(1f))
+                    ZTextField("", rateDraft, { rateDraft = it; rateError = null }, modifier = Modifier.width(110.dp), placeholder = "120", keyboardType = KeyboardType.Decimal,
+                        corner = null)
+                    ZCaption("/hr", tone = ZTextTone.SOFT)
+                }
+                rateError?.let { ZCaption(it, color = colors.danger) }
+                    ?: ZCaption("Applies to all your ${job.category.name.lowercase()} quotes from now on — quotes already sent keep their price.", tone = ZTextTone.FAINT)
+                Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                    Spacer(Modifier.weight(1f))
+                    ZButton("Cancel", style = ZButtonStyle.GHOST, compact = true, fullWidth = false, enabled = !savingRate) { editingRate = false }
+                    ZButton("Save rate", compact = true, fullWidth = false, loading = savingRate) {
+                        val cents = CompanyRates.parseDollars(rateDraft)
+                        if (cents == null) { rateError = "Enter your hourly rate."; return@ZButton }
+                        scope.launch {
+                            savingRate = true
+                            val failure = saveRate(cents)
+                            savingRate = false
+                            if (failure == null) editingRate = false else rateError = failure
+                        }
+                    }
+                }
+            }
+        }
+
         if (rateCents != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) { ZHeadline("Your price", modifier = Modifier.weight(1f)); ZCaption("${job.category.name} rate ${Money.format(rateCents)}/hr") }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ZHeadline("Your price", modifier = Modifier.weight(1f))
+                ZCaption("${job.category.name} rate ${Money.format(rateCents)}/hr")
+                if (saveRate != null && !editingRate) ZTextAction("Change") { startRateEdit() }
+            }
             existing?.hourlyRateCents?.takeIf { it != rateCents }?.let { old ->
                 ZBanner("Your rate changed since this quote went out (${Money.format(old)}/hr → ${Money.format(rateCents)}/hr) — saving reprices at the new rate.", tone = ZTone.INFO)
             }
@@ -301,7 +382,8 @@ fun QuoteComposerSheet(
                 } else ZCaption("Set the hours and your total prices itself — rate × hours × crew.")
             }
         } else {
-            ZBanner("Set your ${job.category.name} hourly rate on your Passport first — quotes are priced from it.", tone = ZTone.WARNING)
+            ZBanner("Set your ${job.category.name} hourly rate${if (saveRate != null) "" else " on your Passport"} first — quotes are priced from it.", tone = ZTone.WARNING)
+            if (saveRate != null && !editingRate) ZTextAction("Set your ${job.category.name.lowercase()} rate") { startRateEdit() }
         }
 
         if (offeredWindows.isNotEmpty()) {

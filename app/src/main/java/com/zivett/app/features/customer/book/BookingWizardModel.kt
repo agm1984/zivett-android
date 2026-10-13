@@ -3,6 +3,8 @@ package com.zivett.app.features.customer.book
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.zivett.app.core.AddressLookup
+import com.zivett.app.core.AddressParts
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
 import com.zivett.app.core.models.AddressBody
@@ -39,7 +41,16 @@ class BookingWizardModel(
 
     var options by mutableStateOf<Loadable<BookingOptions>>(Loadable.Loading)
     var form by mutableStateOf(BookingWizardEngine.Form(area = area, mode = presetMode, modePreset = presetMode != null))
-    var stepIndex by mutableStateOf(0)
+    private var currentStep by mutableStateOf(0)
+    /// Every step change goes through here so arriving can pre-answer
+    /// (the timing screen pre-selects Instant — `BookingWizardEngine.arriving`).
+    var stepIndex: Int
+        get() = currentStep
+        set(value) {
+            currentStep = value
+            val arrived = BookingWizardEngine.arriving(step, form, options.value?.modes?.any { it.key == "instant" } == true)
+            if (arrived != form) form = arrived
+        }
     var submitting by mutableStateOf(false)
     var fieldErrors by mutableStateOf<Map<String, String>>(emptyMap())
     var generalError by mutableStateOf<String?>(null)
@@ -142,6 +153,19 @@ class BookingWizardModel(
     }
 
     fun useNewAddress() { form = form.copy(savedAddressId = null, address = "") }
+
+    /// Set once the street lookup filled something — the Where step says so.
+    var addressAutoFilled by mutableStateOf(false)
+
+    /// Finishing the street line (focus leaves it) fills the blank city /
+    /// province / postcode — typed values always win (`AddressLookup`).
+    suspend fun lookUpStreet() {
+        fun typed() = AddressParts(form.line1, form.city, form.region, form.postal)
+        AddressLookup.fill(client, typed(), ::typed)?.let {
+            form = form.copy(city = it.city, region = it.region, postal = it.postal)
+            addressAutoFilled = true
+        }
+    }
 
     fun next() { if (canContinue && stepIndex < steps.size - 1) stepIndex += 1 }
     fun back() { stepIndex = maxOf(0, stepIndex - 1) }
@@ -361,7 +385,7 @@ class BookingWizardModel(
                 fieldErrors = error.errors.firstMessages
                 error.errors.errors.keys.sorted().firstOrNull()?.let { first ->
                     if (first == "mode") form = form.copy(modePreset = false)
-                    jump(BookingWizardEngine.step(first, questions))
+                    jump(BookingWizardEngine.step(first, questions, area))
                 }
                 generalError = if (fieldErrors.isEmpty()) error.errors.message else null
             } else generalError = error.userMessage

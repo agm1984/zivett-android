@@ -30,16 +30,32 @@ class BookingWizardEngineTest {
 
     @Test fun stepsFollowTheMode() {
         var form = BookingWizardEngine.Form()
-        assertEquals(listOf(Step.Category, Step.Question(7), Step.Issue, Step.Photos, Step.Where, Step.Access, Step.Mode, Step.Review), BookingWizardEngine.steps(form, questions))
+        assertEquals(listOf(Step.Category, Step.Question(7), Step.Issue, Step.Photos, Step.Where, Step.Mode, Step.Review), BookingWizardEngine.steps(form, questions))
         form = form.copy(mode = "scheduled")
-        assertEquals(listOf(Step.Category, Step.Issue, Step.Photos, Step.Where, Step.Access, Step.Mode, Step.Schedule, Step.Review), BookingWizardEngine.steps(form, emptyList()))
+        assertEquals(listOf(Step.Category, Step.Issue, Step.Photos, Step.Where, Step.Mode, Step.Schedule, Step.Review), BookingWizardEngine.steps(form, emptyList()))
         form = form.copy(mode = "quote")
         assertTrue(Step.Urgency in BookingWizardEngine.steps(form, emptyList()))
         assertTrue(Step.Availability in BookingWizardEngine.steps(form, emptyList()))
         form = form.copy(urgency = "planning")
         assertFalse(Step.Availability in BookingWizardEngine.steps(form, emptyList()))
         form = form.copy(mode = "instant", modePreset = true)
-        assertEquals(listOf(Step.Category, Step.Issue, Step.Photos, Step.Where, Step.Access, Step.Review), BookingWizardEngine.steps(form, emptyList()))
+        assertEquals(listOf(Step.Category, Step.Issue, Step.Photos, Step.Where, Step.Review), BookingWizardEngine.steps(form, emptyList()))
+    }
+
+    @Test fun onlyBusinessBookersGetTheDetailsScreen() {
+        // A homeowner's access notes sit on Where; a business keeps unit / tenant / access.
+        val business = BookingWizardEngine.Form(area = BookingWizardEngine.Area.BUSINESS)
+        assertEquals(listOf(Step.Category, Step.Issue, Step.Photos, Step.Where, Step.Details, Step.Mode, Step.Review), BookingWizardEngine.steps(business, emptyList()))
+        assertFalse(Step.Details in BookingWizardEngine.steps(BookingWizardEngine.Form(), emptyList()))
+    }
+
+    @Test fun reachingTheTimingScreenPreselectsInstant() {
+        val form = BookingWizardEngine.Form()
+        assertEquals("instant", BookingWizardEngine.arriving(Step.Mode, form, instantOffered = true).mode)
+        // Not offered, already chosen, or another screen: untouched.
+        assertNull(BookingWizardEngine.arriving(Step.Mode, form, instantOffered = false).mode)
+        assertEquals("quote", BookingWizardEngine.arriving(Step.Mode, form.copy(mode = "quote"), instantOffered = true).mode)
+        assertNull(BookingWizardEngine.arriving(Step.Where, form, instantOffered = true).mode)
     }
 
     @Test fun photosAreTheHardGate() {
@@ -125,6 +141,9 @@ class BookingWizardEngineTest {
         assertEquals(Step.Where, BookingWizardEngine.step("address", emptyList()))
         assertEquals(Step.Question(7), BookingWizardEngine.step("intake_answers.7", questions))
         assertEquals(Step.Schedule, BookingWizardEngine.step("availability_windows", emptyList()))
+        assertEquals(Step.Where, BookingWizardEngine.step("access_notes", emptyList()))
+        assertEquals(Step.Where, BookingWizardEngine.step("unit", emptyList()))
+        assertEquals(Step.Details, BookingWizardEngine.step("access_notes", emptyList(), BookingWizardEngine.Area.BUSINESS))
     }
 
     @Test fun localDateKeyIsCalendarLocal() {
@@ -156,6 +175,15 @@ class BookingWizardModelTest {
         model.form = model.form.copy(intakeAnswers = mapOf(1 to listOf("Faucet")))
         model.selectCategory(model.options.value!!.categories[1])
         assertTrue(model.form.intakeAnswers.isEmpty())
+    }
+
+    @Test fun walkingOntoTheTimingScreenPreselectsInstant() = runTest(dispatcher) {
+        val client = PreviewApiClient(mapOf("api/customer/booking-options" to Fixtures.bookingOptions()))
+        val model = BookingWizardModel(client)
+        model.load()
+        model.jump(Step.Mode)
+        assertEquals(Step.Mode, model.step)
+        assertEquals("instant", model.form.mode)
     }
 
     @Test fun submitRefusesWithoutPhotos() = runTest(dispatcher) {

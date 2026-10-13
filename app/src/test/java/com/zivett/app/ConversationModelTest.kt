@@ -4,6 +4,7 @@ import com.zivett.app.core.models.BlockResponse
 import com.zivett.app.core.models.Conversation
 import com.zivett.app.core.models.ConversationParticipant
 import com.zivett.app.core.models.ConversationResponse
+import com.zivett.app.core.models.ConversationsResponse
 import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.Message
 import com.zivett.app.core.network.ApiError
@@ -12,6 +13,7 @@ import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.core.realtime.RealtimeEvents
 import com.zivett.app.features.customer.messages.ConversationModel
+import com.zivett.app.features.customer.messages.MessagesInbox
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -112,5 +114,22 @@ class ConversationModelTest {
         // Older servers omit the list — the thread still decodes.
         val legacy = JsonCoding.json.decodeFromString<ConversationResponse>("""{"conversation":{"id":7,"messages":[]}}""")
         assertTrue(legacy.conversation.participants.isEmpty())
+    }
+}
+
+/// The property manager's inbox (web `pages/business/Messages.vue`).
+class BusinessInboxTest {
+    @Test fun threadsGroupByPropertyInTheApisOrder() {
+        val rows = JsonCoding.json.decodeFromString(ConversationsResponse.serializer(), """
+            {"conversations":[
+              {"id":1,"unread_count":2,"read_only":false,"job":{"id":10,"code":"RQ-1","title":"Leak","status":"accepted"},"company":"Ravensworth","property":"Harbour Towers"},
+              {"id":null,"unread_count":0,"read_only":false,"job":{"id":11,"code":"RQ-2","title":"Paint","status":"accepted"},"company":"ProCoat","property":null},
+              {"id":3,"unread_count":0,"read_only":false,"job":{"id":12,"code":"RQ-3","title":"Fan","status":"accepted"},"company":"Ravensworth","property":"Harbour Towers"}
+            ]}
+        """.trimIndent()).conversations
+        val groups = MessagesInbox.groupByProperty(rows)
+        assertEquals(listOf("Harbour Towers", MessagesInbox.otherRequests), groups.map { it.first })
+        assertEquals(listOf(10, 12), groups[0].second.map { it.job.id })
+        assertEquals("Harbour Towers", rows[0].property)
     }
 }

@@ -67,7 +67,7 @@ import com.zivett.app.design.ZType
 import com.zivett.app.features.shared.PinPickerMap
 import kotlinx.coroutines.launch
 
-class AddressesModel(private val client: ApiClient) {
+class AddressesModel(val client: ApiClient) {
     var state by mutableStateOf<Loadable<List<CustomerAddress>>>(Loadable.Loading)
     var error by mutableStateOf<String?>(null)
 
@@ -162,7 +162,7 @@ fun AddressFormSheet(model: AddressesModel, existing: CustomerAddress?, onDismis
     ZSheet(onDismiss = onDismiss, title = if (existing == null) "New address" else "Edit address") {
         error?.let { ZBanner(it, tone = ZTone.DANGER) }
         ZTextField("Label", label, { label = it }, placeholder = "Home", error = fieldErrors["label"], capitalization = KeyboardCapitalization.Words)
-        ZAddressFields(address, { address = it }, error = fieldErrors["address"])
+        ZAddressFields(address, { address = it }, error = fieldErrors["address"], lookupClient = model.client)
         ZTextField("Access notes", notes, { notes = it }, placeholder = "Gate code, parking, pets…", error = fieldErrors["access_notes"], capitalization = KeyboardCapitalization.Sentences)
 
         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {

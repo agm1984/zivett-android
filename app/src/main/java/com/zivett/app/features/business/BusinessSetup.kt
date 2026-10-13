@@ -195,7 +195,8 @@ private fun ProfileStep(model: BusinessSetupModel, skip: () -> Unit) {
         ZHeadline("Tell us about your organization")
         ZCaption("Right now your account is named after you. This is the organization your team and the pros working your requests will see — you can change any of it later.")
         if (tried && missing.isNotEmpty()) ZBanner("Still needed before you can continue: ${missing.joinToString(", ")}.", tone = ZTone.DANGER)
-        ZNavRow("Business profile", if (missing.isEmpty()) "Complete — edit anytime" else "Still needed: ${missing.joinToString(", ")}", onClick = { nav.navigate(OrgProfileRoute(Areas.BUSINESS)) }) { ZIconTile(Icons.Outlined.Business) }
+        // After a blocked Continue the form opens with the gaps marked in place.
+        ZNavRow("Business profile", if (missing.isEmpty()) "Complete — edit anytime" else "Still needed: ${missing.joinToString(", ")}", onClick = { nav.navigate(OrgProfileRoute(Areas.BUSINESS, if (tried) missing.joinToString("|") else "")) }) { ZIconTile(Icons.Outlined.Business) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         ZButton("Skip for now", style = ZButtonStyle.GHOST, loading = model.completing, fullWidth = false, onClick = skip)
@@ -204,7 +205,14 @@ private fun ProfileStep(model: BusinessSetupModel, skip: () -> Unit) {
             scope.launch {
                 checking = true; model.refresh(); checking = false
                 val setup = model.state.value
-                if (setup != null && BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PROFILE, setup).complete) model.next() else tried = true
+                val state = setup?.let { BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PROFILE, it) }
+                if (state?.complete == true) model.next()
+                else {
+                    tried = true
+                    // Mark each gap on the form itself, cursor in the first —
+                    // not only the banner (field audit #8).
+                    if (state != null && state.missing.isNotEmpty()) nav.navigate(OrgProfileRoute(Areas.BUSINESS, state.missing.joinToString("|")))
+                }
             }
         }
     }

@@ -380,7 +380,8 @@ data class JobLocation(val points: List<Point> = emptyList(), val updatedAt: Ins
     val latest: Point? get() = points.lastOrNull()
 }
 
-/// `GET /api/customer/conversations` — rows are keyed by JOB; `id` (the
+/// `GET /api/customer/conversations` (and the org-wide
+/// `/api/business/conversations`) — rows are keyed by JOB; `id` (the
 /// conversation id) is null until someone opens the thread.
 @Serializable
 data class ConversationSummary(
@@ -392,6 +393,9 @@ data class ConversationSummary(
     val job: JobRef,
     val company: String? = null,
     val companyPlan: String? = null,
+    /// Business inbox only (`/api/business/conversations`): the request's
+    /// property name, for grouping.
+    val property: String? = null,
 ) {
     @Serializable
     data class JobRef(val id: Int, val code: String? = null, val title: String, val status: JobStatus, val category: Category? = null) {

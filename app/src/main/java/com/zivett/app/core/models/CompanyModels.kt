@@ -73,6 +73,13 @@ data class OpportunitiesResponse(
     @Serializable data class Leads(val limit: Int? = null, val remaining: Int? = null)
 }
 
+@Serializable
+data class RateBody(val hourlyRateCents: Int)
+
+/// `PATCH /api/company/rates/{category}` — category id → cents.
+@Serializable
+data class RatesResponse(@Serializable(with = PhpRatesSerializer::class) val hourlyRates: Map<String, Int> = emptyMap())
+
 /// `GET /api/company/quotes`.
 @Serializable
 data class CompanyQuotesResponse(val quotes: List<Quote> = emptyList(), @Serializable(with = PhpRatesSerializer::class) val hourlyRates: Map<String, Int> = emptyMap(), val commissionBps: Int = 1500)
@@ -190,7 +197,9 @@ data class CompanyDetails(
     val modeOptions: List<ModeOption> = emptyList(),
     val jobAlertEmails: List<String>? = null,
 ) {
-    @Serializable data class CategoryOption(val id: Int, val name: String)
+    /// `code` / `icon` / colors feed the trade tiles' category badge
+    /// (since 2026-10-12; absent on an older server → plain tile).
+    @Serializable data class CategoryOption(val id: Int, val name: String, val code: String? = null, val icon: String? = null, val bgColor: String? = null, val fgColor: String? = null)
     @Serializable data class ModeOption(val value: String, val label: String)
 }
 
@@ -339,6 +348,10 @@ object CompanyEndpoints {
     fun updateOrganization(body: Map<String, String?>) = ApiRequest.json<CompanyOrganizationResponse, Map<String, String?>>(Method.PATCH, "api/company/organization", body, coder = JsonCoding.explicitNulls)
     fun submitOrganization() = ApiRequest.post<CompanyOrganizationResponse>("api/company/organization/submit")
     fun updateDetails(body: DetailsBody) = ApiRequest.patch<CompanyOrganizationResponse, DetailsBody>("api/company/organization/details", body)
+    /// One trade's rate, changed in place from the quote composer (org
+    /// admins; 404 if the org doesn't work in that trade; 422 outside
+    /// $10–$1,000). Returns the whole refreshed rate map.
+    fun updateRate(categoryId: Int, hourlyRateCents: Int) = ApiRequest.patch<RatesResponse, RateBody>("api/company/rates/$categoryId", RateBody(hourlyRateCents))
     fun uploadCredential(kind: String, fileName: String, mimeType: String, data: ByteArray, expiresAt: String?): ApiRequest<Unit> {
         val form = MultipartForm()
         form.addField("kind", kind)
