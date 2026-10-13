@@ -190,7 +190,9 @@ data class CompanyDetails(
     val modeOptions: List<ModeOption> = emptyList(),
     val jobAlertEmails: List<String>? = null,
 ) {
-    @Serializable data class CategoryOption(val id: Int, val name: String)
+    /// `code` / `icon` / colors feed the trade tiles' category badge
+    /// (since 2026-10-12; absent on an older server → plain tile).
+    @Serializable data class CategoryOption(val id: Int, val name: String, val code: String? = null, val icon: String? = null, val bgColor: String? = null, val fgColor: String? = null)
     @Serializable data class ModeOption(val value: String, val label: String)
 }
 
