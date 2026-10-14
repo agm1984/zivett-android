@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import com.zivett.app.app.CredentialGuideRoute
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.OrgProfileRoute
 import com.zivett.app.app.PassportRoute
+import com.zivett.app.app.PlanRoute
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.auth.AuthSession
 import com.zivett.app.core.models.CompanyEndpoints
@@ -93,6 +95,7 @@ class CompanySetupModel(private val client: ApiClient) {
         /// attention" line. Empty = complete, submit unlocks.
         fun missingSummary(steps: CompanySetup.Steps): List<String> {
             val missing = mutableListOf<String>()
+            if (steps.plan?.complete == false) missing += "choose a plan"
             missing += steps.profile.missing ?: (if (steps.profile.complete) emptyList() else listOf("business profile"))
             missing += steps.details.missing ?: (if (steps.details.complete) emptyList() else listOf("services & rates"))
             if (!steps.credentials.complete) {
@@ -105,12 +108,10 @@ class CompanySetupModel(private val client: ApiClient) {
     }
 }
 
-/// The company setup flow: profile → services & rates → credentials →
-/// review & submit. Each step is a screen it links out to; this page is
-/// the checklist + submit, like the web's review step. The web wizard's
-/// plan step is deliberately absent here — the app never offers a plan
-/// (store policy, see PARITY.md); the server's "finish later" path
-/// already submits without one, and the approval email covers the pick.
+/// The company setup flow: plan → profile → services & rates →
+/// credentials → review & submit. Each step is a screen it links out to;
+/// this page is the checklist + submit, like the web's review step. The
+/// plan is sold through Google Play (`features/plans`).
 @Composable
 fun CompanySetupScreen(onBack: (() -> Unit)?) {
     val environment = LocalAppEnvironment.current
@@ -133,9 +134,12 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                             ZDisplay("Your application is in review")
                             ZBody("Our team checks every company before it goes live — that review is what the ZiVETT badge means to bookers. You'll hear back by notification; approval opens the job feed.", tone = ZTextTone.SOFT)
                         } else {
-                            ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the three steps and submit — our team takes it from there.")
+                            ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the steps and submit — our team takes it from there.")
                             SetupChecklist(response.setup)
                             ZCard(padding = 0.dp) {
+                                val plan = response.setup.steps.plan
+                                ZNavRow("Plan", plan?.let { if (it.complete) "${it.planName ?: "Chosen"} — view or change" else "Choose your membership" } ?: "Your membership", onClick = { nav.navigate(PlanRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.StarOutline) }
+                                ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Business profile", "Name, address, phone — what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY, model.profileMissingRoute())); model.profileVisited = true }) { ZIconTile(Icons.Outlined.Business) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Services & rates", "Trades, hourly rates, radius, availability", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.Build) }

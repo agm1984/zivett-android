@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.stripe.android)
+    implementation(libs.play.billing)
     implementation(libs.osmdroid)
     implementation(libs.zxing.core)
     implementation(libs.firebase.messaging)

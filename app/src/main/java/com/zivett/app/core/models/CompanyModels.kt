@@ -38,7 +38,11 @@ data class CompanySetup(
     @Serializable
     // The server's `plan` step is deliberately NOT modelled: the app
     // never sells or nudges a plan (store policy — see PARITY.md).
-    data class Steps(val profile: Step, val details: Step, val credentials: Step) {
+    data class Steps(val profile: Step, val details: Step, val credentials: Step, val plan: Plan? = null) {
+        /// The membership pick — first in the flow, like the web wizard.
+        /// Absent on servers older than the plan step.
+        @Serializable data class Plan(val complete: Boolean = false, val planName: String? = null)
+
         @Serializable
         data class Step(
             val complete: Boolean = false,

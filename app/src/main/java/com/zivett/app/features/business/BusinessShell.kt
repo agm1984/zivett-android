@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.zivett.app.app.Areas
 import com.zivett.app.app.BusinessAccountTab
 import com.zivett.app.app.BusinessBookTab
@@ -43,6 +45,7 @@ import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.NotificationPrefsRoute
 import com.zivett.app.app.NotificationsRoute
 import com.zivett.app.app.OrgProfileRoute
+import com.zivett.app.app.PlanRoute
 import com.zivett.app.app.ProfileRoute
 import com.zivett.app.app.PropertiesRoute
 import com.zivett.app.app.TeamRoute
@@ -66,6 +69,7 @@ import com.zivett.app.features.customer.book.BookingWizardEngine
 import com.zivett.app.features.customer.notifications.NotificationBell
 import com.zivett.app.features.customer.notifications.rememberNotificationsModel
 import com.zivett.app.features.customer.shell.bookerDestinations
+import com.zivett.app.features.plans.PlanPickerScreen
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.RoleShell
 import com.zivett.app.features.shared.shellTab
@@ -101,6 +105,7 @@ fun BusinessShell() {
         composable<BusinessPropertiesTab> { BusinessBellScreen("Properties") { PropertiesScreen(onBack = null) } }
         composable<BusinessAccountTab> { BusinessAccountScreen() }
         composable<BusinessSetupRoute> { BusinessSetupScreen { nav.popBackStack() } }
+        composable<PlanRoute> { entry -> PlanPickerScreen(entry.toRoute<PlanRoute>().area) { nav.popBackStack() } }
         composable<BusinessInvoicesRoute> { com.zivett.app.features.customer.account.InvoicesScreen(com.zivett.app.core.models.JobArea.business) { nav.popBackStack() } }
         composable<PropertiesRoute> { PropertiesScreen { nav.popBackStack() } }
         composable<BusinessMessagesRoute> { com.zivett.app.features.customer.messages.MessagesScreen(Areas.BUSINESS) { nav.popBackStack() } }
@@ -143,6 +148,8 @@ fun BusinessAccountScreen() {
                 AccountLink("My account", "Name, email, phone", Icons.Outlined.Person) { nav.navigate(ProfileRoute(Areas.BUSINESS)) }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Business profile", "What pros see about ${user.organization?.name ?: "your business"}", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.BUSINESS)) }
+                ZDivider(Modifier.padding(start = 60.dp))
+                AccountLink("Plan", "Your membership and what it includes", Icons.Outlined.StarOutline) { nav.navigate(PlanRoute(Areas.BUSINESS)) }
                 // Org-admin concerns — members don't get the rows (UX only; the server enforces).
                 if (user.organizationRole == OrganizationRole.ADMIN) {
                     ZDivider(Modifier.padding(start = 60.dp))

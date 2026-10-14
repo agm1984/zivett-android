@@ -71,12 +71,15 @@ import com.zivett.app.design.ZToastBox
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
+import com.zivett.app.features.plans.PlanPickerContent
+import com.zivett.app.features.plans.PlanPickerModel
+import com.zivett.app.features.plans.rememberPlanPickerModel
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.launch
 
 class BusinessSetupModel(private val client: ApiClient) {
     var state by mutableStateOf<Loadable<BusinessSetup>>(Loadable.Loading)
-    var step by mutableStateOf(BusinessSetupSteps.Step.PROFILE)
+    var step by mutableStateOf(BusinessSetupSteps.Step.PLAN)
     var finished by mutableStateOf(false)
     var completing by mutableStateOf(false)
     var toast by mutableStateOf<String?>(null)
@@ -108,15 +111,15 @@ class BusinessSetupModel(private val client: ApiClient) {
     }
 }
 
-/// The business setup wizard: profile → properties → team, the web's
-/// `/business/setup` flow minus its plan step. Pushed full-screen to
-/// fresh org admins from the shell and from the overview's "Resume
-/// setup" for skippers.
+/// The business setup wizard: plan → profile → properties → team, the
+/// web's `/business/setup` flow. Pushed full-screen to fresh org admins
+/// from the shell and from the overview's "Resume setup" for skippers.
 @Composable
 fun BusinessSetupScreen(onDismiss: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val scope = rememberCoroutineScope()
     val model = remember { BusinessSetupModel(environment.client) }
+    val plans = rememberPlanPickerModel(Areas.BUSINESS)
     LaunchedEffect(model) { model.load() }
     // Fires again when a pushed editor (the profile form) pops — re-learn completeness.
     LifecycleResumeEffect(model) { scope.launch { model.refresh() }; onPauseOrDispose { } }
@@ -125,7 +128,7 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
 
     Column {
         ZTopBar("Set up your account", onBack = onDismiss)
-        ZToastBox(model.toast, { model.toast = null }) {
+        ZToastBox(model.toast ?: plans.toast, { model.toast = null; plans.toast = null }) {
             ZScreen {
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { setup ->
                     if (model.finished) {
@@ -146,6 +149,7 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
                             Stepper(model, setup)
                             BusinessSetupSteps.whatsLeft(model.step, setup)?.let { ZCaption("Needs attention — $it", color = ZTheme.colors.danger) }
                             when (model.step) {
+                                BusinessSetupSteps.Step.PLAN -> PlanStep(model, plans, ::skip)
                                 BusinessSetupSteps.Step.PROFILE -> ProfileStep(model, ::skip)
                                 BusinessSetupSteps.Step.PROPERTIES -> PropertiesStep(model, ::skip)
                                 BusinessSetupSteps.Step.TEAM -> TeamStep(model) { scope.launch { if (model.complete(environment.session)) model.finished = true } }
@@ -182,7 +186,19 @@ private fun Stepper(model: BusinessSetupModel, setup: BusinessSetup) {
     }
 }
 
-/* Step 1 — the org profile. The form itself is the shared editor
+/* Step 1 — the plan. The shared shelf: Premium through Google Play,
+   Basic through our API. Continue unlocks once either is chosen; the
+   setup payload is re-read so the stepper moves. */
+@Composable
+private fun PlanStep(model: BusinessSetupModel, plans: PlanPickerModel, skip: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    PlanPickerContent(plans) { scope.launch { model.refresh(); model.next() } }
+    // The first step, so no Back — but skipping the whole wizard stays
+    // possible, as on the web.
+    ZButton("Skip for now", style = ZButtonStyle.GHOST, loading = model.completing, onClick = skip)
+}
+
+/* Step 2 — the org profile. The form itself is the shared editor
    (pushed, it saves on its own); Continue re-checks completeness. */
 @Composable
 private fun ProfileStep(model: BusinessSetupModel, skip: () -> Unit) {
@@ -218,7 +234,7 @@ private fun ProfileStep(model: BusinessSetupModel, skip: () -> Unit) {
     }
 }
 
-/* Step 2 — properties. One is enough; the wizard's Where step walls an
+/* Step 3 — properties. One is enough; the wizard's Where step walls an
    empty portfolio later, so skipping is allowed but the stepper stays honest. */
 @Composable
 private fun PropertiesStep(model: BusinessSetupModel, skip: () -> Unit) {
@@ -249,7 +265,7 @@ private fun PropertiesStep(model: BusinessSetupModel, skip: () -> Unit) {
     if (adding) PropertyFormSheet(properties, null) { adding = false; scope.launch { properties.load(); model.refresh() } }
 }
 
-/* Step 3 — invite the team. Genuinely optional, and the last step:
+/* Step 4 — invite the team. Genuinely optional, and the last step:
    Finish stamps setup_completed_at. */
 @Composable
 private fun TeamStep(model: BusinessSetupModel, finish: () -> Unit) {

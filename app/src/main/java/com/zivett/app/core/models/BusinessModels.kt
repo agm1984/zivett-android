@@ -32,9 +32,9 @@ data class Property(
 @Serializable
 data class BusinessSetup(val status: String, val setupCompletedAt: Instant? = null, val steps: Steps) {
     @Serializable
-    // The server's `plan` step is deliberately NOT modelled: the mobile
-    // wizard has no plan step (store policy — see PARITY.md).
-    data class Steps(val profile: Profile, val properties: Properties) {
+    data class Steps(val profile: Profile, val properties: Properties, val plan: Plan? = null) {
+        /// The membership pick (Basic free, Premium through Google Play).
+        @Serializable data class Plan(val complete: Boolean = false, val missing: List<String>? = null)
         @Serializable data class Profile(val complete: Boolean = false, val missing: List<String>? = null)
         @Serializable data class Properties(val complete: Boolean = false, val count: Int? = null)
     }
