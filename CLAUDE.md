@@ -63,6 +63,20 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   Test cards: 4242 4242 4242 4242, 4000 0027 6000 3184 (3DS),
   4000 0000 0000 0341 (saves fine, DECLINES at charge — the one to test
   the card-change flow with).
+- **Plans (Google Play Billing)**: `core/store/StoreBridge.kt` is the ONE
+  file that imports the Play Billing Library (`PlayStore`, `StoreHost`
+  mounted beside `StripeHost` for the activity + delivery); everything
+  else speaks `StoreTypes.kt`. The app never decides a purchase is
+  valid: it posts the purchase TOKEN to
+  `POST /api/{company|business}/subscription/google-play` and the
+  server asks Google. Acknowledge only AFTER the server took it
+  (`StoreDelivery`) — Google refunds unacknowledged purchases after 3
+  days, which is the right outcome if we never granted the plan.
+  Prices are always Play's formatted strings. Never offer a purchase
+  while another biller owns the plan (`PlanShelf.mode`: App Store or a
+  paid web term → read-only), and never mention or link web pricing.
+  Contract: `docs/mobile-api.md` "Android: Google Play Billing"; Play
+  Console checklist: README "Google Play Billing".
 - **Every pay surface shows the card and lets it be changed**
   (`core/payments/PaymentCard.kt` — `PaymentCardModel` +
   `PaymentCardSection`, which go through `StripeBridge`, never the SDK):

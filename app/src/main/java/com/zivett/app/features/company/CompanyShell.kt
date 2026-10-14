@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.runtime.Composable
@@ -55,6 +56,7 @@ import com.zivett.app.app.NotificationPrefsRoute
 import com.zivett.app.app.NotificationsRoute
 import com.zivett.app.app.OpportunitiesRoute
 import com.zivett.app.app.OrgProfileRoute
+import com.zivett.app.app.PlanRoute
 import com.zivett.app.app.PassportRoute
 import com.zivett.app.app.PayoutsRoute
 import com.zivett.app.app.ProfileRoute
@@ -82,6 +84,7 @@ import com.zivett.app.features.customer.account.ProfileScreen
 import com.zivett.app.features.customer.notifications.NotificationBell
 import com.zivett.app.features.customer.notifications.rememberNotificationsModel
 import com.zivett.app.features.customer.shell.bookerDestinations
+import com.zivett.app.features.plans.PlanPickerScreen
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.RoleShell
 import com.zivett.app.features.shared.shellTab
@@ -150,6 +153,7 @@ fun CompanyShell(approved: Boolean) {
         composable<PassportRoute> { PassportScreen { nav.popBackStack() } }
         composable<CompanySetupRoute> { CompanySetupScreen { nav.popBackStack() } }
         composable<CredentialGuideRoute> { CredentialGuideScreen { nav.popBackStack() } }
+        composable<PlanRoute> { entry -> PlanPickerScreen(entry.toRoute<PlanRoute>().area) { nav.popBackStack() } }
         bookerDestinations(nav)
     }
 }
@@ -195,6 +199,8 @@ fun CompanyMoreScreen() {
                 AccountLink("Verified Pro Passport", "Credentials, rates, radius, availability", Icons.Outlined.Verified) { nav.navigate(PassportRoute) }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Business profile", "What customers see", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.COMPANY)) }
+                ZDivider(Modifier.padding(start = 60.dp))
+                AccountLink("Plan", "Your membership and what it includes", Icons.Outlined.StarOutline) { nav.navigate(PlanRoute(Areas.COMPANY)) }
                 // Org-admin concerns — members don't get the rows (UX only; the server enforces).
                 if (isAdmin) {
                     ZDivider(Modifier.padding(start = 60.dp))

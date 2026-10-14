@@ -21,6 +21,7 @@ import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.core.push.PushRouting
 import com.zivett.app.design.ZivettTheme
 import com.zivett.app.core.payments.StripeHost
+import com.zivett.app.core.store.StoreHost
 
 class MainActivity : ComponentActivity() {
     private var environment by mutableStateOf<AppEnvironment?>(null)
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
             ZivettTheme {
                 CompositionLocalProvider(LocalAppEnvironment provides current) {
                     StripeHost()
+                    StoreHost()
                     RootScreen()
                 }
             }

@@ -170,6 +170,32 @@ comes back 409 with a `client_secret` + `payment_method_id`. Test cards:
 The launcher owns its own result route and return URL, so the app
 registers nothing for 3DS. Connect onboarding for pros is a hosted web link.
 
+## Google Play Billing
+
+Company and business plans are sold in the app as Play subscriptions
+(`core/store/StoreBridge.kt` + `features/plans/`). The server mirrors
+them — the app only hands it a purchase token (see
+`../ratedpro-web/docs/mobile-api.md`, "Android: Google Play Billing").
+
+Products (Play Console → Monetize → Subscriptions), ids permanent:
+
+| Product | Base plans | Plan |
+|---|---|---|
+| `com.zivett.app.basic` | `yearly` | Basic |
+| `com.zivett.app.pro` | `yearly`, `monthly` | Pro |
+| `com.zivett.app.elite` | `yearly`, `monthly` | Elite |
+| `com.zivett.app.premium` | `yearly`, `monthly` | Business Premium |
+
+Both base plans auto-renew (1 year / 1 month); price = web price ÷ 0.85.
+Products load only once the app is on a Play testing track and the
+device's Google account is a tester; installing the build FROM that
+track (internal testing is enough) is the surest route. Until then the
+plan cards read "Not available right now" — expected, not a bug. Test with License testing accounts:
+purchases are free and renew in minutes, and the server books them as
+waived test charges. Server setup (service account access, the Pub/Sub
+notification push, env vars) is in `../ratedpro-web/.env.example`; the
+full pre-release checklist is the unchecked Play item in `PARITY.md`.
+
 ## Deep links
 
 - `zivett://r/CODE` and `https://zivett.com/r/CODE` open signup with a

@@ -13,6 +13,7 @@ coroutines = "1.10.2"
 okhttp = "5.5.0"
 coil = "3.3.0"
 stripe = "23.17.1"
+playBilling = "9.1.0"
 osmdroid = "6.1.20"
 zxing = "3.5.4"
 firebaseMessaging = "25.1.2"
@@ -45,6 +46,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 stripe-android = { group = "com.stripe", name = "stripe-android", version.ref = "stripe" }
+play-billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "playBilling" }
 osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }

@@ -8,11 +8,10 @@ import com.zivett.app.core.models.BusinessSetup
 /// skipped-incomplete step wears a warn ring. Pure so the gating is
 /// unit-testable.
 object BusinessSetupSteps {
-    /// Three steps, not the web's four: the plan pick is web-only (the
-    /// app never offers a plan — store policy, see PARITY.md). The
-    /// server treats an unpicked business plan as free Basic.
+    /// The web's four, plan FIRST: Basic is free (our API), Premium is
+    /// sold through Google Play (`features/plans`).
     enum class Step(val title: String) {
-        PROFILE("Business profile"), PROPERTIES("Properties"), TEAM("Team");
+        PLAN("Plan"), PROFILE("Business profile"), PROPERTIES("Properties"), TEAM("Team");
 
         val index: Int get() = ordinal
     }
@@ -26,6 +25,8 @@ object BusinessSetupSteps {
     /// properties stay skippable but the stepper is honest about an
     /// empty portfolio (same calls as the web's step list).
     fun completeness(step: Step, setup: BusinessSetup): Completeness = when (step) {
+        // An older server without the step: never block on it.
+        Step.PLAN -> setup.steps.plan?.let { Completeness(it.complete, it.missing ?: emptyList()) } ?: Completeness(true, emptyList())
         Step.PROFILE -> Completeness(setup.steps.profile.complete, setup.steps.profile.missing ?: emptyList())
         Step.PROPERTIES -> Completeness(setup.steps.properties.complete, if (setup.steps.properties.complete) emptyList() else listOf("add at least one property"))
         Step.TEAM -> Completeness(true, emptyList())

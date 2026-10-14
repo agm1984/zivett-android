@@ -251,11 +251,12 @@ class PusherProtocolTest {
     }
 }
 
-/// Three steps here: the web's plan step is web-only (store policy).
+/// The web's four steps, plan first (Premium sold through Google Play).
 class BusinessSetupStepsTest {
-    private fun setup(profileComplete: Boolean = true, profileMissing: List<String> = emptyList(), properties: Boolean = true) = BusinessSetup(
+    private fun setup(profileComplete: Boolean = true, profileMissing: List<String> = emptyList(), properties: Boolean = true, plan: Boolean? = true) = BusinessSetup(
         status = "pending", steps = BusinessSetup.Steps(
             profile = BusinessSetup.Steps.Profile(profileComplete, profileMissing), properties = BusinessSetup.Steps.Properties(properties, if (properties) 1 else 0),
+            plan = plan?.let { BusinessSetup.Steps.Plan(it, if (it) emptyList() else listOf("pick a plan")) },
         ),
     )
 
@@ -264,9 +265,12 @@ class BusinessSetupStepsTest {
         assertEquals(listOf("add at least one property"), BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PROPERTIES, setup(properties = false)).missing)
     }
 
-    @Test fun thereIsNoPlanStep() {
-        // The app never offers a plan — the wizard ends at Team.
-        assertEquals(listOf("Business profile", "Properties", "Team"), BusinessSetupSteps.Step.entries.map { it.title })
+    @Test fun thePlanComesFirst() {
+        assertEquals(listOf("Plan", "Business profile", "Properties", "Team"), BusinessSetupSteps.Step.entries.map { it.title })
+        assertEquals(BusinessSetupSteps.Step.PLAN, BusinessSetupSteps.firstIncomplete(setup(plan = false, profileComplete = false)))
+        assertFalse(BusinessSetupSteps.canJump(BusinessSetupSteps.Step.PROFILE, BusinessSetupSteps.Step.PLAN, setup(plan = false)))
+        // An older server without the step never blocks on it.
+        assertTrue(BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PLAN, setup(plan = null)).complete)
     }
 
     @Test fun reentryLandsOnTheFirstIncompleteStep() {
