@@ -286,12 +286,13 @@ object JobPresentation {
     /// ZiVETT.
     fun quoteCompanyName(quote: Quote): String = quote.company?.name ?: "Your ZiVETT quote"
 
-    /// `proLine` on the quotes hero. The web reads the tier off
-    /// `company.plan` ("ZiVETT Elite"); the app says "ZiVETT-verified" for
-    /// every tier — plan chips were pulled for store review (PARITY.md
-    /// "plan chips").
+    /// `proLine` on the quotes hero.
     fun proLine(company: CompanySummary?): String {
-        val tier = "ZiVETT-verified"
+        val tier = when (company?.plan) {
+            "elite" -> "ZiVETT Elite"
+            "pro" -> "ZiVETT Pro"
+            else -> "ZiVETT-verified"
+        }
         val rating = company?.rating
         val count = company?.count ?: 0
         if (rating != null && count > 0) return "$tier professional · ★ ${rating.oneDecimal()} ($count ${if (count == 1) "review" else "reviews"})"

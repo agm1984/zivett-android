@@ -58,6 +58,7 @@ import com.zivett.app.design.ZButtonStyle
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZDivider
+import com.zivett.app.design.ZPlanTag
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZTitle
@@ -141,7 +142,11 @@ fun BusinessAccountScreen() {
                 ZAvatar(user.initials, size = 56.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     ZTitle(user.name)
-                    ZCaption(user.organization?.name ?: user.email)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ZCaption(user.organization?.name ?: user.email)
+                        // The tier badge, same mark pros see.
+                        if (user.organization?.planBadge == "premium") ZPlanTag("PREMIUM")
+                    }
                 }
             }
             ZCard(padding = 0.dp) {
