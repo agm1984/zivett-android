@@ -22,6 +22,8 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,7 +143,14 @@ fun CompanyShell(approved: Boolean) {
         composable<CompanyPassportTab> { BellScreen("Passport") { PassportScreen(onBack = null) } }
         composable<CompanySetupTab> { CompanySetupScreen(onBack = null) }
         composable<CompanyTeamTab> { TeamScreen(TeamArea.company, onBack = null) }
-        composable<CompanyAccountTab> { ProfileScreen(ProfileArea.company) { } }
+        // No More tab before approval, so log out lives here.
+        composable<CompanyAccountTab> {
+            val environment = LocalAppEnvironment.current
+            val scope = rememberCoroutineScope()
+            ProfileScreen(ProfileArea.company, onBack = null, actions = {
+                TextButton(onClick = { scope.launch { environment.session.logout() } }) { Text("Log out") }
+            })
+        }
 
         composable<CompanyJobRoute> { entry -> entry.toRoute<CompanyJobRoute>().let { route -> CompanyJobDetailScreen(route.jobId, route.openAssign) { nav.popBackStack() } } }
         composable<OpportunitiesRoute> { BellScreen("Opportunities", onBack = { nav.popBackStack() }) { OpportunitiesScreen() } }

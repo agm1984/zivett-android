@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -178,7 +179,7 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
 }
 
 @Composable
-fun ProfileScreen(area: ProfileArea, onBack: () -> Unit) {
+fun ProfileScreen(area: ProfileArea, onBack: (() -> Unit)?, actions: @Composable RowScope.() -> Unit = {}) {
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -190,7 +191,7 @@ fun ProfileScreen(area: ProfileArea, onBack: () -> Unit) {
     }
 
     Column {
-        ZTopBar("Profile", onBack = onBack)
+        ZTopBar("Profile", onBack = onBack, actions = actions)
         ZScreen {
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { profile ->
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {

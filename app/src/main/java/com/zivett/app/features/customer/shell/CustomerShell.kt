@@ -116,7 +116,7 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     }
     composable<InvoicesRoute> { entry -> InvoicesScreen(Areas.jobArea(entry.toRoute<InvoicesRoute>().area)) { nav.popBackStack() } }
     composable<WarrantiesRoute> { entry -> WarrantiesScreen(Areas.jobArea(entry.toRoute<WarrantiesRoute>().area)) { nav.popBackStack() } }
-    composable<ProfileRoute> { entry -> ProfileScreen(Areas.profileArea(entry.toRoute<ProfileRoute>().area)) { nav.popBackStack() } }
+    composable<ProfileRoute> { entry -> ProfileScreen(Areas.profileArea(entry.toRoute<ProfileRoute>().area), onBack = { nav.popBackStack() }) }
     composable<NotificationPrefsRoute> { entry -> NotificationPreferencesScreen(Areas.profileArea(entry.toRoute<NotificationPrefsRoute>().area)) { nav.popBackStack() } }
     composable<AddressesRoute> { AddressesScreen { nav.popBackStack() } }
     composable<ReferralRoute> { ReferralScreen { nav.popBackStack() } }

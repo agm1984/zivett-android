@@ -219,8 +219,7 @@ fun OpportunityCard(job: Job, commissionBps: Int, busy: Boolean, quote: () -> Un
                     ZFlowRow(spacing = 4.dp) {
                         val mode = JobPresentation.modeMeta(job.mode)
                         ZBadge(mode.label, mode.tone)
-                        // The feed pins some bookers' jobs first; the badge names the
-                        // ORDERING, never the plan behind it (PARITY.md "plan chips").
+                        // Business Premium's perk made visible: pinned to the top of the feed.
                         if (job.priority == true) ZPlanTag("PRIORITY")
                         CompanyPresentation.urgencyBadge(job.urgency)?.let { ZBadge(it.label, it.tone) }
                         if (job.bookerType == "business") ZBadge("Property manager", ZTone.INFO)
