@@ -543,7 +543,7 @@ private fun CompanyWithdrawSheet(job: Job, model: CompanyJobDetailModel, onDismi
     val scope = rememberCoroutineScope()
     ZSheet(onDismiss = onDismiss, title = "Withdraw from ${job.code ?: "this job"}?") {
         ZBody("The job goes back to the marketplace and the booker is notified that you stepped away.", tone = ZTextTone.SOFT)
-        ZBanner("Withdrawals lower your reliability ranking in quotes and the directory. A second withdrawal within 30 days pauses your opportunities feed for 24 hours. Taking this booker's work off-platform breaches the marketplace terms.", tone = ZTone.WARNING)
+        ZBanner("ZiVETT records every withdrawal on your reliability record. A second withdrawal within 30 days pauses your opportunities feed for 24 hours. Taking this booker's work off-platform breaches the marketplace terms.", tone = ZTone.WARNING)
         ZButton("Withdraw", style = ZButtonStyle.DANGER, loading = model.busy) { scope.launch { if (model.withdraw()) done() } }
         ZButton("Keep the job", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
     }
