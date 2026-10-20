@@ -35,11 +35,11 @@ verification), pending company, business, and new business.
 - [x] Notifications inbox + bell badge
 - [x] Account: profile (phone OTP, photo for company members), notification prefs, saved addresses (pin-adjust map), referral (QR + share + banked credits), warranties (active/past), invoices + detail + pay + PDF share
 - [x] Booking wizard: `BookingWizardEngine` port with tests, server drafts (debounced autosave, resume/start-over rules, photos uploaded on pick), ResumeBookingBanner on the same screens as iOS, success screen
-- [x] Terms / Privacy links + delete-account sheet on every Account screen
+- [x] Terms / Privacy links + delete-account sheet on every Account screen; "Your privacy" advertising opt-out toggle above it (`AdvertisingPrivacySection`, `PUT /api/privacy/advertising`, 2026-10-19)
 
 ## Company
 - [x] Dashboard (stat tiles → reviews sheet, setup checklist, timeline, referral card with QR), Opportunities + quote composer (payouts pre-flight, leads banner), Quotes, Active/Completed jobs
-- [x] Job detail: status advance, assign/reassign, change orders, report, withdraw, breadcrumb tracking map, live-location sharer while en route (LocationManager, foreground only, same as iOS)
+- [x] Job detail: status advance, assign/reassign, change orders, report, withdraw, breadcrumb tracking map, live-location sharer while en route (LocationManager, foreground only — ON_STOP stops it, ON_START resumes while en route; same as iOS)
 - [x] Calendar month grid with chips, blocked days, tap-through
 - [x] Passport: credential uploads (document picker + photo picker), viewer (PdfRenderer / image, "Open with…"), details editor, field guide, business-identity row
 - [x] Setup wizard + credential guide, submit blocked until complete, pending state

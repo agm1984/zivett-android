@@ -103,6 +103,8 @@ fun AccountHomeScreen() {
                 scope.launch { environment.session.logout() }
             }
 
+            AdvertisingPrivacySection()
+
             AccountFooter()
             Spacer(Modifier.padding(ZSpacing.lg))
         }

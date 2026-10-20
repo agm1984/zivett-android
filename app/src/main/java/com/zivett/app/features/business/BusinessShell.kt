@@ -64,6 +64,7 @@ import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZTitle
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.features.customer.account.AccountFooter
+import com.zivett.app.features.customer.account.AdvertisingPrivacySection
 import com.zivett.app.features.customer.account.AccountLink
 import com.zivett.app.features.customer.book.BookJobScreen
 import com.zivett.app.features.customer.book.BookingWizardEngine
@@ -169,6 +170,7 @@ fun BusinessAccountScreen() {
                 AccountLink("Warranties", "Covered work and claims", Icons.Outlined.VerifiedUser) { nav.navigate(WarrantiesRoute(Areas.BUSINESS)) }
             }
             ZButton("Log out", style = ZButtonStyle.OUTLINE, loading = loggingOut) { loggingOut = true; scope.launch { environment.session.logout() } }
+            AdvertisingPrivacySection()
             AccountFooter()
             Spacer(Modifier.padding(ZSpacing.lg))
         }
