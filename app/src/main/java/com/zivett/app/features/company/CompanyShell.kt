@@ -81,6 +81,7 @@ import com.zivett.app.design.ZTitle
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.features.business.TeamScreen
 import com.zivett.app.features.customer.account.AccountFooter
+import com.zivett.app.features.customer.account.AdvertisingPrivacySection
 import com.zivett.app.features.customer.account.AccountLink
 import com.zivett.app.features.customer.account.ProfileScreen
 import com.zivett.app.features.customer.notifications.NotificationBell
@@ -222,6 +223,7 @@ fun CompanyMoreScreen() {
                 AccountLink("Notifications", "Email and SMS preferences", Icons.Outlined.NotificationsActive) { nav.navigate(NotificationPrefsRoute(Areas.COMPANY)) }
             }
             ZButton("Log out", style = ZButtonStyle.OUTLINE, loading = loggingOut) { loggingOut = true; scope.launch { environment.session.logout() } }
+            AdvertisingPrivacySection()
             AccountFooter()
             Spacer(Modifier.padding(ZSpacing.lg))
         }

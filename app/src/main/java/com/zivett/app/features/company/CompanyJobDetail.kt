@@ -41,6 +41,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.zivett.app.app.Areas
 import com.zivett.app.app.CompanyInvoiceRoute
 import com.zivett.app.app.ConversationRoute
@@ -273,6 +276,25 @@ fun CompanyJobDetailScreen(jobId: Int, openAssign: Boolean = false, onBack: () -
         if (openAssign && isAdmin && model.job?.let { it.assignedTech == null && it.status in CompanyPresentation.assignable } == true) sheet = CompanyJobSheet.Assign
     }
     DisposableEffect(Unit) { onDispose { sharer.stop() } }
+    // "Only while using the app": backgrounding the app (Home, lock,
+    // another app) stops reporting — the OS only blocks it on Android 10+,
+    // and minSdk is 26. Coming back resumes if the job is still en route.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var resumeOnStart = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> if (sharer.sharing) { resumeOnStart = true; sharer.stop() }
+                Lifecycle.Event.ON_START -> if (resumeOnStart) {
+                    resumeOnStart = false
+                    if (model.job?.status == JobStatus.EN_ROUTE && sharer.hasPermission) sharer.start { lat, lng -> model.reportLocation(lat, lng) }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LiveJobEffect(jobId) { model.refresh() }
     // A live refetch can move the job off EnRoute (arrived from another
     // device, cancelled by the booker) — stop broadcasting with it.
@@ -543,7 +565,7 @@ private fun CompanyWithdrawSheet(job: Job, model: CompanyJobDetailModel, onDismi
     val scope = rememberCoroutineScope()
     ZSheet(onDismiss = onDismiss, title = "Withdraw from ${job.code ?: "this job"}?") {
         ZBody("The job goes back to the marketplace and the booker is notified that you stepped away.", tone = ZTextTone.SOFT)
-        ZBanner("Withdrawals lower your reliability ranking in quotes and the directory. A second withdrawal within 30 days pauses your opportunities feed for 24 hours. Taking this booker's work off-platform breaches the marketplace terms.", tone = ZTone.WARNING)
+        ZBanner("ZiVETT records every withdrawal on your reliability record. A second withdrawal within 30 days pauses your opportunities feed for 24 hours. Taking this booker's work off-platform breaches the marketplace terms.", tone = ZTone.WARNING)
         ZButton("Withdraw", style = ZButtonStyle.DANGER, loading = model.busy) { scope.launch { if (model.withdraw()) done() } }
         ZButton("Keep the job", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
     }
