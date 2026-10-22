@@ -255,6 +255,13 @@ object JobPresentation {
         return "Free to cancel right now — once a pro is committed, a cancellation fee applies."
     }
 
+    /// The "Your pro" card's line under each crew member, lead first.
+    fun crewCaption(index: Int, crewCount: Int): String = when {
+        crewCount < 2 -> "is your assigned technician"
+        index == 0 -> "leads your crew"
+        else -> "is on your crew"
+    }
+
     fun cancelConfirmCopy(job: Job): String {
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) {

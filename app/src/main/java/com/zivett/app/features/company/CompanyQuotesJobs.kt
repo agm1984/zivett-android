@@ -198,7 +198,9 @@ class CompanyJobsModel(private val client: ApiClient) {
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.jobs()).jobs } }
     suspend fun loadInvoices() { invoices = invoices.reloaded { client.send(CompanyEndpoints.invoices()).invoices } }
 
-    suspend fun advance(job: Job) {
+    /// True when the server refused en route for want of the quote's crew
+    /// (`crew_incomplete`) — the screen opens the job on its picker.
+    suspend fun advance(job: Job): Boolean {
         busyId = job.id
         try {
             val updated = client.send(CompanyEndpoints.advance(job.id)).job
@@ -209,7 +211,11 @@ class CompanyJobsModel(private val client: ApiClient) {
                     invoices = Loadable.Loading
                 } else state = Loadable.Loaded(jobs.map { if (it.id == job.id) updated else it })
             }
-        } catch (error: ApiError) { toast = error.userMessage } catch (_: Exception) { toast = "Could not update ${job.code ?: "that job"}. Please try again." } finally { busyId = null }
+        } catch (error: ApiError) {
+            toast = error.userMessage
+            return (error as? ApiError.Validation)?.errors?.code == CompanyJobDetailModel.CREW_INCOMPLETE
+        } catch (_: Exception) { toast = "Could not update ${job.code ?: "that job"}. Please try again." } finally { busyId = null }
+        return false
     }
 }
 
@@ -256,14 +262,17 @@ fun CompanyActiveJobsScreen() {
                                     // Acceptance normally assigns a field tech; this is the exception.
                                     else -> ZBadge("No tech", ZTone.WARNING)
                                 }
+                                // Short of the quote's crew — it can't go en route yet.
+                                if (job.assignedTech != null && job.crewMissing > 0) ZBadge("Needs ${job.crewMissing} more", ZTone.WARNING)
                                 // Withdraw deliberately does NOT ride these rows — a destructive act never
                                 // sits beside the button techs tap all day. It lives on the job detail screen.
                                 val next = CompanyPresentation.nextStage(job.status)
-                                // Unassigned + no photo to self-assign with = the server would refuse
-                                // en route; open the job on its assign picker instead.
+                                // Short of the quote's crew (or unassigned with no photo to self-assign
+                                // with) = the server would refuse en route; open the job on its assign
+                                // picker instead.
                                 if (next != null) ZButton("Mark ${next.label.lowercase()}", compact = true, loading = model.busyId == job.id, fullWidth = false) {
                                     if (CompanyPresentation.needsTechBeforeEnRoute(job, environment.session.user)) nav.navigate(CompanyJobRoute(job.id, openAssign = true))
-                                    else scope.launch { model.advance(job) }
+                                    else scope.launch { if (model.advance(job)) nav.navigate(CompanyJobRoute(job.id, openAssign = true)) }
                                 }
                                 else if (job.status == JobStatus.INVOICED) ZCaption("Awaiting payment")
                             }

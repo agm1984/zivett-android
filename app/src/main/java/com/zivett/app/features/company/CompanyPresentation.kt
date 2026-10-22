@@ -2,6 +2,7 @@ package com.zivett.app.features.company
 
 import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
+import com.zivett.app.core.models.OrganizationRole
 import com.zivett.app.core.models.User
 import com.zivett.app.design.ZTone
 import com.zivett.app.features.customer.jobs.JobPresentation
@@ -28,12 +29,20 @@ object CompanyPresentation {
     /// Statuses a dispatcher can (re)assign in — `Assignments::ASSIGNABLE_STATUSES`.
     val assignable: Set<JobStatus> = setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
 
-    /// Going en route needs a face on the job: the server self-assigns an
-    /// unassigned job to the advancing user, but 422s when they have no
-    /// photo. In that case the job page opens the assign picker (and the
-    /// Jobs list routes there) instead of firing a doomed request.
-    fun needsTechBeforeEnRoute(job: Job, user: User?): Boolean =
-        nextStage(job.status) == JobStatus.EN_ROUTE && job.assignedTech == null && user?.photoUrl == null
+    /// Going en route needs the job's whole crew: the server self-assigns
+    /// an unassigned one-tech job to the advancing user, but 422s when
+    /// they have no photo — and a crew job short of its quote's crew 422s
+    /// `crew_incomplete`. In those cases the job page opens the assign
+    /// picker (and the Jobs list routes there) instead of firing a doomed
+    /// request. Only org admins can staff a crew, so a member's short crew
+    /// job goes to the server, whose refusal says how many are missing.
+    fun needsTechBeforeEnRoute(job: Job, user: User?): Boolean {
+        if (nextStage(job.status) != JobStatus.EN_ROUTE || job.crewMissing == 0) return false
+        return if ((job.crewSize ?: 1) > 1) user?.organizationRole == OrganizationRole.ADMIN else user?.photoUrl == null
+    }
+
+    /// "1 technician" / "3 technicians".
+    fun technicians(count: Int): String = if (count == 1) "1 technician" else "$count technicians"
 
     fun urgencyBadge(urgency: String?): JobPresentation.Meta? = when (urgency) {
         "asap" -> JobPresentation.Meta("URGENT", ZTone.DANGER)
