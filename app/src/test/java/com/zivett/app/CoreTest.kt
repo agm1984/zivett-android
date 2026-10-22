@@ -351,18 +351,6 @@ class TechAssignmentTest {
         assertFalse(String(TeamArea.company.updateMember(7, body.copy(takesJobs = null)).body!!).contains("takes_jobs"))
     }
 
-    @Test fun enRouteNeedsATechWhenTheUserCantSelfAssign() {
-        val unassigned = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
-        val withTech = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"assigned_tech":{"id":5,"name":"Mike R."}}""")
-        val photoless = Fixtures.user(role = UserRole.COMPANY)
-        val withPhoto = photoless.copy(photoUrl = "https://example.test/me.jpg")
-        assertTrue(CompanyPresentation.needsTechBeforeEnRoute(unassigned, photoless))
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned, withPhoto)) // server self-assigns
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(withTech, photoless))
-        // Only the en-route step needs it.
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned.copy(status = JobStatus.EN_ROUTE), photoless))
-    }
-
     // Crews (web a2df43e): a quote prices `crew_size` techs and the job is
     // staffed with exactly that many, lead first.
     private val crewJob = """{"id":9,"title":"Deck","status":"accepted","mode":"quote","category":{"id":1,"name":"Painting"},"crew_size":3,"assigned_tech":{"id":5,"name":"Mike R."},"crew":[{"id":5,"name":"Mike R.","photo_url":"https://example.test/m.jpg"},{"id":6,"name":"Ana P."}]}"""
@@ -374,6 +362,8 @@ class TechAssignmentTest {
         assertEquals("https://example.test/m.jpg", crew.crewMembers[0].photoUrl)
         assertEquals(1, crew.crewMissing)
         assertTrue(crew.isAssigned(6)) // crew members work the job like the lead
+        assertTrue(CompanyPresentation.onCrew(crew, Fixtures.user(role = UserRole.COMPANY).copy(id = 6)))
+        assertFalse(CompanyPresentation.onCrew(crew, null))
         assertFalse(crew.isAssigned(7))
         // Older server: no crew / crew_size — the lead is the whole crew.
         val older = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"assigned_tech":{"id":5,"name":"Mike R."}}""")
@@ -415,13 +405,54 @@ class TechAssignmentTest {
         assertEquals("{\"user_ids\":[6,5]}", body)
     }
 
-    @Test fun enRouteOpensThePickerForAShortCrewOnlyForAdmins() {
-        val short = job(crewJob)
-        val admin = Fixtures.user(role = UserRole.COMPANY).copy(organizationRole = OrganizationRole.ADMIN, photoUrl = "https://example.test/me.jpg")
-        val member = admin.copy(organizationRole = OrganizationRole.MEMBER)
-        assertTrue(CompanyPresentation.needsTechBeforeEnRoute(short, admin)) // a photo doesn't help — the crew is short
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(short, member)) // the server's refusal says how many
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(job(crewJob.replace("\"crew_size\":3", "\"crew_size\":2")), admin))
+    // Start job (web 5f40de0): an admin starts a won job, then only a tech
+    // on the crew can mark it en route.
+    private val admin = Fixtures.user(role = UserRole.COMPANY).copy(id = 1, organizationRole = OrganizationRole.ADMIN)
+    private val member = admin.copy(id = 6, organizationRole = OrganizationRole.MEMBER)
+    private val started = crewJob.replace("\"crew_size\":3", "\"crew_size\":2,\"dispatched_at\":\"2026-10-22T16:00:00.000000Z\"")
+
+    @Test fun jobsDecodeWhenTheyWereStarted() {
+        assertNull(job(crewJob).dispatchedAt)
+        assertEquals(java.time.Instant.parse("2026-10-22T16:00:00Z"), job(started).dispatchedAt)
+    }
+
+    @Test fun theJobActionFollowsTheStartRule() {
+        val unstarted = job(crewJob)
+        assertEquals(CompanyPresentation.JobAction.Start, CompanyPresentation.jobAction(unstarted, admin))
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting to be started"), CompanyPresentation.jobAction(unstarted, member))
+        // Started: the crew goes; everyone else — admins included — waits on the lead.
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark on the way"), CompanyPresentation.jobAction(job(started), member))
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for Mike R. to set off"), CompanyPresentation.jobAction(job(started), admin))
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark on the way"), CompanyPresentation.jobAction(job(started), admin.copy(id = 5)))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"dispatched_at":"2026-10-22T16:00:00.000000Z"}""")
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for the crew to set off"), CompanyPresentation.jobAction(nobody, admin))
+        // Later stages advance for anyone who can see the job; nothing past completed.
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark arrived"), CompanyPresentation.jobAction(job(started).copy(status = JobStatus.EN_ROUTE), admin))
+        assertNull(CompanyPresentation.jobAction(job(started).copy(status = JobStatus.INVOICED), admin))
+    }
+
+    @Test fun startingSendsTheCrewAndSaysWhoIsGoing() {
+        val request = CompanyEndpoints.start(9, listOf(5, 6))
+        assertEquals("{\"user_ids\":[5,6]}", String(request.body!!))
+        assertTrue(request.path.endsWith("api/company/jobs/9/start"))
+        assertEquals("Mike R. and Ana P. are doing this job. Confirm to start it — they can then mark it en route — or change who's going.", CompanyPresentation.startPickerIntro(job(crewJob), 3))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
+        assertEquals("Pick who's doing this job. Starting it lets them mark it en route.", CompanyPresentation.startPickerIntro(nobody, 1))
+        assertEquals("Pick 3 technicians. Starting it lets them mark it en route.", CompanyPresentation.startPickerIntro(nobody, 3))
+        assertEquals("Z-1 started — the crew has been told to head out", CompanyPresentation.startedToast("Z-1", 2))
+        assertEquals("Z-1 started — they've been told to head out", CompanyPresentation.startedToast("Z-1", 1))
+    }
+
+    @Test fun theStartNoticeSpeaksToWhoeverIsLooking() {
+        val unstarted = job(crewJob)
+        assertEquals("You're doing this job. Start job to confirm who's going, then mark it en route when you set off.", CompanyPresentation.startNotice(unstarted, admin.copy(id = 5)))
+        assertEquals("You're doing this job. Your team will start it when it's time — you'll get a notification, then you can mark it en route.", CompanyPresentation.startNotice(unstarted, member))
+        assertEquals("Started — you're on the crew. Mark it en route when you set off.", CompanyPresentation.startNotice(job(started), member))
+        assertEquals("Mike R., Ana P. are lined up for this job. Start job to confirm who's going.", CompanyPresentation.startNotice(unstarted, admin))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
+        assertEquals("Start job to pick who's going.", CompanyPresentation.startNotice(nobody, admin))
+        assertNull(CompanyPresentation.startNotice(job(started), admin)) // started, not on it: the action says it
+        assertNull(CompanyPresentation.startNotice(unstarted.copy(status = JobStatus.EN_ROUTE), member))
     }
 
     @Test fun bookersSeeWhoLeadsTheCrew() {

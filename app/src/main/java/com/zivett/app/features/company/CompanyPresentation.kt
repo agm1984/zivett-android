@@ -29,16 +29,68 @@ object CompanyPresentation {
     /// Statuses a dispatcher can (re)assign in — `Assignments::ASSIGNABLE_STATUSES`.
     val assignable: Set<JobStatus> = setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
 
-    /// Going en route needs the job's whole crew: the server self-assigns
-    /// an unassigned one-tech job to the advancing user, but 422s when
-    /// they have no photo — and a crew job short of its quote's crew 422s
-    /// `crew_incomplete`. In those cases the job page opens the assign
-    /// picker (and the Jobs list routes there) instead of firing a doomed
-    /// request. Only org admins can staff a crew, so a member's short crew
-    /// job goes to the server, whose refusal says how many are missing.
-    fun needsTechBeforeEnRoute(job: Job, user: User?): Boolean {
-        if (nextStage(job.status) != JobStatus.EN_ROUTE || job.crewMissing == 0) return false
-        return if ((job.crewSize ?: 1) > 1) user?.organizationRole == OrganizationRole.ADMIN else user?.photoUrl == null
+    /// `onCrew`: the user is one of the techs going (lead or crew).
+    fun onCrew(job: Job, user: User?): Boolean = user != null && job.isAssigned(user.id)
+
+    /// The company-side primary action (`companyJobAction` in lib/jobs.js),
+    /// shared by the Jobs list and the job page. A won job waits at
+    /// Accepted until an org admin STARTS it (confirming who's going);
+    /// only a tech on the crew may then mark it en route. Later stages
+    /// advance for anyone who can see the job. Null = nothing further
+    /// (awaiting payment).
+    sealed interface JobAction {
+        /// Admin, not started — "Start job" opens the crew picker.
+        object Start : JobAction
+        /// Nothing for THIS user to press yet.
+        data class Waiting(val label: String) : JobAction
+        /// The next stage.
+        data class Advance(val label: String) : JobAction
+    }
+
+    fun jobAction(job: Job, user: User?): JobAction? {
+        val stage = nextStage(job.status) ?: return null
+        if (job.status == JobStatus.ACCEPTED) {
+            if (job.dispatchedAt == null) {
+                return if (user?.organizationRole == OrganizationRole.ADMIN) JobAction.Start else JobAction.Waiting("Waiting to be started")
+            }
+            if (!onCrew(job, user)) {
+                val lead = job.crew?.firstOrNull()?.name ?: job.assignedTech?.name
+                return JobAction.Waiting(if (lead != null) "Waiting for $lead to set off" else "Waiting for the crew to set off")
+            }
+        }
+        return JobAction.Advance("Mark ${stage.label.lowercase()}")
+    }
+
+    /// "Mike R.", "Mike R. and Ana P.", "Mike R., Ana P. and Jo K.".
+    fun nameList(names: List<String>): String =
+        if (names.size > 1) names.dropLast(1).joinToString(", ") + " and " + names.last() else names.firstOrNull().orEmpty()
+
+    /// The Start job picker's opening line. With a crew already lined up
+    /// (auto-assigned at acceptance) it says who — shown success-tinted.
+    fun startPickerIntro(job: Job, crewSize: Int): String {
+        val crew = job.crewMembers
+        if (crew.isNotEmpty()) return "${nameList(crew.map { it.name })} ${if (crew.size > 1) "are" else "is"} doing this job. Confirm to start it — they can then mark it en route — or change who's going."
+        return "Pick ${if (crewSize > 1) technicians(crewSize) else "who's doing this job"}. Starting it lets them mark it en route."
+    }
+
+    /// The snackbar after a start.
+    fun startedToast(code: String?, crewCount: Int): String =
+        "${code ?: "Job"} started — ${if (crewCount > 1) "the crew has" else "they've"} been told to head out"
+
+    /// The job page's Start-job notice under the status header — accepted
+    /// jobs only, for a tech on the crew or an admin who can start it.
+    fun startNotice(job: Job, user: User?): String? {
+        if (job.status != JobStatus.ACCEPTED) return null
+        val mine = onCrew(job, user)
+        val starts = jobAction(job, user) == JobAction.Start
+        return when {
+            mine && starts -> "You're doing this job. Start job to confirm who's going, then mark it en route when you set off."
+            mine && job.dispatchedAt == null -> "You're doing this job. Your team will start it when it's time — you'll get a notification, then you can mark it en route."
+            mine -> "Started — you're on the crew. Mark it en route when you set off."
+            !starts -> null
+            !job.crew.isNullOrEmpty() -> "${job.crew.joinToString(", ") { it.name }} ${if (job.crew.size > 1) "are" else "is"} lined up for this job. Start job to confirm who's going."
+            else -> "Start job to pick who's going."
+        }
     }
 
     /// "1 technician" / "3 technicians".

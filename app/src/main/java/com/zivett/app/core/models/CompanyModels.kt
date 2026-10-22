@@ -343,6 +343,9 @@ object CompanyEndpoints {
     fun advance(jobId: Int) = ApiRequest.post<JobResponse>("api/company/jobs/$jobId/advance")
     fun assignment(jobId: Int) = ApiRequest.get<AssignmentRoster>("api/company/jobs/$jobId/assignment")
     fun assign(jobId: Int, userIds: List<Int>) = ApiRequest.post<AssignmentResult, CrewBody>("api/company/jobs/$jobId/assignment", CrewBody(userIds))
+    /// "Start job" (org admins): confirms the crew — exactly `crew_size`
+    /// ids, lead first — and stamps `dispatched_at`. Same reply as assign.
+    fun start(jobId: Int, userIds: List<Int>) = ApiRequest.post<AssignmentResult, CrewBody>("api/company/jobs/$jobId/start", CrewBody(userIds))
     fun withdraw(jobId: Int) = ApiRequest.post<WithdrawnResponse>("api/company/jobs/$jobId/withdraw")
     fun reportLocation(jobId: Int, lat: Double, lng: Double) = ApiRequest.empty(Method.POST, "api/company/jobs/$jobId/location", mapOf("lat" to lat, "lng" to lng))
     fun invoiceJob(jobId: Int) = ApiRequest.post<InvoiceResponse>("api/company/jobs/$jobId/invoice")

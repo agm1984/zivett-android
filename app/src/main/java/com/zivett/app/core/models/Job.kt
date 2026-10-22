@@ -248,10 +248,13 @@ data class Job(
     /// Everyone coming, lead first. Absent on an older server, where
     /// `assignedTech` is the whole crew.
     val crew: List<AssignedTech>? = null,
+    /// When an org admin STARTED the job (confirmed who's going). Until
+    /// then nobody can mark it en route.
+    val dispatchedAt: Instant? = null,
 ) {
     /// Whether this job is assigned to the given user (a company member
     /// checking "is this one mine") — any crew member works it like the lead.
-    fun isAssigned(to: Int?): Boolean = to != null && crewMembers.any { it.id == to }
+    fun isAssigned(to: Int?): Boolean = to != null && (crew.orEmpty().any { it.id == to } || assignedTech?.id == to)
 
     /// The crew as shown, lead first.
     val crewMembers: List<AssignedTech> get() = crew ?: listOfNotNull(assignedTech)
