@@ -421,9 +421,9 @@ class TechAssignmentTest {
         assertEquals(CompanyPresentation.JobAction.Start, CompanyPresentation.jobAction(unstarted, admin))
         assertEquals(CompanyPresentation.JobAction.Waiting("Waiting to be started"), CompanyPresentation.jobAction(unstarted, member))
         // Started: the crew goes; everyone else — admins included — waits on the lead.
-        assertEquals(CompanyPresentation.JobAction.Advance("Mark on the way"), CompanyPresentation.jobAction(job(started), member))
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark en route"), CompanyPresentation.jobAction(job(started), member))
         assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for Mike R. to set off"), CompanyPresentation.jobAction(job(started), admin))
-        assertEquals(CompanyPresentation.JobAction.Advance("Mark on the way"), CompanyPresentation.jobAction(job(started), admin.copy(id = 5)))
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark en route"), CompanyPresentation.jobAction(job(started), admin.copy(id = 5)))
         val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"dispatched_at":"2026-10-22T16:00:00.000000Z"}""")
         assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for the crew to set off"), CompanyPresentation.jobAction(nobody, admin))
         // Later stages advance for anyone who can see the job; nothing past completed.

@@ -58,7 +58,9 @@ object CompanyPresentation {
                 return JobAction.Waiting(if (lead != null) "Waiting for $lead to set off" else "Waiting for the crew to set off")
             }
         }
-        return JobAction.Advance("Mark ${stage.label.lowercase()}")
+        // The web's status words ("Mark en route"), as on iOS — not the
+        // model's customer-facing label ("On the way").
+        return JobAction.Advance("Mark ${JobPresentation.meta(stage).label.lowercase()}")
     }
 
     /// "Mike R.", "Mike R. and Ana P.", "Mike R., Ana P. and Jo K.".
