@@ -288,11 +288,16 @@ private fun ProCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
                     } else ZCaption("Verified pro")
                 }
             }
-            // Who's actually coming — the trust signal, as soon as the org assigns someone.
-            job.assignedTech?.let { tech ->
+            // Who's actually coming — the trust signal, as soon as the org
+            // assigns someone. A crew job lists everyone, lead first.
+            val crew = job.crewMembers
+            crew.forEachIndexed { index, tech ->
                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                     ZPhotoAvatar(tech.photoUrl, tech.name.take(1), 40.dp)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { ZBodyStrong(tech.name); ZCaption("Your assigned tech") }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        ZBodyStrong(tech.name)
+                        ZCaption(JobPresentation.crewCaption(index, crew.size))
+                    }
                 }
             }
             job.scheduledDate?.takeIf { job.status in setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED) }?.let {

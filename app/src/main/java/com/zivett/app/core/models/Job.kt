@@ -239,12 +239,29 @@ data class Job(
     val property: PropertyRef? = null,
     /// Company viewers get the booker's name.
     val customer: CustomerRef? = null,
-    /// The tech who shows up; null until the company assigns one.
+    /// The tech who shows up; null until the company assigns one. On a
+    /// crew job this is the LEAD.
     val assignedTech: AssignedTech? = null,
+    /// How many techs the accepted quote priced — only once a company is
+    /// assigned; absent means one.
+    val crewSize: Int? = null,
+    /// Everyone coming, lead first. Absent on an older server, where
+    /// `assignedTech` is the whole crew.
+    val crew: List<AssignedTech>? = null,
+    /// When an org admin STARTED the job (confirmed who's going). Until
+    /// then nobody can mark it en route.
+    val dispatchedAt: Instant? = null,
 ) {
     /// Whether this job is assigned to the given user (a company member
-    /// checking "is this one mine").
-    fun isAssigned(to: Int?): Boolean = to != null && assignedTech?.id == to
+    /// checking "is this one mine") — any crew member works it like the lead.
+    fun isAssigned(to: Int?): Boolean = to != null && (crew.orEmpty().any { it.id == to } || assignedTech?.id == to)
+
+    /// The crew as shown, lead first.
+    val crewMembers: List<AssignedTech> get() = crew ?: listOfNotNull(assignedTech)
+
+    /// `crewMissing` (lib/jobs.js): techs still to assign before the
+    /// server lets the job go en route.
+    val crewMissing: Int get() = maxOf(0, (crewSize ?: 1) - crewMembers.size)
 
     val pendingQuotes: List<Quote> get() = (quotes ?: emptyList()).filter { it.status == QuoteStatus.PENDING }
     val acceptedQuote: Quote? get() = (quotes ?: emptyList()).firstOrNull { it.status == QuoteStatus.ACCEPTED }

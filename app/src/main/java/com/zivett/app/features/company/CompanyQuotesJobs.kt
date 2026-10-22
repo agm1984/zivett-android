@@ -32,6 +32,7 @@ import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.models.OrganizationRole
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.Money
+import com.zivett.app.core.models.AssignmentRoster
 import com.zivett.app.core.models.CompanyEndpoints
 import com.zivett.app.core.models.CompanyQuotesResponse
 import com.zivett.app.core.models.Invoice
@@ -198,6 +199,8 @@ class CompanyJobsModel(private val client: ApiClient) {
     suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.jobs()).jobs } }
     suspend fun loadInvoices() { invoices = invoices.reloaded { client.send(CompanyEndpoints.invoices()).invoices } }
 
+    /// Refusals (`not_started`, `not_on_crew`, `crew_incomplete`) carry a
+    /// message that says what's missing — it's shown as is.
     suspend fun advance(job: Job) {
         busyId = job.id
         try {
@@ -211,6 +214,22 @@ class CompanyJobsModel(private val client: ApiClient) {
             }
         } catch (error: ApiError) { toast = error.userMessage } catch (_: Exception) { toast = "Could not update ${job.code ?: "that job"}. Please try again." } finally { busyId = null }
     }
+
+    /// The Start job picker's roster — for whichever row opened it.
+    var roster by mutableStateOf<Loadable<AssignmentRoster>>(Loadable.Loading)
+
+    suspend fun loadRoster(jobId: Int) { roster = roster.reloaded { client.send(CompanyEndpoints.assignment(jobId)) } }
+
+    /// "Start job" from the row: confirm who's going, then swap the row.
+    suspend fun start(job: Job, userIds: List<Int>): Boolean {
+        try {
+            val result = client.send(CompanyEndpoints.start(job.id, userIds))
+            state.value?.let { jobs -> state = Loadable.Loaded(jobs.map { if (it.id == job.id) result.job else it }) }
+            toast = CompanyPresentation.startedToast(result.job.code, userIds.size)
+            return true
+        } catch (error: ApiError) { toast = error.first("user_ids") ?: error.first("user_ids.0") ?: error.userMessage } catch (_: Exception) { toast = "Could not start the job. Please try again." }
+        return false
+    }
 }
 
 @Composable
@@ -221,6 +240,8 @@ fun CompanyActiveJobsScreen() {
     val colors = ZTheme.colors
     val model = remember { CompanyJobsModel(environment.client) }
     var completed by remember { mutableStateOf(false) }
+    // The row whose Start job picker is open.
+    var starting by remember { mutableStateOf<Job?>(null) }
     val myId = environment.session.user?.id
     LaunchedEffect(model) { model.load() }
     LaunchedEffect(completed) { if (completed && model.invoices.value == null) model.loadInvoices() }
@@ -256,16 +277,19 @@ fun CompanyActiveJobsScreen() {
                                     // Acceptance normally assigns a field tech; this is the exception.
                                     else -> ZBadge("No tech", ZTone.WARNING)
                                 }
+                                // Short of the quote's crew — it can't go en route yet.
+                                if (job.assignedTech != null && job.crewMissing > 0) ZBadge("Needs ${job.crewMissing} more", ZTone.WARNING)
                                 // Withdraw deliberately does NOT ride these rows — a destructive act never
                                 // sits beside the button techs tap all day. It lives on the job detail screen.
-                                val next = CompanyPresentation.nextStage(job.status)
-                                // Unassigned + no photo to self-assign with = the server would refuse
-                                // en route; open the job on its assign picker instead.
-                                if (next != null) ZButton("Mark ${next.label.lowercase()}", compact = true, loading = model.busyId == job.id, fullWidth = false) {
-                                    if (CompanyPresentation.needsTechBeforeEnRoute(job, environment.session.user)) nav.navigate(CompanyJobRoute(job.id, openAssign = true))
-                                    else scope.launch { model.advance(job) }
+                                // The row's primary action (`companyJobAction`): an admin STARTS a won
+                                // job — the crew picker opens right here — and only a tech on the crew
+                                // then marks it en route.
+                                when (val action = CompanyPresentation.jobAction(job, environment.session.user)) {
+                                    CompanyPresentation.JobAction.Start -> ZButton("Start job", compact = true, fullWidth = false) { model.roster = Loadable.Loading; starting = job }
+                                    is CompanyPresentation.JobAction.Advance -> ZButton(action.label, compact = true, loading = model.busyId == job.id, fullWidth = false) { scope.launch { model.advance(job) } }
+                                    is CompanyPresentation.JobAction.Waiting -> ZCaption(action.label)
+                                    null -> if (job.status == JobStatus.INVOICED) ZCaption("Awaiting payment")
                                 }
-                                else if (job.status == JobStatus.INVOICED) ZCaption("Awaiting payment")
                             }
                         }
                     }
@@ -273,6 +297,9 @@ fun CompanyActiveJobsScreen() {
             }
             Spacer(Modifier.padding(ZSpacing.lg))
         }
+    }
+    starting?.let { job ->
+        CrewPickerSheet(job, starting = true, roster = model.roster, loadRoster = { model.loadRoster(job.id) }, save = { ids -> model.start(job, ids) }) { starting = null }
     }
 }
 

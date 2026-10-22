@@ -245,9 +245,16 @@ data class QuoteBody(
 /// photo), then assignable office staff, then the unassignable — each
 /// group in suggested-fairness order (fewest open jobs, longest since
 /// last assignment). Accepting a quote already auto-assigns that head,
-/// so the picker is mostly for reassigning.
+/// so the picker is mostly for reassigning. A quote prices a crew
+/// (`crewSize`): the job is staffed with exactly that many, lead first
+/// (`crewUserIds`) — both absent on an older server.
 @Serializable
-data class AssignmentRoster(val assignedUserId: Int? = null, val members: List<RosterMember> = emptyList())
+data class AssignmentRoster(
+    val assignedUserId: Int? = null,
+    val members: List<RosterMember> = emptyList(),
+    val crewUserIds: List<Int> = emptyList(),
+    val crewSize: Int? = null,
+)
 
 @Serializable
 data class RosterMember(
@@ -278,6 +285,31 @@ val AssignmentRoster.nobodyAssignable: Boolean get() = members.none { it.assigna
 /// Photos exist, but everyone who has one is marked as office staff — so
 /// acceptance assigned nobody and "Auto-assign next" has no one to offer.
 val AssignmentRoster.noFieldTechs: Boolean get() = members.any { it.assignable } && members.none { it.isAutoPickable }
+
+/// Fewer teammates have a photo than the quote's crew needs — the crew
+/// can't be completed until someone adds one.
+fun AssignmentRoster.tooFewAssignable(crewSize: Int): Boolean = members.count { it.assignable } < crewSize
+
+/// "Auto-pick the crew/the rest": fills the open slots after `selection`
+/// with field techs in roster (fairness) order.
+fun AssignmentRoster.autoPick(selection: List<Int>, crewSize: Int): List<Int> =
+    selection + members.filter { it.isAutoPickable && it.id !in selection }.take(maxOf(0, crewSize - selection.size)).map { it.id }
+
+/// Whether auto-pick has anyone left to add.
+fun AssignmentRoster.canAutoPick(selection: List<Int>, crewSize: Int): Boolean =
+    selection.size < crewSize && members.any { it.isAutoPickable && it.id !in selection }
+
+/// The crew picker's tap: off if picked, else on while there's room. The
+/// first id picked leads.
+fun List<Int>.togglingCrew(id: Int, crewSize: Int): List<Int> = when {
+    id in this -> this - id
+    size < crewSize -> this + id
+    else -> this
+}
+
+/// `POST .../assignment` body — the whole crew, lead first, exactly
+/// `crew_size` ids.
+@Serializable data class CrewBody(val userIds: List<Int>)
 
 @Serializable data class AssignmentResult(val job: Job, val members: List<RosterMember> = emptyList())
 
@@ -310,7 +342,10 @@ object CompanyEndpoints {
     /// Advances to the NEXT stage server-side — no body.
     fun advance(jobId: Int) = ApiRequest.post<JobResponse>("api/company/jobs/$jobId/advance")
     fun assignment(jobId: Int) = ApiRequest.get<AssignmentRoster>("api/company/jobs/$jobId/assignment")
-    fun assign(jobId: Int, userId: Int) = ApiRequest.post<AssignmentResult, Map<String, Int>>("api/company/jobs/$jobId/assignment", mapOf("user_id" to userId))
+    fun assign(jobId: Int, userIds: List<Int>) = ApiRequest.post<AssignmentResult, CrewBody>("api/company/jobs/$jobId/assignment", CrewBody(userIds))
+    /// "Start job" (org admins): confirms the crew — exactly `crew_size`
+    /// ids, lead first — and stamps `dispatched_at`. Same reply as assign.
+    fun start(jobId: Int, userIds: List<Int>) = ApiRequest.post<AssignmentResult, CrewBody>("api/company/jobs/$jobId/start", CrewBody(userIds))
     fun withdraw(jobId: Int) = ApiRequest.post<WithdrawnResponse>("api/company/jobs/$jobId/withdraw")
     fun reportLocation(jobId: Int, lat: Double, lng: Double) = ApiRequest.empty(Method.POST, "api/company/jobs/$jobId/location", mapOf("lat" to lat, "lng" to lng))
     fun invoiceJob(jobId: Int) = ApiRequest.post<InvoiceResponse>("api/company/jobs/$jobId/invoice")

@@ -5,6 +5,12 @@ import com.zivett.app.core.Money
 import com.zivett.app.core.PhoneFormatter
 import com.zivett.app.core.models.AppNotification
 import com.zivett.app.core.models.AssignmentRoster
+import com.zivett.app.core.models.CompanyEndpoints
+import com.zivett.app.core.models.OrganizationRole
+import com.zivett.app.core.models.autoPick
+import com.zivett.app.core.models.canAutoPick
+import com.zivett.app.core.models.togglingCrew
+import com.zivett.app.core.models.tooFewAssignable
 import com.zivett.app.core.models.MemberBody
 import com.zivett.app.core.models.Team
 import com.zivett.app.core.models.TeamArea
@@ -26,6 +32,7 @@ import com.zivett.app.core.realtime.RealtimeBackoff
 import com.zivett.app.core.realtime.RealtimeEvents
 import com.zivett.app.features.business.BusinessSetupSteps
 import com.zivett.app.features.company.CompanyPresentation
+import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.customer.book.BookingDraftPayload
 import com.zivett.app.features.customer.book.BookingDraftResponse
 import org.junit.Assert.assertEquals
@@ -344,16 +351,116 @@ class TechAssignmentTest {
         assertFalse(String(TeamArea.company.updateMember(7, body.copy(takesJobs = null)).body!!).contains("takes_jobs"))
     }
 
-    @Test fun enRouteNeedsATechWhenTheUserCantSelfAssign() {
+    // Crews (web a2df43e): a quote prices `crew_size` techs and the job is
+    // staffed with exactly that many, lead first.
+    private val crewJob = """{"id":9,"title":"Deck","status":"accepted","mode":"quote","category":{"id":1,"name":"Painting"},"crew_size":3,"assigned_tech":{"id":5,"name":"Mike R."},"crew":[{"id":5,"name":"Mike R.","photo_url":"https://example.test/m.jpg"},{"id":6,"name":"Ana P."}]}"""
+
+    @Test fun jobsDecodeTheirCrewAndCountWhoIsMissing() {
+        val crew = job(crewJob)
+        assertEquals(3, crew.crewSize)
+        assertEquals(listOf(5, 6), crew.crewMembers.map { it.id })
+        assertEquals("https://example.test/m.jpg", crew.crewMembers[0].photoUrl)
+        assertEquals(1, crew.crewMissing)
+        assertTrue(crew.isAssigned(6)) // crew members work the job like the lead
+        assertTrue(CompanyPresentation.onCrew(crew, Fixtures.user(role = UserRole.COMPANY).copy(id = 6)))
+        assertFalse(CompanyPresentation.onCrew(crew, null))
+        assertFalse(crew.isAssigned(7))
+        // Older server: no crew / crew_size — the lead is the whole crew.
+        val older = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"assigned_tech":{"id":5,"name":"Mike R."}}""")
+        assertNull(older.crewSize)
+        assertEquals(listOf(5), older.crewMembers.map { it.id })
+        assertEquals(0, older.crewMissing)
         val unassigned = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
-        val withTech = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"assigned_tech":{"id":5,"name":"Mike R."}}""")
-        val photoless = Fixtures.user(role = UserRole.COMPANY)
-        val withPhoto = photoless.copy(photoUrl = "https://example.test/me.jpg")
-        assertTrue(CompanyPresentation.needsTechBeforeEnRoute(unassigned, photoless))
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned, withPhoto)) // server self-assigns
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(withTech, photoless))
-        // Only the en-route step needs it.
-        assertFalse(CompanyPresentation.needsTechBeforeEnRoute(unassigned.copy(status = JobStatus.EN_ROUTE), photoless))
+        assertEquals(1, unassigned.crewMissing)
+        assertEquals(0, job(crewJob.replace("\"crew_size\":3", "\"crew_size\":2")).crewMissing)
+    }
+
+    @Test fun theAssignmentRosterCarriesTheCrew() {
+        val current = roster("""{"assigned_user_id":5,"crew_user_ids":[5,6],"crew_size":3,"members":[]}""")
+        assertEquals(listOf(5, 6), current.crewUserIds)
+        assertEquals(3, current.crewSize)
+        val older = roster("""{"assigned_user_id":5,"members":[]}""")
+        assertTrue(older.crewUserIds.isEmpty())
+        assertNull(older.crewSize)
+    }
+
+    @Test fun theCrewPickerTogglesAutoPicksAndWarns() {
+        val team = roster("""{"members":[{"id":1,"name":"A","assignable":true,"auto_pickable":true},{"id":2,"name":"Office","assignable":true,"takes_jobs":false,"auto_pickable":false},{"id":3,"name":"C","assignable":true,"auto_pickable":true},{"id":4,"name":"D","assignable":false,"needs_photo":true}]}""")
+        // First picked leads; a full crew takes no more; tapping again drops one.
+        assertEquals(listOf(3, 1), listOf(3).togglingCrew(1, 2))
+        assertEquals(listOf(3, 1), listOf(3, 1).togglingCrew(2, 2))
+        assertEquals(listOf(1), listOf(3, 1).togglingCrew(3, 2))
+        // Auto-pick fills the open slots with field techs in roster order, skipping office staff.
+        assertEquals(listOf(1, 3), team.autoPick(emptyList(), 2))
+        assertEquals(listOf(2, 1, 3), team.autoPick(listOf(2), 3))
+        assertTrue(team.canAutoPick(listOf(1), 2))
+        assertFalse(team.canAutoPick(listOf(1, 3), 3)) // no field tech left
+        assertFalse(team.canAutoPick(listOf(1, 3), 2)) // full
+        assertFalse(team.tooFewAssignable(3))
+        assertTrue(team.tooFewAssignable(4))
+    }
+
+    @Test fun assigningSendsTheWholeCrewLeadFirst() {
+        val body = String(CompanyEndpoints.assign(9, listOf(6, 5)).body!!)
+        assertEquals("{\"user_ids\":[6,5]}", body)
+    }
+
+    // Start job (web 5f40de0): an admin starts a won job, then only a tech
+    // on the crew can mark it en route.
+    private val admin = Fixtures.user(role = UserRole.COMPANY).copy(id = 1, organizationRole = OrganizationRole.ADMIN)
+    private val member = admin.copy(id = 6, organizationRole = OrganizationRole.MEMBER)
+    private val started = crewJob.replace("\"crew_size\":3", "\"crew_size\":2,\"dispatched_at\":\"2026-10-22T16:00:00.000000Z\"")
+
+    @Test fun jobsDecodeWhenTheyWereStarted() {
+        assertNull(job(crewJob).dispatchedAt)
+        assertEquals(java.time.Instant.parse("2026-10-22T16:00:00Z"), job(started).dispatchedAt)
+    }
+
+    @Test fun theJobActionFollowsTheStartRule() {
+        val unstarted = job(crewJob)
+        assertEquals(CompanyPresentation.JobAction.Start, CompanyPresentation.jobAction(unstarted, admin))
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting to be started"), CompanyPresentation.jobAction(unstarted, member))
+        // Started: the crew goes; everyone else — admins included — waits on the lead.
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark en route"), CompanyPresentation.jobAction(job(started), member))
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for Mike R. to set off"), CompanyPresentation.jobAction(job(started), admin))
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark en route"), CompanyPresentation.jobAction(job(started), admin.copy(id = 5)))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"},"dispatched_at":"2026-10-22T16:00:00.000000Z"}""")
+        assertEquals(CompanyPresentation.JobAction.Waiting("Waiting for the crew to set off"), CompanyPresentation.jobAction(nobody, admin))
+        // Later stages advance for anyone who can see the job; nothing past completed.
+        assertEquals(CompanyPresentation.JobAction.Advance("Mark arrived"), CompanyPresentation.jobAction(job(started).copy(status = JobStatus.EN_ROUTE), admin))
+        assertNull(CompanyPresentation.jobAction(job(started).copy(status = JobStatus.INVOICED), admin))
+    }
+
+    @Test fun startingSendsTheCrewAndSaysWhoIsGoing() {
+        val request = CompanyEndpoints.start(9, listOf(5, 6))
+        assertEquals("{\"user_ids\":[5,6]}", String(request.body!!))
+        assertTrue(request.path.endsWith("api/company/jobs/9/start"))
+        assertEquals("Mike R. and Ana P. are doing this job. Confirm to start it — they can then mark it en route — or change who's going.", CompanyPresentation.startPickerIntro(job(crewJob), 3))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
+        assertEquals("Pick who's doing this job. Starting it lets them mark it en route.", CompanyPresentation.startPickerIntro(nobody, 1))
+        assertEquals("Pick 3 technicians. Starting it lets them mark it en route.", CompanyPresentation.startPickerIntro(nobody, 3))
+        assertEquals("Z-1 started — the crew has been told to head out", CompanyPresentation.startedToast("Z-1", 2))
+        assertEquals("Z-1 started — they've been told to head out", CompanyPresentation.startedToast("Z-1", 1))
+    }
+
+    @Test fun theStartNoticeSpeaksToWhoeverIsLooking() {
+        val unstarted = job(crewJob)
+        assertEquals("You're doing this job. Start job to confirm who's going, then mark it en route when you set off.", CompanyPresentation.startNotice(unstarted, admin.copy(id = 5)))
+        assertEquals("You're doing this job. Your team will start it when it's time — you'll get a notification, then you can mark it en route.", CompanyPresentation.startNotice(unstarted, member))
+        assertEquals("Started — you're on the crew. Mark it en route when you set off.", CompanyPresentation.startNotice(job(started), member))
+        assertEquals("Mike R., Ana P. are lined up for this job. Start job to confirm who's going.", CompanyPresentation.startNotice(unstarted, admin))
+        val nobody = job("""{"id":9,"title":"Leak","status":"accepted","mode":"quote","category":{"id":1,"name":"Plumbing"}}""")
+        assertEquals("Start job to pick who's going.", CompanyPresentation.startNotice(nobody, admin))
+        assertNull(CompanyPresentation.startNotice(job(started), admin)) // started, not on it: the action says it
+        assertNull(CompanyPresentation.startNotice(unstarted.copy(status = JobStatus.EN_ROUTE), member))
+    }
+
+    @Test fun bookersSeeWhoLeadsTheCrew() {
+        assertEquals("is your assigned technician", JobPresentation.crewCaption(0, 1))
+        assertEquals("leads your crew", JobPresentation.crewCaption(0, 3))
+        assertEquals("is on your crew", JobPresentation.crewCaption(2, 3))
+        assertEquals("1 technician", CompanyPresentation.technicians(1))
+        assertEquals("3 technicians", CompanyPresentation.technicians(3))
     }
 
     @Test fun theSessionUserCarriesItsPhoto() {
