@@ -73,7 +73,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -120,23 +125,27 @@ fun ZScreen(
     val scope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(false) }
 
+    // A readable column, centred: 560dp on a phone, 720dp on a large
+    // screen (tablet, unfolded foldable) — iOS's ZScreen does the same.
+    // The cap sits on an inner column: after fillMaxSize, a widthIn on
+    // the same chain is ignored, which left every screen edge to edge on
+    // a tablet until 2026-10-24.
+    val maxWidth = readableMaxWidth()
     val body: @Composable () -> Unit = {
-        if (scrolls) {
+        val outer = if (scrolls) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxSize()
+        Column(modifier = outer.padding(contentPadding), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(contentPadding)
-                    .widthIn(max = 560.dp),
+                modifier = Modifier.widthIn(max = maxWidth).fillMaxWidth().let { if (scrolls) it else it.weight(1f) },
                 verticalArrangement = Arrangement.spacedBy(ZSpacing.md),
                 content = content,
             )
-        } else {
-            Column(modifier = Modifier.fillMaxSize().padding(contentPadding), verticalArrangement = Arrangement.spacedBy(ZSpacing.md), content = content)
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(colors.cream)) {
+    // imePadding: the page shrinks above the on-screen keyboard and scrolls
+    // in what's left, so nothing (a Log in button) is stranded beneath it —
+    // in landscape on a tablet the keyboard takes over half the screen.
+    Box(modifier = modifier.fillMaxSize().background(colors.cream).imePadding()) {
         if (onRefresh != null) {
             PullToRefreshBox(
                 isRefreshing = refreshing,
@@ -145,6 +154,24 @@ fun ZScreen(
         } else {
             body()
         }
+    }
+}
+
+/// The readable column every screen shares: 560dp on a phone, 720dp on a
+/// large screen (tablet, unfolded foldable).
+@Composable
+fun readableMaxWidth(): Dp = if (LocalConfiguration.current.screenWidthDp >= 600) 720.dp else 560.dp
+
+/// Centres content in the readable column, for screens that don't sit in
+/// a ZScreen (the welcome panels, the booking wizard): backgrounds stay
+/// full-bleed, the content doesn't stretch across a tablet.
+@Composable
+fun ZReadableWidth(modifier: Modifier = Modifier, fillHeight: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            modifier = Modifier.widthIn(max = readableMaxWidth()).fillMaxWidth().let { if (fillHeight) it.fillMaxHeight() else it },
+            content = content,
+        )
     }
 }
 
@@ -366,9 +393,15 @@ fun ZTextField(
     /// (the address auto-fill looks the street up then).
     onFocusLost: (() -> Unit)? = null,
     fieldModifier: Modifier = Modifier,
+    /// The keyboard's action key (✓ / Go / Search) — a login form submits
+    /// from it, so nobody hunts for a button under the keyboard.
+    onImeAction: (() -> Unit)? = null,
 ) {
     val colors = ZTheme.colors
     var hadFocus by remember { mutableStateOf(false) }
+    // A secure field's eye: show what was typed, like the web's password
+    // inputs. Starts hidden every time the field appears.
+    var revealed by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         if (label.isNotEmpty() || corner != null) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -389,8 +422,20 @@ fun ZTextField(
             singleLine = singleLine,
             minLines = minLines,
             enabled = enabled,
-            visualTransformation = if (secure) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = if (secure && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = if (secure) KeyboardType.Password else keyboardType, capitalization = capitalization, imeAction = imeAction, autoCorrectEnabled = false),
+            keyboardActions = if (onImeAction == null) KeyboardActions.Default else KeyboardActions(
+                onDone = { onImeAction() }, onGo = { onImeAction() }, onSend = { onImeAction() }, onSearch = { onImeAction() }, onNext = { onImeAction() },
+            ),
+            trailingIcon = if (!secure) null else ({
+                IconButton(onClick = { revealed = !revealed }) {
+                    Icon(
+                        if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (revealed) "Hide password" else "Show password",
+                        tint = colors.inkMuted,
+                    )
+                }
+            }),
             textStyle = ZType.body.copy(color = colors.ink),
             shape = RoundedCornerShape(ZRadius.field),
             colors = OutlinedTextFieldDefaults.colors(

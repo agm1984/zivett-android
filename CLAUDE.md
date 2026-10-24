@@ -109,6 +109,30 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   `catch (Exception)` on a money path rethrows `CancellationException`
   first — a cancelled call says nothing about what the server did.
 
+## Devices & orientation (2026-10-24)
+
+Phones stay portrait; large screens (600dp+ on the short side — tablets,
+unfolded foldables) turn freely: `MainActivity.orientationFor`, applied in
+onCreate (a fold recreates the activity) and onConfigurationChanged — no
+manifest lock (Android 16+ ignores one on large screens for API 36+
+anyway). Every screen sits in the readable column — `ZScreen`, or
+`ZReadableWidth` for screens that don't (welcome panels, booking wizard):
+560dp on a phone, 720dp on a large screen (`readableMaxWidth()`); a
+`widthIn` after `fillMaxSize` is IGNORED, which left every screen edge to
+edge on a tablet until this date. `ZScreen` also carries `imePadding()`
+so the page shrinks above the keyboard (in tablet landscape it covers the
+Log in button), and `ZTextField(onImeAction = …)` wires the keyboard's
+✓/Next key (login: Next → password via a FocusRequester — the default
+focus order went to "Forgot?" — and ✓ submits). Secure fields have the
+show/hide eye.
+
+**Screen tour:** `scripts/screen-tour.py <out-dir> [portrait|landscape]`
+drives the first `adb` device — signs in as the seeded dev accounts
+(fresh `pm clear` per role, keyboard Next/✓ like a person) and
+screenshots every tab, menu row and first list item, tapping nothing
+that changes data. A large-screen AVD is `Large_Screen_API_35`
+(2208×1840, 420dpi).
+
 ## Layout
 
 ```

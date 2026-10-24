@@ -57,6 +57,7 @@ import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.BookingOptions
 import com.zivett.app.core.models.Job
+import com.zivett.app.design.ZReadableWidth
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBanner
@@ -115,6 +116,9 @@ fun BookJobScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(ZTheme.colors.cream)) {
         ZTopBar(if (area == BookingWizardEngine.Area.BUSINESS) "New request" else "Book a job", onBack = onBack)
+        // The readable column on a tablet — tiles and the Next button
+        // stretched edge to edge across 2208px in landscape.
+        ZReadableWidth(Modifier.weight(1f), fillHeight = true) {
         when {
             user != null && !user.isEmailVerified -> VerifyGate()
             else -> {
@@ -132,6 +136,7 @@ fun BookJobScreen(
                     model.options.value?.let { options -> WizardBody(model, options) }
                 }
             }
+        }
         }
     }
 }

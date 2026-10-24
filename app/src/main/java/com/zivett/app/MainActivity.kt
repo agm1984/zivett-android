@@ -1,6 +1,8 @@
 package com.zivett.app
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,6 +30,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = orientationFor(resources.configuration.smallestScreenWidthDp)
         enableEdgeToEdge()
         environment = AppEnvironment.live(this)
         handleIntent(intent)
@@ -54,6 +57,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // A fold or unfold recreates the activity (it doesn't handle size
+    // changes itself), so onCreate re-applies the rule; this covers any
+    // configuration change that's delivered here instead.
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        requestedOrientation = orientationFor(newConfig.smallestScreenWidthDp)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -98,3 +109,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/// Phones stay portrait — a book-it, track-it, pay-it app held in one
+/// hand. Large screens (600dp+ on the short side: an unfolded foldable, a
+/// tablet) follow the device, since the layouts already cap their width.
+internal fun orientationFor(smallestWidthDp: Int): Int =
+    if (smallestWidthDp >= LARGE_SCREEN_DP) ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
+internal const val LARGE_SCREEN_DP = 600

@@ -44,6 +44,7 @@ import com.zivett.app.app.LoginRoute
 import com.zivett.app.app.SignupRoute
 import com.zivett.app.app.Tagline
 import com.zivett.app.app.WelcomeRoute
+import com.zivett.app.design.ZReadableWidth
 import com.zivett.app.design.LightStatusBarIcons
 import com.zivett.app.design.BrandMark
 import com.zivett.app.design.BrandWordmark
@@ -113,24 +114,32 @@ fun WelcomeScreen(nav: NavHostController) {
         // splash and the web's charcoal hero.
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().background(ZColors.fixedNavyDeep).statusBarsPadding().padding(horizontal = ZSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(ZSpacing.lg, Alignment.Bottom),
+            verticalArrangement = Arrangement.Bottom,
         ) {
-            BrandMark(72.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                BrandWordmark(color = Color.White)
-                Text("Repairs, booked.", style = ZType.display.copy(fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp), color = Color.White)
-                Text("Verified local pros for your home or properties — quoted, scheduled, and tracked in one place.", style = ZType.body, color = Color.White.copy(alpha = 0.72f))
+            // Full-bleed panel, content in the readable column on a tablet.
+            ZReadableWidth {
+                Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.lg)) {
+                    BrandMark(72.dp)
+                    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                        BrandWordmark(color = Color.White)
+                        Text("Repairs, booked.", style = ZType.display.copy(fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp), color = Color.White)
+                        Text("Verified local pros for your home or properties — quoted, scheduled, and tracked in one place.", style = ZType.body, color = Color.White.copy(alpha = 0.72f))
+                    }
+                    Box(Modifier.padding(bottom = ZSpacing.xl)) { Tagline() }
+                }
             }
-            Box(Modifier.padding(bottom = ZSpacing.xl)) { Tagline() }
         }
 
         Column(
             modifier = Modifier.fillMaxWidth().background(colors.cream).padding(horizontal = ZSpacing.md).padding(top = ZSpacing.lg, bottom = ZSpacing.lg).navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(ZSpacing.sm),
         ) {
-            ZButton("Create an account") { nav.navigate(SignupRoute()) }
-            ZButton("Log in", style = ZButtonStyle.OUTLINE) { nav.navigate(LoginRoute) }
-            if (BuildConfig.BACKEND_SWITCHER) DebugBackendPicker()
+            ZReadableWidth {
+                Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
+                    ZButton("Create an account") { nav.navigate(SignupRoute()) }
+                    ZButton("Log in", style = ZButtonStyle.OUTLINE) { nav.navigate(LoginRoute) }
+                    if (BuildConfig.BACKEND_SWITCHER) DebugBackendPicker()
+                }
+            }
         }
     }
 }
