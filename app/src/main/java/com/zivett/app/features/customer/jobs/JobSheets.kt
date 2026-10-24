@@ -68,6 +68,7 @@ import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZType
 import com.zivett.app.features.shared.InvoiceBreakdown
 import com.zivett.app.features.shared.MoneyRow
+import com.zivett.app.features.shared.VerificationBadges
 import kotlinx.coroutines.launch
 
 /// The accept modal: what you're agreeing to, the hold preview, the
@@ -152,6 +153,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                         ZCaption(JobPresentation.proLine(quote.company))
                     }
                 }
+                VerificationBadges(quote.company?.verification)
                 Text(Money.format(quote.amountCents), style = ZType.money, color = colors.ink)
 
                 ZCard {
