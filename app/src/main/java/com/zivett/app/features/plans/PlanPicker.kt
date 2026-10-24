@@ -203,7 +203,8 @@ private fun PlanCard(model: PlanPickerModel, card: PlanShelf.Card, canManage: Bo
                             }
                             ZButton(
                                 label,
-                                style = if (option.billing == StoreBillingPlan.YEARLY && !switching) ZButtonStyle.PRIMARY else ZButtonStyle.OUTLINE,
+                                // The first option (monthly, or a yearly-only plan's one price) is filled.
+                                style = if (option == card.options.first() && !switching) ZButtonStyle.PRIMARY else ZButtonStyle.OUTLINE,
                                 compact = true,
                                 fullWidth = false,
                                 loading = model.working == "${card.plan.id}-${option.billing.basePlanId}",
