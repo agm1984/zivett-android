@@ -86,6 +86,7 @@ import com.zivett.app.design.ZTitle
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
+import com.zivett.app.features.business.PropertyThumb
 import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.delay
@@ -329,6 +330,8 @@ private fun PropertyStep(model: BookingWizardModel, autoAdvance: () -> Unit, add
     if (model.properties.isEmpty()) ZBanner("You haven't added any properties yet — add one now to book a request against it.", tone = ZTone.WARNING)
     for (property in model.properties) {
         ZSelectableRow(selected = model.form.propertyId == property.id, onClick = { model.form = model.form.copy(propertyId = property.id); autoAdvance() }) {
+            PropertyThumb(property, size = 40.dp)
+            Spacer(Modifier.width(ZSpacing.sm))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 ZBodyStrong(property.name)
                 ZCaption(listOfNotNull(property.kind, property.address).joinToString(" · "))

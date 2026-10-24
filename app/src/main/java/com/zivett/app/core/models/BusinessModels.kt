@@ -20,6 +20,8 @@ data class Property(
     val name: String,
     val kind: String? = null,
     val address: String,
+    /// The property's photo, if one's been added (`PropertyPhotos`).
+    val photoUrl: String? = null,
     val lat: Double? = null,
     val lng: Double? = null,
     val pinAdjustedAt: Instant? = null,
@@ -143,6 +145,7 @@ data class MemberBody(
     val takesJobs: Boolean? = null,
 )
 @Serializable data class LogoResponse(val logoUrl: String? = null)
+@Serializable data class PropertyPhotoResponse(val photoUrl: String? = null)
 
 object BusinessEndpoints {
     fun dashboard() = ApiRequest.get<BusinessDashboard>("api/business/dashboard")
@@ -153,6 +156,13 @@ object BusinessEndpoints {
         return ApiRequest.multipart("api/business/organization/logo", form)
     }
     fun deleteLogo() = ApiRequest.delete<LogoResponse>("api/business/organization/logo")
+    /// A property's photo — org admins only (`PropertyPolicy`).
+    fun uploadPropertyPhoto(id: Int, jpeg: ByteArray): ApiRequest<PropertyPhotoResponse> {
+        val form = MultipartForm()
+        form.addFile("file", "property.jpg", "image/jpeg", jpeg)
+        return ApiRequest.multipart("api/business/properties/$id/photo", form)
+    }
+    fun deletePropertyPhoto(id: Int) = ApiRequest.delete<PropertyPhotoResponse>("api/business/properties/$id/photo")
     fun updateOrganization(body: Map<String, String?>) = ApiRequest.json<BusinessOrganizationResponse, Map<String, String?>>(Method.PATCH, "api/business/organization", body, coder = JsonCoding.explicitNulls)
     fun completeSetup() = ApiRequest.post<BusinessOrganizationResponse>("api/business/organization/setup/complete")
 

@@ -143,7 +143,8 @@ fun BusinessHomeScreen() {
                 }
                 for (property in dashboard.properties.take(4)) {
                     ZCard(padding = ZSpacing.sm) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
+                            PropertyThumb(property, size = 40.dp)
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 ZBodyStrong(property.name)
                                 ZCaption(listOfNotNull(property.kind, property.address).joinToString(" · "), maxLines = 1)
