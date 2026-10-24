@@ -82,9 +82,10 @@ object PlanShelf {
         }
     }
 
-    /// Yearly FIRST — the price sales calls anchor on, with what it works
-    /// out to per month and the saving — then monthly.
-    fun options(product: StoreProduct): List<Option> = StoreBillingPlan.entries.mapNotNull { billing ->
+    /// Monthly FIRST (back from the yearly-first order of 2026-10-11, like
+    /// the web and iOS), then yearly with what it works out to per month
+    /// and the saving.
+    fun options(product: StoreProduct): List<Option> = listOf(StoreBillingPlan.MONTHLY, StoreBillingPlan.YEARLY).mapNotNull { billing ->
         val term = product.term(billing) ?: return@mapNotNull null
         when (billing) {
             StoreBillingPlan.YEARLY -> Option(billing, "${term.displayPrice}/year", yearlyDetail(product))

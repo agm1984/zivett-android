@@ -79,6 +79,7 @@ import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.PhotoGrid
 import com.zivett.app.features.shared.SupportCaseCards
 import com.zivett.app.features.shared.TimelineStepper
+import com.zivett.app.features.shared.VerificationBadges
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -452,6 +453,9 @@ fun QuoteRow(index: Int, quote: Quote, showReviews: (() -> Unit)?, accept: () ->
         Column(modifier = Modifier.padding(ZSpacing.sm), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) { ZMono("Option $index", modifier = Modifier.weight(1f)); ZMonoLarge(Money.format(quote.amountCents)) }
             ZBodyStrong(JobPresentation.quoteCompanyName(quote))
+            // What ZiVETT checked about this pro (ID, insurance, licence,
+            // WorkSafeBC, background check…).
+            VerificationBadges(quote.company?.verification)
             val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
             if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()} h × ${Money.format(rate)}/hr")
             quote.proposedDate?.let { ZCaption("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", tone = ZTextTone.SOFT) }
