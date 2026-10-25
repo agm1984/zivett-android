@@ -104,6 +104,14 @@ data class QuoteJob(
     /// Annotated on pending quotes so the revise picker stays live.
     val companyWindows: List<CompanyWindow>? = null,
     val category: JobCategory? = null,
+    /// The booker's photos (My quotes thumbnails + the revise composer).
+    val photos: List<JobPhoto>? = null,
+    /// A JobStatus value — kept a string so an unknown status never fails
+    /// the list. "cancelled" turns a declined quote into "Job cancelled".
+    val status: String? = null,
+    /// False = still in ZiVETT's review queue; true = the booker has it.
+    /// Absent on older servers → false.
+    val quotesReleased: Boolean = false,
 )
 
 /// `GET /api/company/payouts`.

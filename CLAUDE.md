@@ -161,6 +161,21 @@ the booker answers on the job page's `RescheduleCard`
 `[]` for empty objects: `load` uses `PhpRatesSerializer`, `openings`
 its own `OpeningsSerializer` (drops undecodable rows).
 
+## My quotes (2026-10-25)
+
+Contract: `docs/mobile-api.md` "My quotes". `CompanyQuotesScreen`
+(`features/company/CompanyQuotesJobs.kt`) is a summary line ("N out · $X
+in play · N won in the last 30 days") over **Waiting on a decision**
+(rich cards: booker photos, trade + code, price + "You keep ≈", "Can
+arrive …", the release state + "Sent N days ago"; Revise is the one
+button and shows only while `job.quotes_released` is false — the PATCH
+422s after; Withdraw sits in the More menu with its confirm) and **Past
+quotes** (Won / Not chosen / Job cancelled, decided date, price; All · Won
+· Not chosen + a title/code search; only Won rows open `CompanyJobRoute`).
+All derivation is pure in `CompanyQuotesLogic` (`CompanyQuotesLogicTest`).
+`decided_at`, `job.status` (a string) and `job.quotes_released` decode
+with defaults, so an older server reads as "not released, undated".
+
 ## Layout
 
 ```

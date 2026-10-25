@@ -111,6 +111,9 @@ data class Quote(
     /// Company-side lists load the quote's job.
     val job: QuoteJob? = null,
     val createdAt: Instant? = null,
+    /// When a settled quote was accepted/declined; null while pending (and
+    /// on older servers).
+    val decidedAt: Instant? = null,
 ) {
     /// `Payments::bookerBreakdown()`.
     @Serializable
