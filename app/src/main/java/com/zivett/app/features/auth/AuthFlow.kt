@@ -137,7 +137,7 @@ fun WelcomeScreen(nav: NavHostController) {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
                     ZButton("Create an account") { nav.navigate(SignupRoute()) }
                     ZButton("Log in", style = ZButtonStyle.OUTLINE) { nav.navigate(LoginRoute) }
-                    if (BuildConfig.BACKEND_SWITCHER) DebugBackendPicker()
+                    if (BuildConfig.BACKEND_SWITCHER && !com.zivett.app.app.AppEvents.storeScreenshots) DebugBackendPicker()
                 }
             }
         }

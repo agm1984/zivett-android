@@ -21,3 +21,6 @@ local.properties
 # Signing keys never belong in git (the upload key lives in ~/.android, see README "Shipping")
 *.jks
 *.keystore
+
+# Python caches from scripts/
+__pycache__/

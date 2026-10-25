@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
         requestedOrientation = orientationFor(resources.configuration.smallestScreenWidthDp)
         enableEdgeToEdge()
         environment = AppEnvironment.live(this)
+        if (BuildConfig.BACKEND_SWITCHER && intent?.getBooleanExtra("store_screenshots", false) == true) AppEvents.storeScreenshots = true
         handleIntent(intent)
 
         setContent {

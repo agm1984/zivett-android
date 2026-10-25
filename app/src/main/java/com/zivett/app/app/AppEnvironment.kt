@@ -69,6 +69,10 @@ object AppEvents {
     /// rebuilt against the new base URL.
     var backendChanged: Int by mutableIntStateOf(0)
 
+    /// Debug builds launched for store screenshots (`--ez store_screenshots
+    /// true`) hide the backend switcher on the welcome screen.
+    var storeScreenshots: Boolean by mutableStateOf(false)
+
     /// Set when a referral link opens the app — the signed-out flow
     /// pushes the signup screen so the invite banner is actually seen
     /// (the web lands /r/{code} straight on /signup).
