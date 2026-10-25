@@ -34,6 +34,10 @@ object CustomerEndpoints {
     fun couponPreview(jobId: Int, code: String) = ApiRequest.post<CouponPreviewResponse, Map<String, String>>("api/customer/jobs/$jobId/coupon-preview", mapOf("code" to code))
     fun approveChangeOrder(jobId: Int, changeOrderId: Int) = ApiRequest.post<ChangeOrderResponse>("api/customer/jobs/$jobId/change-orders/$changeOrderId/approve")
     fun declineChangeOrder(jobId: Int, changeOrderId: Int) = ApiRequest.post<ChangeOrderResponse>("api/customer/jobs/$jobId/change-orders/$changeOrderId/decline")
+    /// The pro asked to move the visit: accept (409 `schedule_conflict`
+    /// when the slot closed meanwhile) or keep the original time.
+    fun acceptReschedule(jobId: Int) = ApiRequest.post<JobResponse>("api/customer/jobs/$jobId/reschedule/accept")
+    fun declineReschedule(jobId: Int) = ApiRequest.post<JobResponse>("api/customer/jobs/$jobId/reschedule/decline")
     fun review(jobId: Int, rating: Int, comment: String?) = ApiRequest.post<ReviewResponse, ReviewBody>("api/customer/jobs/$jobId/review", ReviewBody(rating, comment))
     fun updateReview(reviewId: Int, rating: Int, comment: String?) = ApiRequest.patch<ReviewResponse, ReviewBody>("api/customer/reviews/$reviewId", ReviewBody(rating, comment))
     fun warrantyClaim(jobId: Int, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/customer/jobs/$jobId/claim", mapOf("body" to body))

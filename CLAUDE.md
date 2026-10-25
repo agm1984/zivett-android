@@ -133,6 +133,34 @@ screenshots every tab, menu row and first list item, tapping nothing
 that changes data. A large-screen AVD is `Large_Screen_API_35`
 (2208×1840, 420dpi).
 
+## Calendar & dispatch (2026-10-25)
+
+Contract: `docs/mobile-api.md` "Calendar & dispatch". The company
+Calendar (`features/company/CompanyCalendar.kt`) is a Month | Week toggle
+over ONE payload (`CompanyCalendar` in `core/models/CalendarModels.kt`,
+`?month=` / `?week=`); all derivation is pure in `CalendarLogic` (flags,
+load-vs-cap labels, the board rows, window states, openings, map legs,
+settings bodies) and tested in `CalendarDispatchTest`. Month cells show
+the lead's face + window + code, warning-tinted for `needs_crew` /
+`needs_start` / `overdue`, dashed ghosts for `moves` and `tentative`, and
+"N open" for `openings`; admins get a tech filter. Week = the dispatch
+board: a real grid at ≥600dp width, a per-day list grouped by tech on a
+phone. Tapping a day opens `CalendarDaySheet` (window states + blocks
+with an inline confirm, the osmdroid `DayRouteMap` — numbered pins from
+the company `base`, straight-line legs — jobs with Start job (the job
+page's `CrewPickerSheet` via `CompanyJobDetailModel`) and Move, pending
+moves, tentative quotes, openings whose Quote opens the feed's
+`QuoteComposerSheet`, and time off). Settings (admins): working days go
+through `updateWorkingDays` (explicit null = every day — `DetailsBody`'s
+coder would drop it), weekly blocks + cap through
+`PATCH /api/company/availability`. Moving a visit is `MoveVisit.kt`
+(`MoveVisitModel` + sheet; `VisitTimeCard` on the company job page);
+the booker answers on the job page's `RescheduleCard`
+(`JobDetailModel.decideReschedule`, via `JobArea.accept/declineReschedule`;
+409 `schedule_conflict` shows the server's sentence and reloads). PHP's
+`[]` for empty objects: `load` uses `PhpRatesSerializer`, `openings`
+its own `OpeningsSerializer` (drops undecodable rows).
+
 ## Layout
 
 ```

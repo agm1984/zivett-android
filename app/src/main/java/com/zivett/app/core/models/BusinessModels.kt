@@ -185,6 +185,8 @@ object BusinessEndpoints {
     fun acceptQuote(jobId: Int, quoteId: Int, body: AcceptQuoteBody) = ApiRequest.post<JobResponse, AcceptQuoteBody>("api/business/requests/$jobId/quotes/$quoteId/accept", body)
     fun approveChangeOrder(jobId: Int, changeOrderId: Int) = ApiRequest.post<ChangeOrderResponse>("api/business/requests/$jobId/change-orders/$changeOrderId/approve")
     fun declineChangeOrder(jobId: Int, changeOrderId: Int) = ApiRequest.post<ChangeOrderResponse>("api/business/requests/$jobId/change-orders/$changeOrderId/decline")
+    fun acceptReschedule(jobId: Int) = ApiRequest.post<JobResponse>("api/business/requests/$jobId/reschedule/accept")
+    fun declineReschedule(jobId: Int) = ApiRequest.post<JobResponse>("api/business/requests/$jobId/reschedule/decline")
     fun review(jobId: Int, rating: Int, comment: String?) = ApiRequest.post<ReviewResponse, ReviewBody>("api/business/requests/$jobId/review", ReviewBody(rating, comment))
     fun updateReview(reviewId: Int, rating: Int, comment: String?) = ApiRequest.patch<ReviewResponse, ReviewBody>("api/business/reviews/$reviewId", ReviewBody(rating, comment))
     fun warrantyClaim(jobId: Int, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/business/requests/$jobId/claim", mapOf("body" to body))
