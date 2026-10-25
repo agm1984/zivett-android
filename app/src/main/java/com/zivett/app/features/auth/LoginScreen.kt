@@ -1,5 +1,8 @@
 package com.zivett.app.features.auth
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -78,6 +81,9 @@ fun LoginScreen(nav: NavHostController) {
     val environment = LocalAppEnvironment.current
     val scope = rememberCoroutineScope()
     val form = remember { LoginFormModel() }
+    // Next on the email goes to the password — left to the default focus
+    // order it landed on the "Forgot?" link beside the password label.
+    val passwordFocus = remember { FocusRequester() }
 
     ZScreen {
         AuthHeader(backTitle = "Back to home", onBack = { nav.backToHome() }, title = "Log in") {
@@ -89,9 +95,11 @@ fun LoginScreen(nav: NavHostController) {
 
         form.bannerError?.let { ZBanner(it, tone = ZTone.DANGER) }
 
-        ZTextField("Email", form.email, { form.email = it }, placeholder = "you@example.com", error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+        ZTextField("Email", form.email, { form.email = it }, placeholder = "you@example.com", error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, onImeAction = { passwordFocus.requestFocus() })
 
-        ZTextField("Password", form.password, { form.password = it }, error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Done, corner = {
+        // The keyboard's ✓ logs in: in landscape on a tablet the keyboard
+        // covers the button.
+        ZTextField("Password", form.password, { form.password = it }, error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Done, fieldModifier = Modifier.focusRequester(passwordFocus), onImeAction = { scope.launch { form.submit(environment.session) } }, corner = {
             ZTextAction("Forgot?", color = com.zivett.app.design.ZTheme.colors.inkMuted) { nav.navigate(ForgotPasswordRoute) }
         })
 

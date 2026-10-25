@@ -111,6 +111,9 @@ data class Quote(
     /// Company-side lists load the quote's job.
     val job: QuoteJob? = null,
     val createdAt: Instant? = null,
+    /// When a settled quote was accepted/declined; null while pending (and
+    /// on older servers).
+    val decidedAt: Instant? = null,
 ) {
     /// `Payments::bookerBreakdown()`.
     @Serializable
@@ -251,6 +254,9 @@ data class Job(
     /// When an org admin STARTED the job (confirmed who's going). Until
     /// then nobody can mark it en route.
     val dispatchedAt: Instant? = null,
+    /// The pro's pending ask to move the confirmed visit (both sides,
+    /// accepted jobs only); null/absent when there is none.
+    val rescheduleRequest: RescheduleRequest? = null,
 ) {
     /// Whether this job is assigned to the given user (a company member
     /// checking "is this one mine") — any crew member works it like the lead.

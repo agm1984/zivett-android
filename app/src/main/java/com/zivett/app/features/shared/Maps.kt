@@ -186,3 +186,72 @@ fun PinPickerMap(lat: Double, lng: Double, label: String, modifier: Modifier = M
         },
     )
 }
+
+/// A numbered stop pin (charcoal disc, white number) — the day map's
+/// route order.
+private fun numberedPin(context: android.content.Context, number: Int, warn: Boolean): android.graphics.drawable.BitmapDrawable {
+    val density = context.resources.displayMetrics.density
+    val size = (28 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.parseColor(if (warn) "#B45309" else "#151B23") }
+    val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.WHITE; style = android.graphics.Paint.Style.STROKE; strokeWidth = 2.5f * density }
+    val radius = size / 2f - 2 * density
+    canvas.drawCircle(size / 2f, size / 2f, radius, fill)
+    canvas.drawCircle(size / 2f, size / 2f, radius, ring)
+    val text = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE; textSize = 13 * density; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true
+    }
+    canvas.drawText(number.toString(), size / 2f, size / 2f - (text.descent() + text.ascent()) / 2, text)
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+}
+
+/// One located visit on the day map.
+data class RouteStop(val number: Int, val lat: Double, val lng: Double, val title: String, val warn: Boolean = false)
+
+/// The calendar day's route: the company's base (gold) and each located
+/// visit as a numbered pin in window order, joined by straight lines —
+/// no routing API, the same osmdroid tiles as live tracking.
+@Composable
+fun DayRouteMap(base: Pair<Double, Double>?, baseLabel: String?, stops: List<RouteStop>, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.clipToBounds()) {
+        AndroidView(
+            factory = { context -> clippedHost(MapView(context).apply { standard() }) },
+            modifier = Modifier.fillMaxSize(),
+            update = { host ->
+                val map = host.getChildAt(0) as MapView
+                map.overlays.clear()
+                val points = mutableListOf<GeoPoint>()
+                base?.let { (lat, lng) ->
+                    val point = GeoPoint(lat, lng)
+                    points += point
+                    map.overlays += Marker(map).apply { position = point; title = baseLabel ?: "Base"; icon = dot(AndroidColor.parseColor("#D4AF37")); setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER) }
+                }
+                stops.forEach { stop -> points += GeoPoint(stop.lat, stop.lng) }
+                if (points.size > 1) {
+                    map.overlays += Polyline(map).apply {
+                        setPoints(points)
+                        outlinePaint.color = AndroidColor.argb(170, 0x15, 0x1B, 0x23)
+                        outlinePaint.strokeWidth = 5f
+                        outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(18f, 12f), 0f)
+                    }
+                }
+                stops.forEach { stop ->
+                    map.overlays += Marker(map).apply {
+                        position = GeoPoint(stop.lat, stop.lng); title = stop.title
+                        icon = numberedPin(map.context, stop.number, stop.warn)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    }
+                }
+                when {
+                    points.size == 1 -> { map.controller.setZoom(14.0); map.controller.setCenter(points[0]) }
+                    points.size > 1 -> {
+                        val box = BoundingBox.fromGeoPointsSafe(points)
+                        map.post { map.zoomToBoundingBox(box.increaseByScale(1.5f), false) }
+                    }
+                }
+                map.invalidate()
+            },
+        )
+    }
+}

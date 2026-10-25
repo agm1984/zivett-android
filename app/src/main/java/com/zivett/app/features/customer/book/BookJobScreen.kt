@@ -57,6 +57,7 @@ import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.BookingOptions
 import com.zivett.app.core.models.Job
+import com.zivett.app.design.ZReadableWidth
 import com.zivett.app.design.ZActionBand
 import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBanner
@@ -86,6 +87,7 @@ import com.zivett.app.design.ZTitle
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
+import com.zivett.app.features.business.PropertyThumb
 import com.zivett.app.features.customer.jobs.JobPresentation
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.delay
@@ -114,6 +116,9 @@ fun BookJobScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(ZTheme.colors.cream)) {
         ZTopBar(if (area == BookingWizardEngine.Area.BUSINESS) "New request" else "Book a job", onBack = onBack)
+        // The readable column on a tablet — tiles and the Next button
+        // stretched edge to edge across 2208px in landscape.
+        ZReadableWidth(Modifier.weight(1f), fillHeight = true) {
         when {
             user != null && !user.isEmailVerified -> VerifyGate()
             else -> {
@@ -131,6 +136,7 @@ fun BookJobScreen(
                     model.options.value?.let { options -> WizardBody(model, options) }
                 }
             }
+        }
         }
     }
 }
@@ -329,6 +335,8 @@ private fun PropertyStep(model: BookingWizardModel, autoAdvance: () -> Unit, add
     if (model.properties.isEmpty()) ZBanner("You haven't added any properties yet — add one now to book a request against it.", tone = ZTone.WARNING)
     for (property in model.properties) {
         ZSelectableRow(selected = model.form.propertyId == property.id, onClick = { model.form = model.form.copy(propertyId = property.id); autoAdvance() }) {
+            PropertyThumb(property, size = 40.dp)
+            Spacer(Modifier.width(ZSpacing.sm))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 ZBodyStrong(property.name)
                 ZCaption(listOfNotNull(property.kind, property.address).joinToString(" · "))

@@ -155,6 +155,9 @@ private fun JobDetailContent(job: Job, model: JobDetailModel, area: JobArea, onS
         // they're why "Pay & close" would refuse.
         SupportCaseCards(job, JobPresentation.CaseSide.BOOKER)
 
+        // The pro asked to move the visit — a decision, so it leads.
+        RescheduleCard(job, model)
+
         if (job.lat != null && job.status in setOf(JobStatus.EN_ROUTE, JobStatus.ARRIVED)) {
             JobTrackingMap(job, area, modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(ZRadius.panel)))
         }
@@ -400,6 +403,33 @@ private fun ReviewCard(job: Job, onSheet: (JobSheet) -> Unit) {
             ZCaption("How did the visit go?")
             ZButton("Write a review", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onSheet(JobSheet.ReviewSheetKey) }
         }
+    }
+}
+
+/// "{company} asked to move your visit": from → to, their reason, and the
+/// booker's two answers. Cancelling is fee-free while it's pending.
+@Composable
+private fun RescheduleCard(job: Job, model: JobDetailModel) {
+    val request = job.rescheduleRequest ?: return
+    val scope = rememberCoroutineScope()
+    val colors = ZTheme.colors
+    ZCard {
+        ZBadge("Decide", ZTone.WARNING)
+        ZHeadline("${job.company?.name ?: "Your pro"} asked to move your visit")
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                ZMono("From", modifier = Modifier.padding(top = 2.dp))
+                Text(JobPresentation.reschedulePoint(request.fromDate ?: job.scheduledDate, request.fromWindow ?: job.scheduledWindow), style = ZType.body.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough), color = colors.inkMuted)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                ZMono("To", modifier = Modifier.padding(top = 2.dp))
+                ZBodyStrong(JobPresentation.reschedulePoint(request.date, request.window))
+            }
+        }
+        request.reason?.takeIf { it.isNotBlank() }?.let { Text("“$it”", style = ZType.body.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = colors.inkSoft) }
+        ZButton("Accept new time", style = ZButtonStyle.SUCCESS, loading = model.busy) { scope.launch { model.decideReschedule(accept = true) } }
+        ZButton("Keep original time", style = ZButtonStyle.OUTLINE, enabled = !model.busy) { scope.launch { model.decideReschedule(accept = false) } }
+        ZCaption("Cancelling is free while you decide.")
     }
 }
 

@@ -127,7 +127,12 @@ fun CrewPickerSheet(
                     ) {
                         ZPhotoAvatar(member.photoUrl, member.name.take(1), 40.dp)
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            ZBodyStrong(member.name)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                ZBodyStrong(member.name, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
+                                // Booked off for this slot: auto-assignment skipped
+                                // them, but the dispatcher can still pick them.
+                                if (member.off) ZBadge("Off that day", ZTone.WARNING)
+                            }
                             ZCaption(if (member.needsPhoto) "Needs a profile photo before they can be assigned" else "${member.openJobs} open ${if (member.openJobs == 1) "job" else "jobs"}")
                         }
                         if (confirms && isCrew && slot == 0) ZBadge("Lead", ZTone.SUCCESS)

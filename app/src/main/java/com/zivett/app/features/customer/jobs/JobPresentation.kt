@@ -199,6 +199,10 @@ object JobPresentation {
         return "$day · ${windowShortLabel(window)}"
     }
 
+    /// A move request's end: "Sat, Aug 9 · Morning", or a plain fallback
+    /// when the slot is unknown.
+    fun reschedulePoint(date: String?, window: String?): String = date?.let { windowSlot(it, window) } ?: "Your agreed time"
+
     /// `arrivalLabel` → "Saturday, August 9 — Morning (8am–12pm)".
     fun arrivalLabel(date: String, window: String?): String {
         val day = JsonCoding.parseDate(date)?.let { longDay.format(it) } ?: date

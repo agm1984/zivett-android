@@ -109,6 +109,73 @@ are the `API_BASE_URL` BuildConfig field in `app/build.gradle.kts` →
   `catch (Exception)` on a money path rethrows `CancellationException`
   first — a cancelled call says nothing about what the server did.
 
+## Devices & orientation (2026-10-24)
+
+Phones stay portrait; large screens (600dp+ on the short side — tablets,
+unfolded foldables) turn freely: `MainActivity.orientationFor`, applied in
+onCreate (a fold recreates the activity) and onConfigurationChanged — no
+manifest lock (Android 16+ ignores one on large screens for API 36+
+anyway). Every screen sits in the readable column — `ZScreen`, or
+`ZReadableWidth` for screens that don't (welcome panels, booking wizard):
+560dp on a phone, 720dp on a large screen (`readableMaxWidth()`); a
+`widthIn` after `fillMaxSize` is IGNORED, which left every screen edge to
+edge on a tablet until this date. `ZScreen` also carries `imePadding()`
+so the page shrinks above the keyboard (in tablet landscape it covers the
+Log in button), and `ZTextField(onImeAction = …)` wires the keyboard's
+✓/Next key (login: Next → password via a FocusRequester — the default
+focus order went to "Forgot?" — and ✓ submits). Secure fields have the
+show/hide eye.
+
+**Screen tour:** `scripts/screen-tour.py <out-dir> [portrait|landscape]`
+drives the first `adb` device — signs in as the seeded dev accounts
+(fresh `pm clear` per role, keyboard Next/✓ like a person) and
+screenshots every tab, menu row and first list item, tapping nothing
+that changes data. A large-screen AVD is `Large_Screen_API_35`
+(2208×1840, 420dpi).
+
+## Calendar & dispatch (2026-10-25)
+
+Contract: `docs/mobile-api.md` "Calendar & dispatch". The company
+Calendar (`features/company/CompanyCalendar.kt`) is a Month | Week toggle
+over ONE payload (`CompanyCalendar` in `core/models/CalendarModels.kt`,
+`?month=` / `?week=`); all derivation is pure in `CalendarLogic` (flags,
+load-vs-cap labels, the board rows, window states, openings, map legs,
+settings bodies) and tested in `CalendarDispatchTest`. Month cells show
+the lead's face + window + code, warning-tinted for `needs_crew` /
+`needs_start` / `overdue`, dashed ghosts for `moves` and `tentative`, and
+"N open" for `openings`; admins get a tech filter. Week = the dispatch
+board: a real grid at ≥600dp width, a per-day list grouped by tech on a
+phone. Tapping a day opens `CalendarDaySheet` (window states + blocks
+with an inline confirm, the osmdroid `DayRouteMap` — numbered pins from
+the company `base`, straight-line legs — jobs with Start job (the job
+page's `CrewPickerSheet` via `CompanyJobDetailModel`) and Move, pending
+moves, tentative quotes, openings whose Quote opens the feed's
+`QuoteComposerSheet`, and time off). Settings (admins): working days go
+through `updateWorkingDays` (explicit null = every day — `DetailsBody`'s
+coder would drop it), weekly blocks + cap through
+`PATCH /api/company/availability`. Moving a visit is `MoveVisit.kt`
+(`MoveVisitModel` + sheet; `VisitTimeCard` on the company job page);
+the booker answers on the job page's `RescheduleCard`
+(`JobDetailModel.decideReschedule`, via `JobArea.accept/declineReschedule`;
+409 `schedule_conflict` shows the server's sentence and reloads). PHP's
+`[]` for empty objects: `load` uses `PhpRatesSerializer`, `openings`
+its own `OpeningsSerializer` (drops undecodable rows).
+
+## My quotes (2026-10-25)
+
+Contract: `docs/mobile-api.md` "My quotes". `CompanyQuotesScreen`
+(`features/company/CompanyQuotesJobs.kt`) is a summary line ("N out · $X
+in play · N won in the last 30 days") over **Waiting on a decision**
+(rich cards: booker photos, trade + code, price + "You keep ≈", "Can
+arrive …", the release state + "Sent N days ago"; Revise is the one
+button and shows only while `job.quotes_released` is false — the PATCH
+422s after; Withdraw sits in the More menu with its confirm) and **Past
+quotes** (Won / Not chosen / Job cancelled, decided date, price; All · Won
+· Not chosen + a title/code search; only Won rows open `CompanyJobRoute`).
+All derivation is pure in `CompanyQuotesLogic` (`CompanyQuotesLogicTest`).
+`decided_at`, `job.status` (a string) and `job.quotes_released` decode
+with defaults, so an older server reads as "not released, undated".
+
 ## Layout
 
 ```

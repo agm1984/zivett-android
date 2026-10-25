@@ -104,6 +104,14 @@ data class QuoteJob(
     /// Annotated on pending quotes so the revise picker stays live.
     val companyWindows: List<CompanyWindow>? = null,
     val category: JobCategory? = null,
+    /// The booker's photos (My quotes thumbnails + the revise composer).
+    val photos: List<JobPhoto>? = null,
+    /// A JobStatus value — kept a string so an unknown status never fails
+    /// the list. "cancelled" turns a declined quote into "Job cancelled".
+    val status: String? = null,
+    /// False = still in ZiVETT's review queue; true = the booker has it.
+    /// Absent on older servers → false.
+    val quotesReleased: Boolean = false,
 )
 
 /// `GET /api/company/payouts`.
@@ -125,38 +133,14 @@ data class PayoutsResponse(val summary: Summary, val payouts: List<Payout> = emp
 
 /// `GET /api/company/availability` + calendar.
 @Serializable
-data class AvailabilityResponse(val workingDays: List<Int>? = null, val blockedDates: List<BlockedDate> = emptyList()) {
-    @Serializable data class BlockedDate(val id: Int, val date: String)
-}
-
-/// `GET /api/company/calendar` — confirmed jobs, tentative quote
-/// proposals, blocked days, working days.
-@Serializable
-data class CompanyCalendar(
-    val month: String,
-    val jobs: List<CalendarJob> = emptyList(),
-    val tentative: List<Tentative>? = null,
-    val blockedDates: List<AvailabilityResponse.BlockedDate> = emptyList(),
+data class AvailabilityResponse(
     val workingDays: List<Int>? = null,
+    val blockedDates: List<BlockedDate> = emptyList(),
+    val blockedWindows: List<WeeklyBlock>? = null,
+    val windowCapacity: Int? = null,
 ) {
-    /// Fields mirror `Company\CalendarController::index`'s jobs map.
-    @Serializable
-    data class CalendarJob(
-        val id: Int,
-        val code: String? = null,
-        val title: String,
-        val status: JobStatus,
-        val mode: String? = null,
-        /// Scheduled date, or the acceptance day for instant work — the
-        /// server drops rows with neither.
-        val date: String,
-        val window: String? = null,
-        val categoryCode: String? = null,
-    )
-
-    /// `{quote_id, job_code, title, amount_cents, date, window}`.
-    @Serializable
-    data class Tentative(val quoteId: Int, val jobCode: String? = null, val title: String? = null, val amountCents: Int = 0, val date: String, val window: String? = null)
+    /// `window` null = the whole day is blocked.
+    @Serializable data class BlockedDate(val id: Int, val date: String, val window: String? = null)
 }
 
 /// `GET /api/company/passport`.
@@ -222,7 +206,9 @@ data class CompanyReferral(val code: String, val link: String, val reward: Rewar
 @Serializable data class StripeLink(val url: String)
 @Serializable data class PayoutsReady(val payoutsReady: Boolean = false)
 @Serializable data class WithdrawnResponse(val withdrawn: Boolean = false)
-@Serializable data class BlockedDateResponse(val blockedDate: AvailabilityResponse.BlockedDate)
+/// `day` = that date's rows after the change (a whole-day block replaces
+/// its window rows); absent on an older server.
+@Serializable data class BlockedDateResponse(val blockedDate: AvailabilityResponse.BlockedDate, val day: List<AvailabilityResponse.BlockedDate>? = null)
 
 /// `StoreQuoteRequest` — the server derives `amount_cents` from the
 /// published rate × hours × crew. Encoded with EXPLICIT nulls: a
@@ -271,6 +257,9 @@ data class RosterMember(
     /// Server-computed `assignable && takes_jobs`; absent on an older
     /// server, where it falls back to that same rule.
     val autoPickable: Boolean? = null,
+    /// Booked off for the job's slot — auto-assignment skips them, but a
+    /// dispatcher can still pick them by hand ("Off that day").
+    val off: Boolean = false,
 ) {
     /// Who "Auto-assign next" (and acceptance) may pick.
     val isAutoPickable: Boolean get() = autoPickable ?: (assignable && takesJobs)
@@ -378,14 +367,34 @@ object CompanyEndpoints {
     fun refreshStripeStatus() = ApiRequest.post<PayoutsReady>("api/company/stripe/refresh-status")
 
     fun availability() = ApiRequest.get<AvailabilityResponse>("api/company/availability")
-    fun blockDate(date: String) = ApiRequest.post<BlockedDateResponse, Map<String, String>>("api/company/availability/blocked-dates", mapOf("date" to date))
+    /// `window` null = the whole day.
+    fun blockDate(date: String, window: String? = null) = ApiRequest.post<BlockedDateResponse, BlockDateBody>("api/company/availability/blocked-dates", BlockDateBody(date, window))
     fun unblockDate(id: Int) = ApiRequest.empty(Method.DELETE, "api/company/availability/blocked-dates/$id")
+    /// Weekly window blocks + the per-window cap (org admins). Both keys
+    /// always sent — null clears.
+    fun updateAvailability(body: AvailabilitySettingsBody) = ApiRequest.json<AvailabilitySettingsResponse, AvailabilitySettingsBody>(Method.PATCH, "api/company/availability", body, coder = JsonCoding.explicitNulls)
     fun monthCalendar(month: String? = null) = ApiRequest.get<CompanyCalendar>("api/company/calendar", month?.let { listOf("month" to it) } ?: emptyList())
+    /// The Monday–Sunday week around `day` (Y-m-d).
+    fun weekCalendar(day: String) = ApiRequest.get<CompanyCalendar>("api/company/calendar", listOf("week" to day))
+    /// Admins for anyone; a member only for themselves (else 403).
+    fun addTimeOff(userId: Int, date: String, window: String? = null) = ApiRequest.post<TimeOffResponse, TimeOffBody>("api/company/time-off", TimeOffBody(userId, date, window))
+    fun removeTimeOff(id: Int) = ApiRequest.empty(Method.DELETE, "api/company/time-off/$id")
+
+    /// Moving a confirmed visit (org admins of the assigned company).
+    fun rescheduleSlots(jobId: Int) = ApiRequest.get<RescheduleSlots>("api/company/jobs/$jobId/reschedule/slots")
+    fun reschedule(jobId: Int, body: RescheduleBody) = ApiRequest.post<JobResponse, RescheduleBody>("api/company/jobs/$jobId/reschedule", body)
+    fun withdrawReschedule(jobId: Int) = ApiRequest.delete<JobResponse>("api/company/jobs/$jobId/reschedule")
 
     fun passport() = ApiRequest.get<PassportResponse>("api/company/passport")
     fun organization() = ApiRequest.get<CompanyOrganizationResponse>("api/company/organization")
     fun updateOrganization(body: Map<String, String?>) = ApiRequest.json<CompanyOrganizationResponse, Map<String, String?>>(Method.PATCH, "api/company/organization", body, coder = JsonCoding.explicitNulls)
     fun submitOrganization() = ApiRequest.post<CompanyOrganizationResponse>("api/company/organization/submit")
+    /// Working days alone — `null` (every day) must reach the server as an
+    /// explicit null, which `DetailsBody`'s coder would drop.
+    fun updateWorkingDays(days: List<Int>?) = ApiRequest.empty(
+        Method.PATCH, "api/company/organization/details",
+        buildJsonObject { put("working_days", days?.let { list -> kotlinx.serialization.json.JsonArray(list.map { kotlinx.serialization.json.JsonPrimitive(it) }) } ?: kotlinx.serialization.json.JsonNull) }.toString().toByteArray(),
+    )
     fun updateDetails(body: DetailsBody) = ApiRequest.patch<CompanyOrganizationResponse, DetailsBody>("api/company/organization/details", body)
     /// One trade's rate, changed in place from the quote composer (org
     /// admins; 404 if the org doesn't work in that trade; 422 outside

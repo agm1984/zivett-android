@@ -40,7 +40,6 @@ import com.zivett.app.core.models.Job
 import com.zivett.app.core.models.JobStatus
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.models.QuoteBody
-import com.zivett.app.core.models.QuoteStatus
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.userMessage
@@ -54,7 +53,6 @@ import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZEmptyState
 import com.zivett.app.design.ZLoadable
 import com.zivett.app.design.ZMonoBody
-import com.zivett.app.design.ZMonoLarge
 import com.zivett.app.design.ZPageTitle
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
@@ -69,6 +67,18 @@ import com.zivett.app.features.shared.JobStatusBadge
 import com.zivett.app.features.shared.LocalNav
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.TextUnit
+import com.zivett.app.design.ZHeadline
+import com.zivett.app.design.ZTextField
+import com.zivett.app.features.shared.PhotoGrid
+import java.time.Instant
 
 class CompanyQuotesModel(private val client: ApiClient) {
     var state by mutableStateOf<Loadable<CompanyQuotesResponse>>(Loadable.Loading)
@@ -108,48 +118,50 @@ class CompanyQuotesModel(private val client: ApiClient) {
 @Composable
 fun CompanyQuotesScreen() {
     val environment = LocalAppEnvironment.current
+    val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
     val model = remember { CompanyQuotesModel(environment.client) }
     var revising by remember { mutableStateOf<Quote?>(null) }
     var withdrawing by remember { mutableStateOf<Quote?>(null) }
+    var filter by remember { mutableStateOf(CompanyQuotesLogic.Filter.ALL) }
+    var query by remember { mutableStateOf("") }
     LaunchedEffect(model) { model.load() }
-
-    fun badge(status: QuoteStatus) = when (status) {
-        QuoteStatus.PENDING -> "Pending" to ZTone.INFO
-        QuoteStatus.ACCEPTED -> "Accepted" to ZTone.SUCCESS
-        QuoteStatus.DECLINED -> "Declined" to ZTone.NEUTRAL
-    }
 
     ZToastBox(model.toast, { model.toast = null }) {
         ZScreen(onRefresh = { model.load() }) {
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { response ->
+                val now = Instant.now()
+                val waiting = CompanyQuotesLogic.waiting(response.quotes)
+                val settled = CompanyQuotesLogic.past(response.quotes, CompanyQuotesLogic.Filter.ALL, "")
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                    ZPageTitle("My quotes")
-                    if (response.quotes.isEmpty()) ZEmptyState(Icons.Outlined.Description, "No quotes yet", "Every job in Opportunities takes a quote (your hourly rate × estimated hours × crew), and they land here.")
-                    for (quote in response.quotes) {
-                        ZCard {
-                            Row(verticalAlignment = Alignment.Top) {
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    ZBodyStrong(quote.job?.title ?: "Job", maxLines = 1)
-                                    Text(quote.job?.code ?: "", style = ZType.mono.copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.Normal), color = colors.inkMuted)
+                    ZPageTitle("My quotes", subtitle = CompanyQuotesLogic.summary(response.quotes, now))
+                    if (response.quotes.isEmpty()) {
+                        ZEmptyState(Icons.Outlined.Description, "No quotes yet", "Every job in Opportunities takes a quote (your hourly rate × estimated hours × crew), and they land here.")
+                    } else {
+                        ZHeadline("Waiting on a decision")
+                        if (waiting.isEmpty()) ZEmptyState(Icons.Outlined.Description, "Nothing waiting on a decision", "Quote a job in Opportunities and it waits here until the booker decides.")
+                        for (quote in waiting) {
+                            WaitingQuoteCard(quote, response.commissionBps, now, onRevise = { revising = quote }, onWithdraw = { withdrawing = quote })
+                        }
+
+                        ZHeadline("Past quotes", modifier = Modifier.padding(top = ZSpacing.sm))
+                        if (settled.isEmpty()) {
+                            ZCaption("Quotes the booker has decided on land here — won, not chosen, or the job was cancelled.")
+                        } else {
+                            val filters = CompanyQuotesLogic.Filter.entries
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                filters.forEachIndexed { index, option ->
+                                    SegmentedButton(selected = filter == option, onClick = { filter = option }, shape = SegmentedButtonDefaults.itemShape(index, filters.size)) { Text(option.label) }
                                 }
-                                val (label, tone) = badge(quote.status)
-                                ZBadge(label, tone)
                             }
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    ZMonoLarge(Money.format(quote.amountCents), color = colors.navy)
-                                    val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
-                                    if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()}h × ${Money.format(rate)}/hr")
-                                }
-                                quote.createdAt?.let { ZCaption(Dates.monthDay(it), tone = ZTextTone.FAINT) }
-                            }
-                            if (quote.status == QuoteStatus.PENDING) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                                    ZButton("Revise", style = ZButtonStyle.SOFT, compact = true, fullWidth = false) { revising = quote }
-                                    ZButton("Withdraw", style = ZButtonStyle.GHOST, compact = true, fullWidth = false) { withdrawing = quote }
-                                }
+                            ZTextField("", query, { query = it }, placeholder = "Search by title or code", imeAction = ImeAction.Search)
+                            val shown = CompanyQuotesLogic.past(response.quotes, filter, query)
+                            if (shown.isEmpty()) ZCaption("No past quotes match.")
+                            for (quote in shown) {
+                                val won = CompanyQuotesLogic.outcome(quote) == CompanyQuotesLogic.Outcome.WON
+                                val jobId = quote.job?.id
+                                PastQuoteRow(quote, onClick = if (won && jobId != null) ({ nav.navigate(CompanyJobRoute(jobId)) }) else null)
                             }
                         }
                     }
@@ -178,6 +190,77 @@ fun CompanyQuotesScreen() {
     }
 }
 
+/// The job code — the one monospace thing on the screen (people copy it).
+@Composable
+private fun QuoteCode(code: String) {
+    Text(code, style = ZType.mono.copy(letterSpacing = TextUnit.Unspecified, fontWeight = FontWeight.Normal), color = ZTheme.colors.inkMuted)
+}
+
+private val money = ZType.headline.copy(fontFeatureSettings = "tnum")
+
+/// A pending quote: what was quoted, what the company keeps, when it would
+/// arrive, where it stands. Revise is the one button (only before release);
+/// Withdraw sits behind More with its confirm.
+@Composable
+private fun WaitingQuoteCard(quote: Quote, commissionBps: Int, now: Instant, onRevise: () -> Unit, onWithdraw: () -> Unit) {
+    val colors = ZTheme.colors
+    ZCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                ZBodyStrong(quote.job?.title ?: "Job", maxLines = 2)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    quote.job?.category?.name?.let { ZCaption(it) }
+                    if (quote.job?.category != null && quote.job.code != null) ZCaption("·")
+                    quote.job?.code?.let { QuoteCode(it) }
+                }
+            }
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = colors.inkMuted) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Withdraw quote", color = colors.danger) }, onClick = { menu = false; onWithdraw() })
+                }
+            }
+        }
+        quote.job?.photos?.takeIf { it.isNotEmpty() }?.let { PhotoGrid(it.take(4), thumbSize = 56.dp) }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
+            Text(Money.format(quote.amountCents), style = money, color = colors.ink)
+            ZCaption("You keep ≈ ${Money.format(CompanyQuotesLogic.youKeepCents(quote.amountCents, commissionBps))}", modifier = Modifier.padding(bottom = 2.dp))
+        }
+        val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
+        if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()}h × ${Money.format(rate)}/hr", tone = ZTextTone.FAINT)
+        quote.proposedDate?.let { ZCaption("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", tone = ZTextTone.SOFT) }
+        Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+            ZBadge(CompanyQuotesLogic.waitingState(quote), if (quote.job?.quotesReleased == true) ZTone.INFO else ZTone.NEUTRAL)
+            quote.createdAt?.let { ZCaption(CompanyQuotesLogic.sentAgo(it, now), tone = ZTextTone.FAINT) }
+        }
+        if (CompanyQuotesLogic.canRevise(quote)) {
+            ZButton("Revise", compact = true, fullWidth = false, onClick = onRevise)
+        }
+    }
+}
+
+/// A settled quote — compact; only a won row opens its job.
+@Composable
+private fun PastQuoteRow(quote: Quote, onClick: (() -> Unit)?) {
+    val outcome = CompanyQuotesLogic.outcome(quote) ?: return
+    ZCard(padding = ZSpacing.sm, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                ZBodyStrong(quote.job?.title ?: "Job", maxLines = 1)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    quote.job?.code?.let { QuoteCode(it) }
+                    quote.decidedAt?.let { ZCaption("· ${Dates.monthDay(it)}") }
+                }
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(Money.format(quote.amountCents), style = ZType.bodyStrong.copy(fontFeatureSettings = "tnum"), color = ZTheme.colors.ink)
+                ZBadge(outcome.label, if (outcome == CompanyQuotesLogic.Outcome.WON) ZTone.SUCCESS else ZTone.NEUTRAL)
+            }
+        }
+    }
+}
+
 /// The composer takes a Job; hydrate one from the quote's job ref.
 fun quoteJobAsJob(quote: Quote): Job? {
     val ref = quote.job ?: return null
@@ -186,6 +269,7 @@ fun quoteJobAsJob(quote: Quote): Job? {
         id = ref.id, code = ref.code, title = ref.title, issue = ref.issue, intakeAnswers = ref.intakeAnswers,
         mode = ref.mode, availabilityWindows = ref.availabilityWindows, status = JobStatus.SUBMITTED,
         estimateMin = ref.estimateMin, estimateMax = ref.estimateMax, category = category, companyWindows = ref.companyWindows,
+        photos = ref.photos,
     )
 }
 

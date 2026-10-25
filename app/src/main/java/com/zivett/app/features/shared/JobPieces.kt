@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -147,14 +148,14 @@ fun IntakeChips(answers: List<IntakeAnswer>) {
 
 /// Thumbnail grid with a full-screen viewer and optional per-photo delete.
 @Composable
-fun PhotoGrid(photos: List<JobPhoto>, onDelete: ((JobPhoto) -> Unit)? = null, canDelete: (JobPhoto) -> Boolean = { it.mine }) {
+fun PhotoGrid(photos: List<JobPhoto>, onDelete: ((JobPhoto) -> Unit)? = null, canDelete: (JobPhoto) -> Boolean = { it.mine }, thumbSize: Dp = 90.dp) {
     if (photos.isEmpty()) return
     var viewing by remember { mutableStateOf<JobPhoto?>(null) }
     val colors = ZTheme.colors
 
     ZFlowRow(spacing = 6.dp) {
         for (photo in photos) {
-            Box(modifier = Modifier.size(90.dp).clip(RoundedCornerShape(8.dp)).background(colors.surfaceSunken).clickable { viewing = photo }) {
+            Box(modifier = Modifier.size(thumbSize).clip(RoundedCornerShape(8.dp)).background(colors.surfaceSunken).clickable { viewing = photo }) {
                 AsyncImage(model = photo.thumbUrl ?: photo.url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 if (onDelete != null && canDelete(photo)) {
                     IconButton(onClick = { onDelete(photo) }, modifier = Modifier.align(Alignment.TopEnd).size(28.dp)) {

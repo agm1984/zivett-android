@@ -232,6 +232,35 @@ class JobDetailModel(
         }
     }
 
+    /// The pro asked to move the visit. Accepting re-checks their live
+    /// calendar: a 409 `schedule_conflict` means the slot closed meanwhile
+    /// and the visit stays put — say the server's words and reload so the
+    /// card reflects what's true now.
+    suspend fun decideReschedule(accept: Boolean) {
+        if (busy) return
+        busy = true
+        try {
+            val job = client.send(if (accept) area.acceptReschedule(jobId) else area.declineReschedule(jobId)).job
+            state = Loadable.Loaded(job)
+            toast = if (accept) "Visit moved to ${job.scheduledDate?.let { JobPresentation.windowSlot(it, job.scheduledWindow) } ?: "the new time"}" else "Kept your original time"
+        } catch (error: ApiError.Conflict) {
+            toast = error.detail ?: "That time is no longer open. Your visit stays as agreed."
+            busy = false
+            load()
+        } catch (error: ApiError) {
+            // 422: nothing pending any more (withdrawn or already answered).
+            toast = error.userMessage
+            busy = false
+            load()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            toast = error.userMessage
+        } finally {
+            busy = false
+        }
+    }
+
     suspend fun submitReview(rating: Int, comment: String): Boolean {
         busy = true
         try {

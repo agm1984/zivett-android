@@ -218,6 +218,15 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         return null
     }
 
+    /// Takes back the pending ask to move the visit.
+    suspend fun withdrawMove() {
+        busy = true
+        try {
+            state = Loadable.Loaded(client.send(CompanyEndpoints.withdrawReschedule(jobId)).job)
+            toast = "Move request withdrawn — the visit stays as agreed"
+        } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
+    }
+
     suspend fun reportLocation(lat: Double, lng: Double): Boolean {
         try { client.send(CompanyEndpoints.reportLocation(jobId, lat, lng)); return true }
         catch (_: ApiError.Unauthenticated) { return false }
@@ -266,7 +275,7 @@ class LiveLocationSharer(private val context: Context) {
     }
 }
 
-sealed interface CompanyJobSheet { object ChangeOrder : CompanyJobSheet; object Report : CompanyJobSheet; object Withdraw : CompanyJobSheet; object Assign : CompanyJobSheet; object Start : CompanyJobSheet }
+sealed interface CompanyJobSheet { object ChangeOrder : CompanyJobSheet; object Report : CompanyJobSheet; object Withdraw : CompanyJobSheet; object Assign : CompanyJobSheet; object Start : CompanyJobSheet; object Move : CompanyJobSheet }
 
 @Composable
 fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () -> Unit) {
@@ -412,6 +421,9 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () ->
                             TimelineStepper(JobPresentation.timeline(job.status))
                         }
 
+                        // The agreed slot and any pending ask to move it.
+                        VisitTimeCard(job, isAdmin, model.busy, onMove = { sheet = CompanyJobSheet.Move }, onWithdraw = { scope.launch { model.withdrawMove() } })
+
                         if (job.status == JobStatus.EN_ROUTE) {
                             ZCard {
                                 ZBodyStrong("Live location")
@@ -520,6 +532,9 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () ->
         CompanyJobSheet.Assign, CompanyJobSheet.Start -> model.job?.let { job ->
             val starting = sheet == CompanyJobSheet.Start
             CrewPickerSheet(job, starting, model.roster, loadRoster = { model.loadRoster() }, save = { ids -> if (starting) model.start(ids) else model.assign(ids) }) { sheet = null }
+        }
+        CompanyJobSheet.Move -> MoveVisitSheet(jobId, model.job?.code, environment.client, onDismiss = { sheet = null }) { job, message ->
+            model.state = Loadable.Loaded(job); model.toast = message; sheet = null
         }
         CompanyJobSheet.Withdraw -> model.job?.let { job -> CompanyWithdrawSheet(job, model, onDismiss = { sheet = null }, done = { sheet = null; onBack() }) }
         null -> Unit
