@@ -20,6 +20,14 @@ rasterised with headless Chrome at 1024×500 (same command as
 `generate.py`'s `render()`) and converted to JPEG with `sips`. A new logo
 set means re-running both steps — never hand-edit the outputs.
 
+Refreshed 2026-10-26 to the black-and-gold app icon: `play-icon-512.png`
+is the iOS `AppIcon.png` again (generated from
+`ratedpro-web/resources/brand/Zivett_App_Icon.png`), downsized with
+`sips -Z 512`. The feature graphic is now a supplied render (black and
+gold, phone + trade icons, "Trusted Pros. Every Time.") scaled from
+1794×876 to 1024×500 and saved as JPEG with `sips` — `feature-graphic.svg`
+is no longer its source.
+
 ## App Links needs TWO fingerprints, not one
 
 `ANDROID_APP_FINGERPRINTS` on production currently holds a single cert:
