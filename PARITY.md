@@ -9,6 +9,7 @@ local Sail backend as customer, company, new company (through email
 verification), pending company, business, and new business.
 
 ## Foundation
+- [x] **Basic is free with a payout account fee (2026-10-31, web `connect_fee_cents`).** The plan card reads "No plan fee" with the fee instead of "Nothing to pay"; payout rows and the company invoice's "You receive" show the deduction. In-app wording says "payout account fee", never "Stripe" (the 3.1.1 history). Still manual: take the Basic store product off sale, and keep its id in the server config so existing buyers can restore.
 - [x] Networking: `ApiRequest`/`ApiClient`/`HttpApiClient` with the same error mapping (401/403/404/409/422/429, `Conflict` carries the body for 3DS), `PreviewApiClient` for tests
 - [x] Token storage: AndroidKeyStore AES-GCM key wrapping the token in private prefs (the iOS Keychain equivalent)
 - [x] `AuthSession` state machine (restore / login / register / accept invitation / logout / delete account / refresh) and `Access` rules, tests mirrored from `AccessTests`

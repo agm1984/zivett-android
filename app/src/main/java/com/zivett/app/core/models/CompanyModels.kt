@@ -133,6 +133,9 @@ data class PayoutsResponse(val summary: Summary, val payouts: List<Payout> = emp
         val invoiceNumber: String? = null,
         val jobCode: String? = null,
         val jobTitle: String? = null,
+        /// The monthly payout account fee this payout carried, already
+        /// taken out of `amountCents`.
+        val connectFeeCents: Int = 0,
     )
 }
 

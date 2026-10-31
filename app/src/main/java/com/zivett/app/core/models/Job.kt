@@ -341,6 +341,9 @@ data class Invoice(
     val trustFeeCents: Int? = null,
     val companyReferralCreditCents: Int? = null,
     val netCents: Int? = null,
+    /// The monthly payout account fee this invoice's payout carried. Not
+    /// included in `netCents`.
+    val connectFeeCents: Int = 0,
     val job: JobSummary? = null,
     val detail: Detail? = null,
 ) {

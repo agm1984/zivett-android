@@ -119,7 +119,7 @@ class PlanPickerModel(val area: String, private val client: ApiClient, private v
             ?: owned.firstOrNull { it.accountId == accountId }
     }
 
-    /// Free plans (Business Basic) never touch Google Play.
+    /// Free plans (the Basic tiers) never touch Google Play.
     suspend fun chooseFree(card: PlanShelf.Card): Boolean {
         working = "${card.plan.id}-free"
         try {

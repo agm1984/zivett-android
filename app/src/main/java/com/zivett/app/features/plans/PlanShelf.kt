@@ -1,5 +1,6 @@
 package com.zivett.app.features.plans
 
+import com.zivett.app.core.Money
 import com.zivett.app.core.models.SubscriptionResponse
 import com.zivett.app.core.store.StoreBillingPlan
 import com.zivett.app.core.store.StoreProduct
@@ -14,6 +15,15 @@ import java.time.Instant
 object PlanShelf {
     const val GOOGLE_PLAY = "google_play"
     const val APP_STORE = "app_store"
+
+    /// How a free plan's card reads. A plan with a payout account fee is
+    /// not "nothing to pay", so it says what it does cost.
+    fun freeHeadline(plan: SubscriptionResponse.Plan): String =
+        if (plan.connectFeeCents > 0) "No plan fee" else "Free"
+
+    fun freeDetail(plan: SubscriptionResponse.Plan): String =
+        if (plan.connectFeeCents > 0) "${Money.format(plan.connectFeeCents)}/month payout account fee, only in months you're paid"
+        else "Nothing to pay"
 
     enum class Mode {
         /// Google Play bills the plan: show it, Manage in Google Play, and

@@ -180,8 +180,8 @@ private fun PlanCard(model: PlanPickerModel, card: PlanShelf.Card, canManage: Bo
 
         when {
             card.plan.isFree -> {
-                ZBodyStrong("Free")
-                ZCaption("Nothing to pay")
+                ZBodyStrong(PlanShelf.freeHeadline(card.plan))
+                ZCaption(PlanShelf.freeDetail(card.plan))
                 // A Play-billed org drops to a free plan by cancelling in
                 // Google Play, not by picking it here.
                 if (canManage && !card.isCurrent && !switching) {
