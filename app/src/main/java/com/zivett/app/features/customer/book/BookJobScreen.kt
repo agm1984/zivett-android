@@ -493,7 +493,7 @@ private fun ReviewStep(model: BookingWizardModel, options: BookingOptions) {
     }
     ZCard {
         ZBodyStrong("Quotes set the price")
-        ZCaption("Verified pros send itemized quotes; nothing is held until you accept one. The quote you accept — plus the trust & support fee and applicable taxes — is authorized then, and only charged when the job's done and you close it.")
+        ZCaption("Verified pros send itemized quotes. Accepting one charges nothing — your card is saved, and the quote plus the trust & support fee and applicable taxes is charged only when the job's done and you close it.")
         if (form.mode == "instant" && model.emergencyFeeCents > 0) ZCaption("Instant dispatch adds a flat ${Money.format(model.emergencyFeeCents)} emergency fee on top of the quote you accept.", tone = ZTextTone.INK)
         val phrase = JobPresentation.warrantyPhrase(options.warrantyDays)
         ZCaption("• ${phrase.replaceFirstChar { it.uppercase() }} on every paid job.\n• Cancel free any time before a pro is committed.\n• Any scope change is approved by you in-app before it bills.")

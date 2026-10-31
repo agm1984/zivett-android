@@ -93,10 +93,14 @@ object PlanShelf {
         }
     }
 
-    /// "Billed once a year · works out to $48.33/month · save 17%".
+    /// "Paid upfront for the year · works out to $48.33/month · save 17%",
+    /// or "… · yearly only" (the web's PlanCards billing line, 2026-10-29).
+    /// Monthly stays "cancel anytime": Play has no 12-month commitment, so
+    /// the web's "12-month term" wording would be untrue here.
     fun yearlyDetail(product: StoreProduct): String {
-        val parts = mutableListOf("Billed once a year")
-        if (product.term(StoreBillingPlan.MONTHLY) != null) product.yearlyPerMonthDisplayPrice?.let { parts += "works out to $it/month" }
+        val parts = mutableListOf("Paid upfront for the year")
+        if (product.term(StoreBillingPlan.MONTHLY) == null) parts += "yearly only"
+        else product.yearlyPerMonthDisplayPrice?.let { parts += "works out to $it/month" }
         product.yearlySavingsPercent?.let { parts += "save $it%" }
         return parts.joinToString(" · ")
     }

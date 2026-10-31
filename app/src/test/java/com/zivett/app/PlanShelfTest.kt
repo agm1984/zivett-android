@@ -75,10 +75,10 @@ class PlanShelfTest {
         assertEquals(listOf("Basic", "Pro", "Elite"), cards.map { it.plan.name })
         assertFalse(cards[0].isCurrent) // defaulted, not chosen
         assertEquals(listOf("$29.99/year"), cards[0].options.map { it.price })
-        assertEquals("Billed once a year", cards[0].options[0].detail) // no monthly = no per-month anchor
+        assertEquals("Paid upfront for the year · yearly only", cards[0].options[0].detail) // no monthly = no per-month anchor
         assertEquals(listOf("$57.99/month", "$576.99/year"), cards[1].options.map { it.price })
         assertEquals("Billed monthly · cancel anytime", cards[1].options[0].detail)
-        assertEquals("Billed once a year · works out to $48.08/month · save 17%", cards[1].options[1].detail)
+        assertEquals("Paid upfront for the year · works out to $48.08/month · save 17%", cards[1].options[1].detail)
         // Play didn't return Elite: shown, not buyable.
         assertFalse(cards[2].available)
     }

@@ -29,6 +29,18 @@ object CompanyPresentation {
     /// Statuses a dispatcher can (re)assign in — `Assignments::ASSIGNABLE_STATUSES`.
     val assignable: Set<JobStatus> = setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
 
+    /// Tap-to-call the booker (`company/JobDetail.vue`, review #29): a
+    /// `tel:` URI from the display-format phone, null without one.
+    fun callUri(phone: String?): String? {
+        val digits = phone?.filter { it.isDigit() || it == '+' }?.takeIf { it.isNotEmpty() } ?: return null
+        return "tel:$digits"
+    }
+
+    /// The "Call <first name>" header action — only while the visit is
+    /// under way; the Customer card's phone link shows throughout.
+    fun callsUpFront(job: Job): Boolean =
+        callUri(job.customer?.phone) != null && job.status in setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
+
     /// `onCrew`: the user is one of the techs going (lead or crew).
     fun onCrew(job: Job, user: User?): Boolean = user != null && job.isAssigned(user.id)
 

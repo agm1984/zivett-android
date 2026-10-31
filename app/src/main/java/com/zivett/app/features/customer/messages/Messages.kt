@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -275,6 +275,10 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
     var menu by remember { mutableStateOf(false) }
     var blocking by remember { mutableStateOf<ConversationParticipant?>(null) }
     var reporting by remember { mutableStateOf(false) }
+    // Reading the thread clears its unread badge server-side; re-read the
+    // tab counts on the way out so the dot follows.
+    val navBadges = com.zivett.app.features.shared.LocalNavBadges.current
+    androidx.compose.runtime.DisposableEffect(navBadges) { onDispose { navBadges?.refreshSoon() } }
 
     LaunchedEffect(model) {
         model.load()
@@ -311,7 +315,7 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
                     when (val state = model.state) {
                         is Loadable.Loaded -> LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(ZSpacing.md), verticalArrangement = Arrangement.spacedBy(ZSpacing.xs), modifier = Modifier.fillMaxSize()) {
                             if (state.loaded.isEmpty()) item { ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "Say hello", "Messages stay attached to this job.") }
-                            items(state.loaded, key = { it.id }) { MessageBubble(it) }
+                            itemsIndexed(state.loaded, key = { _, message -> message.id }) { index, message -> MessageBubble(message, Message.senderLine(state.loaded, index)) }
                         }
                         else -> Column(modifier = Modifier.padding(ZSpacing.md)) { ZLoadable(state, retry = { scope.launch { model.load() } }) {} }
                     }
@@ -366,10 +370,12 @@ fun ConversationScreen(jobId: Int, title: String, subtitle: String?, readOnly: B
 }
 
 @Composable
-fun MessageBubble(message: Message) {
+fun MessageBubble(message: Message, senderLine: String? = null) {
     val colors = ZTheme.colors
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (message.mine) Arrangement.End else Arrangement.Start) {
         Column(horizontalAlignment = if (message.mine) Alignment.End else Alignment.Start, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 300.dp)) {
+            // Who's talking, once per run of their messages.
+            senderLine?.let { ZCaption(it, tone = ZTextTone.FAINT, maxLines = 1) }
             Text(
                 message.body, style = ZType.body, color = if (message.mine) Color.White else colors.ink,
                 modifier = Modifier

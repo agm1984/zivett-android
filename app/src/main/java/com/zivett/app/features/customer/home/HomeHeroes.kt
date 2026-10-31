@@ -251,7 +251,7 @@ fun HeroPendingCard(job: Job, onCancel: () -> Unit) {
             Text(ChecklistLogic.pendingExpectation(quoteMode), style = ZType.caption.copy(fontSize = 14.sp), color = Color.White.copy(alpha = 0.75f), textAlign = TextAlign.Center, modifier = Modifier.padding(top = ZSpacing.xs))
         }
 
-        StatusChecklist(ChecklistLogic.pendingSteps(quoteMode))
+        StatusChecklist(ChecklistLogic.pendingSteps())
 
         // The request summary — what the system is working from.
         Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.panel)).background(colors.surface).border(1.dp, colors.border, RoundedCornerShape(ZRadius.panel)).padding(ZSpacing.md), verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {

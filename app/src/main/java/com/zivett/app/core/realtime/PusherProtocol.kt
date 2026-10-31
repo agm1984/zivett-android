@@ -94,6 +94,8 @@ object RealtimeEvents {
         val sender: String,
         val body: String,
         @Serializable(with = LaravelInstantSerializer::class) val createdAt: Instant? = null,
+        /// "Harbour Plumbing · Tech" — absent on older servers.
+        val senderLabel: String? = null,
     )
 
     /// `LocationUpdated::broadcastWith`.
@@ -121,7 +123,7 @@ object RealtimeEvents {
 
     fun message(payload: String, currentUserId: Int?): Message? {
         val pushed = runCatching { JsonCoding.json.decodeFromString<PushedMessage>(payload) }.getOrNull() ?: return null
-        return Message(pushed.id, pushed.senderId, pushed.sender, pushed.body, mine = pushed.senderId == currentUserId, read = true, createdAt = pushed.createdAt)
+        return Message(pushed.id, pushed.senderId, pushed.sender, pushed.body, mine = pushed.senderId == currentUserId, read = true, createdAt = pushed.createdAt, senderLabel = pushed.senderLabel)
     }
 
     fun point(payload: String): JobLocation.Point? {

@@ -91,6 +91,9 @@ import com.zivett.app.features.plans.PlanPickerScreen
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.RoleShell
 import com.zivett.app.features.shared.shellTab
+import com.zivett.app.core.push.PushTarget
+import com.zivett.app.features.shared.NavBadgesModel
+import com.zivett.app.features.shared.rememberNavBadges
 import kotlinx.coroutines.launch
 
 /// Company shell in three lifecycles, mirroring the web's sidebar menus:
@@ -102,10 +105,12 @@ fun CompanyShell(approved: Boolean) {
     val organization = environment.session.user?.organization
     val isAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
 
+    val navBadges = rememberNavBadges()
     val tabs = when {
         approved -> listOf(
             shellTab(CompanyDashboardTab, "Dashboard", Icons.Filled.Home),
-            shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome),
+            // New feed jobs since this member last looked (`GET /api/nav-badges`).
+            shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome) { navBadges.count(NavBadgesModel.OPPORTUNITIES) },
             shellTab(CompanyQuotesTab, "Quotes", Icons.Outlined.Description),
             shellTab(CompanyJobsTab, "Jobs", Icons.Outlined.Work),
             shellTab(CompanyMoreTab, "More", Icons.Outlined.MoreHoriz),
@@ -135,7 +140,13 @@ fun CompanyShell(approved: Boolean) {
         }
     }
 
-    RoleShell(tabs, NotificationArea.COMPANY, onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) }, onStripeReturn = onStripeReturn) { nav ->
+    RoleShell(
+        tabs, NotificationArea.COMPANY,
+        onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) },
+        onStripeReturn = onStripeReturn,
+        onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target) },
+        navBadges = navBadges,
+    ) { nav ->
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
         composable<CompanyQuotesTab> { BellScreen("Quotes") { CompanyQuotesScreen() } }
@@ -165,6 +176,24 @@ fun CompanyShell(approved: Boolean) {
         composable<CredentialGuideRoute> { CredentialGuideScreen { nav.popBackStack() } }
         composable<PlanRoute> { entry -> PlanPickerScreen(entry.toRoute<PlanRoute>().area) { nav.popBackStack() } }
         bookerDestinations(nav)
+    }
+}
+
+/// A non-job notification's destination (web `lib/notificationRoute.js`):
+/// new job near you → the feed (composer open for that job), quote
+/// released → My quotes, payout sent / payouts set up → Payouts. Tabs are
+/// switched the way the bar switches them.
+fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget) {
+    fun tab(route: Any) = nav.navigate(route) {
+        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+    when (target) {
+        is PushTarget.Opportunities -> { PendingOpportunity.code = target.jobCode; tab(CompanyOpportunitiesTab) }
+        PushTarget.Quotes -> tab(CompanyQuotesTab)
+        PushTarget.Payouts -> nav.navigate(PayoutsRoute)
+        is PushTarget.Job -> {}
     }
 }
 

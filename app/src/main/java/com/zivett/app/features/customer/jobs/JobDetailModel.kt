@@ -270,8 +270,6 @@ class JobDetailModel(
             else client.send(area.review(jobId, rating, trimmed)).review
             job?.let { state = Loadable.Loaded(it.copy(review = review)) }
             toast = "Thanks — your review helps keep pros accountable"
-            // A 5-star review auto-closes the job server-side.
-            if (rating == 5) load()
             return true
         } catch (error: ApiError) {
             toast = error.first("rating") ?: error.first("comment") ?: error.userMessage

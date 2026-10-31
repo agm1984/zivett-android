@@ -73,6 +73,11 @@ data class OpportunitiesResponse(
     /// False only on the stripe driver before Connect onboarding — the
     /// composer warns up front instead of letting the submit 422.
     val payoutsReady: Boolean? = null,
+    /// "Quoted by your team" (2026-10-29): the org's pending quotes (with
+    /// `job` + `submitted_by`) on jobs still in the quote window. Quoting
+    /// takes a job off `opportunities` for the whole org, so these say
+    /// where it went. Absent on older servers.
+    val quoted: List<Quote> = emptyList(),
 ) {
     @Serializable data class Leads(val limit: Int? = null, val remaining: Int? = null)
 }
@@ -454,4 +459,6 @@ object CompanyEndpoints {
     fun invite(email: String) = ApiRequest.empty(Method.POST, "api/company/team/invitations", mapOf("email" to email))
     fun revoke(invitationId: Int) = ApiRequest.empty(Method.DELETE, "api/company/team/invitations/$invitationId")
     fun updateMember(id: Int, body: MemberBody) = ApiRequest.patch<MemberResponse, MemberBody>("api/company/team/members/$id", body)
+    /// "Remove from team" — 204; 422 naming the open jobs whose crew they're still on.
+    fun removeMember(id: Int) = ApiRequest.empty(ApiRequest.Method.DELETE, "api/company/team/members/$id")
 }

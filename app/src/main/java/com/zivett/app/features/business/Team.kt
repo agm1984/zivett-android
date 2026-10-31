@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +49,8 @@ import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBodyStrong
 import com.zivett.app.design.ZButton
+import com.zivett.app.design.ZButtonStyle
+import com.zivett.app.design.ZDivider
 import com.zivett.app.design.ZCaption
 import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZLabel
@@ -66,6 +70,7 @@ import com.zivett.app.design.ZToggleRow
 import com.zivett.app.design.ZTone
 import com.zivett.app.design.ZTopBar
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 /// Shared team page (business + company): roster, invitations, invite by
 /// email, edit member. Your own row edits your name (and, for companies,
@@ -107,6 +112,32 @@ class TeamModel(private val client: ApiClient, val area: TeamArea) {
         catch (e: Exception) { toast = e.userMessage } finally { busy = false }
         return false
     }
+
+    /// "Remove from team": off the roster for good (the server keeps the
+    /// user row, deactivated). null = removed; otherwise the server's
+    /// sentence for the confirm dialog — e.g. still on an open job's crew.
+    suspend fun remove(member: Team.Member): String? {
+        busy = true
+        try {
+            client.send(area.removeMember(member.id))
+            state.value?.let { state = Loadable.Loaded(it.copy(members = it.members.filter { m -> m.id != member.id })) }
+            toast = "${member.name} removed from the team"
+            return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return e.userMessage
+        } finally {
+            busy = false
+        }
+    }
+
+    companion object {
+        /// Deactivated teammates sit behind "Show deactivated (N)" so the
+        /// active team reads cleanly; removed ones never arrive at all.
+        fun visibleMembers(members: List<Team.Member>, showDeactivated: Boolean): List<Team.Member> =
+            if (showDeactivated) members else members.filter { it.status != "deactivated" }
+    }
 }
 
 @Composable
@@ -119,6 +150,9 @@ fun TeamScreen(area: TeamArea, onBack: (() -> Unit)?) {
     var inviteEmail by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<Team.Member?>(null) }
     var photoFor by remember { mutableStateOf<Team.Member?>(null) }
+    var removing by remember { mutableStateOf<Team.Member?>(null) }
+    var removeError by remember { mutableStateOf<String?>(null) }
+    var showDeactivated by remember { mutableStateOf(false) }
     LaunchedEffect(model) { model.load() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -144,7 +178,9 @@ fun TeamScreen(area: TeamArea, onBack: (() -> Unit)?) {
                             }
                         }
                         ZSectionHeader("Members")
-                        for (member in team.members) {
+                        val deactivatedCount = team.members.count { it.status == "deactivated" }
+                        if (deactivatedCount > 0) ZToggleRow("Show deactivated ($deactivatedCount)", null, showDeactivated, { showDeactivated = it })
+                        for (member in TeamModel.visibleMembers(team.members, showDeactivated)) {
                             ZCard(padding = ZSpacing.sm) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
                                     ZPhotoAvatar(member.photoUrl, initialsOf(member.name), 36.dp)
@@ -190,11 +226,38 @@ fun TeamScreen(area: TeamArea, onBack: (() -> Unit)?) {
         }
     }
 
-    editing?.let { member -> EditMemberSheet(member, model, editingSelf = member.id == environment.session.user?.id) { editing = null } }
+    editing?.let { member ->
+        EditMemberSheet(member, model, editingSelf = member.id == environment.session.user?.id, onRemove = {
+            // The sheet closes first so only one dialog is ever open.
+            editing = null; removeError = null; removing = member
+        }) { editing = null }
+    }
+
+    removing?.let { member ->
+        val first = member.firstName.ifBlank { "They" }
+        AlertDialog(
+            onDismissRequest = { if (!model.busy) removing = null },
+            title = { Text("Remove ${member.name} from the team?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                    Text("$first will be signed out and can no longer log in to ${model.state.value?.organization?.name ?: "your account"}. They'll disappear from your team list.")
+                    Text("Jobs, quotes and messages they worked on stay on record. If you only need to pause their access, set them to Deactivated instead — you can reactivate them later.")
+                    if (area.kind == JobArea.Kind.COMPANY) Text("Anyone still on an open job's crew has to be swapped off in that job's crew picker first.")
+                    removeError?.let { Text(it, color = colors.danger) }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !model.busy, onClick = {
+                    scope.launch { val error = model.remove(member); if (error == null) removing = null else removeError = error }
+                }) { Text("Remove from team", color = colors.danger) }
+            },
+            dismissButton = { TextButton(enabled = !model.busy, onClick = { removing = null }) { Text("Keep them") } },
+        )
+    }
 }
 
 @Composable
-private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: Boolean, onDismiss: () -> Unit) {
+private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: Boolean, onRemove: () -> Unit, onDismiss: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val scope = rememberCoroutineScope()
     val isCompany = model.area.kind == JobArea.Kind.COMPANY
@@ -224,7 +287,7 @@ private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: 
         // Field tech vs office staff: steers who won jobs get auto-assigned
         // to. Not a permission, so it's editable on your own row too.
         if (isCompany) {
-            ZToggleRow("Takes jobs", "Won jobs are auto-assigned to teammates who go out on site. Turn this off for office staff — you can still assign them by hand.", takesJobs, { takesJobs = it })
+            ZToggleRow("Takes jobs", "Won jobs are auto-assigned to teammates who go out on site. Turn this off for office staff — auto-assign skips them, but you can still put them on a job yourself from the job's page (the Assigned tech card's Reassign link, or Start job).", takesJobs, { takesJobs = it })
         }
         ZButton("Save", loading = model.busy) {
             scope.launch {
@@ -234,6 +297,14 @@ private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: 
                     onDismiss()
                 }
             }
+        }
+        // Kept apart from Save: leaving the team is permanent from the
+        // org's side, so it gets its own confirm.
+        if (!editingSelf) {
+            ZDivider(Modifier.padding(vertical = ZSpacing.xs))
+            ZBodyStrong("Remove from team")
+            ZCaption("They lose access and drop off this list for good. Their past jobs and quotes stay on record.")
+            ZButton("Remove ${member.firstName.ifBlank { "teammate" }}…", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy, onClick = onRemove)
         }
     }
 }

@@ -221,4 +221,6 @@ object BusinessEndpoints {
     fun revoke(invitationId: Int) = ApiRequest.empty(Method.DELETE, "api/business/team/invitations/$invitationId")
     // Business orgs don't assign jobs — `takes_jobs` is stripped here.
     fun updateMember(id: Int, body: MemberBody) = ApiRequest.patch<MemberResponse, MemberBody>("api/business/team/members/$id", body.copy(takesJobs = null))
+    /// "Remove from team" — 204; 422 with the server's sentence (yourself).
+    fun removeMember(id: Int) = ApiRequest.empty(ApiRequest.Method.DELETE, "api/business/team/members/$id")
 }

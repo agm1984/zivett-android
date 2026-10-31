@@ -91,8 +91,17 @@ import com.zivett.app.features.shared.IntakeChips
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.MoneyRow
 import com.zivett.app.features.shared.PhotoGrid
+import com.zivett.app.features.shared.LocalNavBadges
+import com.zivett.app.features.shared.NavBadgesModel
+import com.zivett.app.features.shared.ViewingNavBadge
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+/// A "New … job near you" tap parks the job's code here; the feed opens
+/// its quote composer once loaded (web `?job=CODE`). Consumed once.
+object PendingOpportunity {
+    var code: String? by mutableStateOf(null)
+}
 
 class OpportunitiesModel(private val client: ApiClient) {
     var state by mutableStateOf<Loadable<OpportunitiesResponse>>(Loadable.Loading)
@@ -131,6 +140,8 @@ class OpportunitiesModel(private val client: ApiClient) {
             client.send(CompanyEndpoints.quote(job.id, body))
             state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
             toast = "Quote sent to ZiVETT for ${job.code ?: "the job"} — track it under My quotes"
+            // Refetch so the job reappears under "Quoted by your team".
+            runCatching { load() }
             return null
         } catch (error: ApiError) {
             if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) {
@@ -165,6 +176,21 @@ fun OpportunitiesScreen() {
     var quoting by remember { mutableStateOf<Job?>(null) }
     var sentToStripe by remember { mutableStateOf(false) }
     LaunchedEffect(model) { model.load() }
+    // Opening the feed clears its "new since you looked" tab badge.
+    ViewingNavBadge(NavBadgesModel.OPPORTUNITIES)
+    // A live notification (a teammate's quote, a new booking) refetches —
+    // event-driven, like the web's `lastReceived` watch.
+    val liveEvents = LocalNavBadges.current?.liveEvents ?: 0
+    LaunchedEffect(liveEvents) { if (liveEvents > 0) model.load() }
+    // A push for one job: open its composer once the feed has it.
+    val pendingCode = PendingOpportunity.code
+    val loadedFeed = model.state.value
+    LaunchedEffect(pendingCode, loadedFeed) {
+        val code = pendingCode ?: return@LaunchedEffect
+        val feed = loadedFeed ?: return@LaunchedEffect
+        PendingOpportunity.code = null
+        feed.opportunities.firstOrNull { it.code == code }?.let { quoting = it }
+    }
     LifecycleResumeEffect(sentToStripe) {
         if (sentToStripe) { sentToStripe = false; scope.launch { model.load() } }
         onPauseOrDispose { }
@@ -183,10 +209,11 @@ fun OpportunitiesScreen() {
                         val remaining = feed.leads.remaining ?: 0
                         ZBanner(if (remaining == 0) "You've used all $limit of your leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
                     }
-                    if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
+                    if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, if (feed.quoted.isNotEmpty()) "No new opportunities right now" else "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
                     for (job in feed.opportunities) {
                         OpportunityCard(job, feed.commissionBps, busy = model.actingOnId == job.id, quote = { quoting = job }, decline = { scope.launch { model.decline(job) } })
                     }
+                    if (feed.quoted.isNotEmpty()) QuotedByTeam(feed.quoted, environment.session.user?.id) { openCompanyTarget(nav, com.zivett.app.core.push.PushTarget.Quotes) }
                     Spacer(Modifier.padding(ZSpacing.lg))
                 }
             }
@@ -204,6 +231,25 @@ fun OpportunitiesScreen() {
             saveRate = if (isAdmin) ({ cents -> model.saveRate(job.category.id, cents) }) else null,
             onDismiss = { quoting = null },
         ) { body -> model.submitQuote(job, body) }
+    }
+}
+
+/// Jobs a teammate already quoted: one quote per company, so they're off
+/// the list above — but never silently gone (web review #20). Who sent
+/// it, for how much, where it sits; a tap opens My quotes.
+@Composable
+private fun QuotedByTeam(quotes: List<Quote>, userId: Int?, openQuotes: () -> Unit) {
+    val now = java.time.Instant.now()
+    Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs), modifier = Modifier.padding(top = ZSpacing.sm)) {
+        ZHeadline("Quoted by your team")
+        ZCaption("Your company has quoted these — one quote per job. Revise or withdraw it from My quotes.")
+        for (quote in quotes) {
+            ZCard(onClick = openQuotes) {
+                ZBodyStrong(quote.job?.title ?: "Job", maxLines = 2)
+                ZBody("Quoted by ${CompanyQuotesLogic.quotedBy(quote, userId)} — ${Money.format(quote.amountCents)}", tone = ZTextTone.SOFT)
+                ZCaption(listOfNotNull(CompanyQuotesLogic.waitingState(quote), quote.createdAt?.let { CompanyQuotesLogic.sentAgo(it, now) }, quote.job?.code).joinToString(" · "), tone = ZTextTone.FAINT)
+            }
+        }
     }
 }
 

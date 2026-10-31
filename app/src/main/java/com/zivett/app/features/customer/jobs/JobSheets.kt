@@ -31,6 +31,7 @@ import com.zivett.app.core.models.CustomerEndpoints
 import com.zivett.app.core.models.Dispute
 import com.zivett.app.core.models.Invoice
 import com.zivett.app.core.models.Job
+import com.zivett.app.core.models.JobArea
 import com.zivett.app.core.models.Quote
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.payments.StripeBridge
@@ -76,6 +77,9 @@ import kotlinx.coroutines.launch
 /// the "You're booked" success state in place.
 @Composable
 fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: () -> Unit) {
+    // The web's wording (2026-10-29): never a "hold" — nothing is
+    // charged until the job closes, on either payment driver.
+    val noun = if (model.area.kind == JobArea.Kind.BUSINESS) "request" else "job"
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -123,7 +127,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                 Icon(Icons.Filled.Verified, contentDescription = null, tint = colors.brandGold, modifier = Modifier.padding(0.dp))
                 ZMono("Quote accepted")
                 ZDisplay("Your ZiVETT Pro is on the way")
-                ZBody(if (stripe) "Your card is saved for the ${Money.format(current.holdCents)} total — it's only charged once the work is done and you close the job." else "We placed a ${Money.format(current.holdCents)} hold on your card — you pay only when the job is done and you close it.", tone = ZTextTone.SOFT)
+                ZBody(if (stripe) "Your card is saved for the ${Money.format(current.holdCents)} total — it's only charged once the work is done and you close the $noun." else "Nothing is charged now — the ${Money.format(current.holdCents)} total is paid only when the work is done and you close the $noun.", tone = ZTextTone.SOFT)
                 val date = current.date
                 if (date != null) ZBanner("Arriving ${JobPresentation.arrivalLabel(date, current.window)}", tone = ZTone.INFO)
                 else ZCaption("No fixed arrival time — arrange timing in the message thread right on this page.")
@@ -175,8 +179,8 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                         preview.pstCents?.takeIf { it > 0 }?.let { MoneyRow("PST", it) }
                         preview.referralCreditCents?.takeIf { it > 0 }?.let { MoneyRow("Referral credit", -it, color = colors.success) }
                         ZDivider()
-                        MoneyRow(if (stripe) "Total at closure" else "Held on your card", preview.totalCents ?: quote.amountCents, strong = true)
-                        ZCaption(if (stripe) "Nothing is charged now — your card is saved and only charged when the job is done and you close it." else "A hold, not a charge — you pay only when the job is done and you close it.")
+                        MoneyRow("Total when you close the $noun", preview.totalCents ?: quote.amountCents, strong = true)
+                        ZCaption(if (stripe) "Nothing is charged now — your card is saved and only charged when the job is done and you close it." else "Nothing is charged now — you pay only when the job is done and you close it.")
                     }
                 }
 

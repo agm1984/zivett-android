@@ -45,6 +45,7 @@ import com.zivett.app.core.models.JobRefEndpoints
 import com.zivett.app.core.models.NotificationArea
 import com.zivett.app.core.models.NotificationFeed
 import com.zivett.app.core.network.ApiClient
+import com.zivett.app.core.push.PushTarget
 import com.zivett.app.core.realtime.RealtimeEvents
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZBody
@@ -151,7 +152,7 @@ fun NotificationBell(unread: Int, dark: Boolean = false, onClick: () -> Unit) {
 
 /// The inbox screen: rows, mark-all-read, tap → the area's job.
 @Composable
-fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openJob: (Int) -> Unit) {
+fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openTarget: (PushTarget) -> Unit = {}, openJob: (Int) -> Unit) {
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
 
@@ -169,7 +170,9 @@ fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openJob: 
                         ZCard(padding = ZSpacing.sm, onClick = {
                             scope.launch {
                                 model.markRead(notification)
-                                val ref = notification.jobRef ?: return@launch
+                                val target = notification.target ?: return@launch
+                                if (target !is PushTarget.Job) { openTarget(target); return@launch }
+                                val ref = target.ref
                                 val id = model.resolveJobId(ref) ?: return@launch
                                 openJob(id)
                             }

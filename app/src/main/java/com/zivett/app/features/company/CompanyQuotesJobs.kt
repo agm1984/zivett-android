@@ -147,7 +147,7 @@ fun CompanyQuotesScreen() {
 
                         ZHeadline("Past quotes", modifier = Modifier.padding(top = ZSpacing.sm))
                         if (settled.isEmpty()) {
-                            ZCaption("Quotes the booker has decided on land here — won, not chosen, or the job was cancelled.")
+                            ZCaption("Quotes land here once the booker decides — accepted ones open their job.")
                         } else {
                             val filters = CompanyQuotesLogic.Filter.entries
                             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -159,9 +159,9 @@ fun CompanyQuotesScreen() {
                             val shown = CompanyQuotesLogic.past(response.quotes, filter, query)
                             if (shown.isEmpty()) ZCaption("No past quotes match.")
                             for (quote in shown) {
-                                val won = CompanyQuotesLogic.outcome(quote) == CompanyQuotesLogic.Outcome.WON
+                                val accepted = CompanyQuotesLogic.outcome(quote) == CompanyQuotesLogic.Outcome.ACCEPTED
                                 val jobId = quote.job?.id
-                                PastQuoteRow(quote, onClick = if (won && jobId != null) ({ nav.navigate(CompanyJobRoute(jobId)) }) else null)
+                                PastQuoteRow(quote, onClick = if (accepted && jobId != null) ({ nav.navigate(CompanyJobRoute(jobId)) }) else null)
                             }
                         }
                     }
@@ -232,7 +232,7 @@ private fun WaitingQuoteCard(quote: Quote, commissionBps: Int, now: Instant, onR
         quote.proposedDate?.let { ZCaption("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", tone = ZTextTone.SOFT) }
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
             ZBadge(CompanyQuotesLogic.waitingState(quote), if (quote.job?.quotesReleased == true) ZTone.INFO else ZTone.NEUTRAL)
-            quote.createdAt?.let { ZCaption(CompanyQuotesLogic.sentAgo(it, now), tone = ZTextTone.FAINT) }
+            quote.createdAt?.let { ZCaption(CompanyQuotesLogic.sentAgo(it, now) + (quote.submittedBy?.let { by -> " by ${by.name}" } ?: ""), tone = ZTextTone.FAINT) }
         }
         if (CompanyQuotesLogic.canRevise(quote)) {
             ZButton("Revise", compact = true, fullWidth = false, onClick = onRevise)
@@ -240,7 +240,7 @@ private fun WaitingQuoteCard(quote: Quote, commissionBps: Int, now: Instant, onR
     }
 }
 
-/// A settled quote — compact; only a won row opens its job.
+/// A settled quote — compact; only an accepted row opens its job.
 @Composable
 private fun PastQuoteRow(quote: Quote, onClick: (() -> Unit)?) {
     val outcome = CompanyQuotesLogic.outcome(quote) ?: return
@@ -255,7 +255,7 @@ private fun PastQuoteRow(quote: Quote, onClick: (() -> Unit)?) {
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(Money.format(quote.amountCents), style = ZType.bodyStrong.copy(fontFeatureSettings = "tnum"), color = ZTheme.colors.ink)
-                ZBadge(outcome.label, if (outcome == CompanyQuotesLogic.Outcome.WON) ZTone.SUCCESS else ZTone.NEUTRAL)
+                ZBadge(outcome.label, if (outcome == CompanyQuotesLogic.Outcome.ACCEPTED) ZTone.SUCCESS else ZTone.NEUTRAL)
             }
         }
     }
