@@ -356,6 +356,12 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () ->
                             Text(job.title, style = ZType.title, color = Color.White)
                             Text(listOfNotNull(job.code, JobPresentation.modeMeta(job.mode).label, job.address, job.unit, job.scheduledDate?.let { JobPresentation.windowSlot(it, job.scheduledWindow) }).joinToString(" · "), style = ZType.caption, color = Color.White.copy(alpha = 0.75f))
                         }
+                        // Tap-to-call while the tech is on the road or on site.
+                        if (CompanyPresentation.callsUpFront(job)) {
+                            ZButton("Call ${job.customerName?.substringBefore(' ')?.ifBlank { null } ?: "customer"}", compact = true, fullWidth = false) {
+                                CompanyPresentation.callUri(job.customer?.phone)?.let { openUrl(context, it) }
+                            }
+                        }
 
                         // Open support cases lead — they're why the payout is frozen.
                         SupportCaseCards(job, JobPresentation.CaseSide.COMPANY)
@@ -443,6 +449,9 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () ->
                         ZCard {
                             ZMono("Customer")
                             ZBodyStrong(job.customerName ?: "Customer")
+                            job.customer?.phone?.let { phone ->
+                                CompanyPresentation.callUri(phone)?.let { uri -> ZTextAction(phone) { openUrl(context, uri) } }
+                            }
                             ZCaption(listOfNotNull(job.address, job.tenant).joinToString(" · "))
                             Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                                 if (job.lat != null && job.lng != null) ZButton("Get directions", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { openUrl(context, "https://www.google.com/maps/dir/?api=1&destination=${job.lat},${job.lng}") }

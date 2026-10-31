@@ -64,6 +64,23 @@ class PlanShelfTest {
         assertEquals(PlanShelf.Mode.BILLED_ELSEWHERE, PlanShelf.mode(companyShelf(provider = "app_store", webTermPaid = false)))
     }
 
+    @Test fun freePlanWithAnAccountFeeSaysWhatItCosts() {
+        val companyBasic = SubscriptionResponse.Plan(1, "basic", "Basic", 0, 0, sortOrder = 1, connectFeeCents = 200)
+
+        val card = PlanShelf.cards(
+            companyShelf().copy(plans = listOf(companyBasic)),
+            mapOf(BASIC to basicProduct),
+        ).first()
+        // Free means chosen through our API, whatever the store still lists.
+        assertNull(card.productId)
+        assertEquals("No plan fee", PlanShelf.freeHeadline(companyBasic))
+        assertEquals("$2.00/month payout account fee, only in months you're paid", PlanShelf.freeDetail(companyBasic))
+
+        val businessBasic = SubscriptionResponse.Plan(2, "business_basic", "Basic", 0, 0, sortOrder = 1)
+        assertEquals("Free", PlanShelf.freeHeadline(businessBasic))
+        assertEquals("Nothing to pay", PlanShelf.freeDetail(businessBasic))
+    }
+
     @Test fun defaultBasicIsNotAChoice() {
         assertFalse(PlanShelf.hasChosen(companyShelf()))
         assertTrue(PlanShelf.hasChosen(companyShelf(changedAt = Instant.EPOCH)))
@@ -75,10 +92,10 @@ class PlanShelfTest {
         assertEquals(listOf("Basic", "Pro", "Elite"), cards.map { it.plan.name })
         assertFalse(cards[0].isCurrent) // defaulted, not chosen
         assertEquals(listOf("$29.99/year"), cards[0].options.map { it.price })
-        assertEquals("Billed once a year", cards[0].options[0].detail) // no monthly = no per-month anchor
+        assertEquals("Paid upfront for the year · yearly only", cards[0].options[0].detail) // no monthly = no per-month anchor
         assertEquals(listOf("$57.99/month", "$576.99/year"), cards[1].options.map { it.price })
         assertEquals("Billed monthly · cancel anytime", cards[1].options[0].detail)
-        assertEquals("Billed once a year · works out to $48.08/month · save 17%", cards[1].options[1].detail)
+        assertEquals("Paid upfront for the year · works out to $48.08/month · save 17%", cards[1].options[1].detail)
         // Play didn't return Elite: shown, not buyable.
         assertFalse(cards[2].available)
     }

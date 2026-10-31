@@ -165,16 +165,29 @@ its own `OpeningsSerializer` (drops undecodable rows).
 
 Contract: `docs/mobile-api.md` "My quotes". `CompanyQuotesScreen`
 (`features/company/CompanyQuotesJobs.kt`) is a summary line ("N out · $X
-in play · N won in the last 30 days") over **Waiting on a decision**
+in play · N accepted in the last 30 days") over **Waiting on a decision**
 (rich cards: booker photos, trade + code, price + "You keep ≈", "Can
 arrive …", the release state + "Sent N days ago"; Revise is the one
 button and shows only while `job.quotes_released` is false — the PATCH
 422s after; Withdraw sits in the More menu with its confirm) and **Past
-quotes** (Won / Not chosen / Job cancelled, decided date, price; All · Won
-· Not chosen + a title/code search; only Won rows open `CompanyJobRoute`).
+quotes** (Accepted / Declined / Job cancelled — never Won / Not chosen,
+Damon's review #12; decided date, price; All · Accepted · Declined + a
+title/code search; only Accepted rows open `CompanyJobRoute`).
 All derivation is pure in `CompanyQuotesLogic` (`CompanyQuotesLogicTest`).
 `decided_at`, `job.status` (a string) and `job.quotes_released` decode
 with defaults, so an older server reads as "not released, undated".
+
+## Review pass (2026-10-29)
+
+Reviews only on closed jobs (`JobStatus.reviewable`; a review never
+closes or charges). Nav badges: `features/shared/NavBadges.kt`
+(`NavBadgesModel` per shell via `RoleShell(navBadges =)` →
+`LocalNavBadges`; `ViewingNavBadge(key)` marks a "since you looked" badge
+seen while its screen shows). Notification taps resolve through
+`PushTarget` (`PushRouting.target` / `AppNotification.target`) — job
+routes open the job, `company.opportunities|quotes|payouts` open
+`openCompanyTarget`; add a case there for any new non-job route. Details
+in PARITY.md "Review pass port".
 
 ## Layout
 

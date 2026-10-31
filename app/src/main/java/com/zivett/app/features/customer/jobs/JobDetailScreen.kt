@@ -165,7 +165,7 @@ private fun JobDetailContent(job: Job, model: JobDetailModel, area: JobArea, onS
         // Ordering mirrors `mainOrder` on the web: what matters most
         // for this phase leads.
         when (phase) {
-            JobPresentation.Phase.DECIDING -> { QuotesCard(job, onSheet); PriceCard(job); StatusCard(job, area); ProCard(job, area, onSheet); DetailsCard(job, model, onAddPhotos) }
+            JobPresentation.Phase.DECIDING -> { QuotesCard(job, area, onSheet); PriceCard(job); StatusCard(job, area); ProCard(job, area, onSheet); DetailsCard(job, model, onAddPhotos) }
             JobPresentation.Phase.WORKING -> { StatusCard(job, area); ProCard(job, area, onSheet); PropertyCard(job, area); ChangeOrders(job, model); PriceCard(job); DetailsCard(job, model, onAddPhotos) }
             JobPresentation.Phase.SETTLING -> { InvoiceCard(job, model, area, onSheet); ReviewCard(job, onSheet); StatusCard(job, area); ProCard(job, area, onSheet); ChangeOrders(job, model); EvidenceCard(job); DetailsCard(job, model, onAddPhotos) }
             JobPresentation.Phase.RECORD -> { StatusCard(job, area); InvoiceCard(job, model, area, onSheet); ReviewCard(job, onSheet); EvidenceCard(job); ProCard(job, area, onSheet); DetailsCard(job, model, onAddPhotos) }
@@ -217,7 +217,7 @@ private fun StatusCard(job: Job, area: JobArea) {
 }
 
 @Composable
-private fun QuotesCard(job: Job, onSheet: (JobSheet) -> Unit) {
+private fun QuotesCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
     val open = if (job.company == null) job.pendingQuotes else emptyList()
     if (open.isEmpty()) return
     ZCard {
@@ -228,6 +228,9 @@ private fun QuotesCard(job: Job, onSheet: (JobSheet) -> Unit) {
             val showReviews: (() -> Unit)? = if (company?.id != null) ({ onSheet(JobSheet.Reviews(company.id, company.name)) }) else null
             QuoteRow(i + 1, quote, showReviews) { onSheet(JobSheet.Accept(quote)) }
         }
+        // "Accept — $150" reads like a checkout button; say plainly that
+        // accepting isn't paying (Damon's review #40).
+        ZCaption("You won't be charged when you accept — you pay once the ${if (area.kind == JobArea.Kind.BUSINESS) "work" else "job"} is done and you close it.")
     }
 }
 
@@ -385,6 +388,9 @@ private fun InvoiceCard(job: Job, model: JobDetailModel, area: JobArea, onSheet:
         } else if (!invoice.isPaid && job.status != JobStatus.CANCELLED) {
             ZActionBand("Pay & close — ${Money.format(invoice.amountDueCents)}", loading = model.busy) { onSheet(JobSheet.Pay) }
             job.autoCloseAt?.let { ZCaption("Payment releases automatically on ${Dates.shortTime(it)} unless you report an issue first.") }
+            // Pay first, then rate — the review card appears only once
+            // the job is closed (JobStatus.reviewable).
+            ZCaption("Once it's paid, you can rate ${job.company?.name ?: "your pro"}.")
         }
     }
 }

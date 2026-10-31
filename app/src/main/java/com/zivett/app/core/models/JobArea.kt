@@ -172,17 +172,20 @@ class TeamArea(
     val invite: (String) -> ApiRequest<Unit>,
     val revoke: (Int) -> ApiRequest<Unit>,
     val updateMember: (Int, MemberBody) -> ApiRequest<MemberResponse>,
+    /// `DELETE .../team/members/{id}` (2026-10-29): off the roster for good.
+    val removeMember: (Int) -> ApiRequest<Unit>,
     /// Company-only: teammate photos are the assigned-tech trust signal.
     val uploadMemberPhoto: ((Int, ByteArray) -> ApiRequest<ProfilePhotoResponse>)? = null,
 ) {
     companion object {
-        val business = TeamArea(JobArea.Kind.BUSINESS, { BusinessEndpoints.team() }, { BusinessEndpoints.invite(it) }, { BusinessEndpoints.revoke(it) }, { id, body -> BusinessEndpoints.updateMember(id, body) })
+        val business = TeamArea(JobArea.Kind.BUSINESS, { BusinessEndpoints.team() }, { BusinessEndpoints.invite(it) }, { BusinessEndpoints.revoke(it) }, { id, body -> BusinessEndpoints.updateMember(id, body) }, { BusinessEndpoints.removeMember(it) })
         val company = TeamArea(
             JobArea.Kind.COMPANY,
             { CompanyEndpoints.team() },
             { CompanyEndpoints.invite(it) },
             { CompanyEndpoints.revoke(it) },
             { id, body -> CompanyEndpoints.updateMember(id, body) },
+            { CompanyEndpoints.removeMember(it) },
             uploadMemberPhoto = { id, jpeg -> CompanyEndpoints.uploadMemberPhoto(id, jpeg) },
         )
 

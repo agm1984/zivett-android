@@ -29,9 +29,11 @@ data class SubscriptionResponse(
         val blurb: String? = null,
         val sortOrder: Int = 0,
         val features: List<String> = emptyList(),
+        /// The monthly payout account fee. Absent on older servers.
+        val connectFeeCents: Int = 0,
     ) {
-        /// Business Basic: nothing to buy, so it's chosen through our own
-        /// API, never Google Play.
+        /// Company and Business Basic: nothing to buy, so it's chosen
+        /// through our own API, never Google Play.
         val isFree: Boolean get() = priceCents == 0 && yearlyPriceCents == 0
     }
 
@@ -86,7 +88,7 @@ object SubscriptionEndpoints {
     fun googlePlayPurchase(area: String, productId: String, purchaseToken: String) =
         ApiRequest.post<SubscriptionResponse, GooglePlayBody>("api/$area/subscription/google-play", GooglePlayBody(productId, purchaseToken))
 
-    /// Free plans only (Business Basic) — anything priced is sold through
+    /// Free plans only (the Basic tiers) — anything priced is sold through
     /// Google Play in the app.
     fun chooseFree(area: String, planId: Int) =
         ApiRequest.post<SubscriptionResponse, ChooseBody>("api/$area/subscription", ChooseBody(planId, "yearly"))

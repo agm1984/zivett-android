@@ -75,6 +75,8 @@ import com.zivett.app.features.plans.PlanPickerScreen
 import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.RoleShell
 import com.zivett.app.features.shared.shellTab
+import com.zivett.app.features.shared.NavBadgesModel
+import com.zivett.app.features.shared.rememberNavBadges
 import kotlinx.coroutines.launch
 
 /// Business (property manager) shell: Overview · Requests · Book ·
@@ -85,15 +87,18 @@ import kotlinx.coroutines.launch
 @Composable
 fun BusinessShell() {
     val environment = LocalAppEnvironment.current
+    // No Messages tab here — the inbox opens from the top of Requests, so
+    // its unread thread count (`GET /api/nav-badges`) badges that tab.
+    val navBadges = rememberNavBadges()
     val tabs = listOf(
         shellTab(BusinessOverviewTab, "Overview", Icons.Filled.Home),
-        shellTab(BusinessRequestsTab, "Requests", Icons.Outlined.Work),
+        shellTab(BusinessRequestsTab, "Requests", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.MESSAGES) },
         shellTab(BusinessBookTab, "Book", Icons.Outlined.AddCircle),
         shellTab(BusinessPropertiesTab, "Properties", Icons.Outlined.Apartment),
         shellTab(BusinessAccountTab, "Account", Icons.Outlined.Person),
     )
 
-    RoleShell(tabs, NotificationArea.BUSINESS, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS)) }) { nav ->
+    RoleShell(tabs, NotificationArea.BUSINESS, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS)) }, navBadges = navBadges) { nav ->
         composable<BusinessOverviewTab> {
             val user = environment.session.user
             var gated by remember { mutableStateOf(false) }

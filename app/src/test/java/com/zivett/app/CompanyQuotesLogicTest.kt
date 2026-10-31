@@ -69,8 +69,8 @@ class CompanyQuotesLogicTest {
 
     @Test fun outcomesWordACancelledJob() {
         assertNull(CompanyQuotesLogic.outcome(quote(1)))
-        assertEquals(Outcome.WON, CompanyQuotesLogic.outcome(quote(1, QuoteStatus.ACCEPTED)))
-        assertEquals(Outcome.NOT_CHOSEN, CompanyQuotesLogic.outcome(quote(1, QuoteStatus.DECLINED, jobStatus = "accepted")))
+        assertEquals(Outcome.ACCEPTED, CompanyQuotesLogic.outcome(quote(1, QuoteStatus.ACCEPTED)))
+        assertEquals(Outcome.DECLINED, CompanyQuotesLogic.outcome(quote(1, QuoteStatus.DECLINED, jobStatus = "accepted")))
         assertEquals(Outcome.CANCELLED, CompanyQuotesLogic.outcome(quote(1, QuoteStatus.DECLINED, jobStatus = "cancelled")))
         assertEquals("Job cancelled", Outcome.CANCELLED.label)
     }
@@ -82,9 +82,9 @@ class CompanyQuotesLogicTest {
             quote(4, QuoteStatus.ACCEPTED, decided = ago(days = 31)),
             quote(5, QuoteStatus.DECLINED, decided = ago(days = 1)),
         )
-        assertEquals("2 out · $350.50 in play · 1 won in the last 30 days", CompanyQuotesLogic.summary(quotes, now))
+        assertEquals("2 out · $350.50 in play · 1 accepted in the last 30 days", CompanyQuotesLogic.summary(quotes, now))
         // Zero parts drop out.
-        assertEquals("1 won in the last 30 days", CompanyQuotesLogic.summary(quotes.drop(2), now))
+        assertEquals("1 accepted in the last 30 days", CompanyQuotesLogic.summary(quotes.drop(2), now))
         assertEquals("1 out · $200.00 in play", CompanyQuotesLogic.summary(quotes.take(1), now))
         assertNull(CompanyQuotesLogic.summary(emptyList(), now))
         // An older server sends no decided_at: the win can't be dated, so it isn't counted.
@@ -99,11 +99,11 @@ class CompanyQuotesLogicTest {
             quote(4, QuoteStatus.DECLINED, decided = ago(days = 3), title = "Tap swap", code = "Z-QQQ9"),
         )
         assertEquals(listOf(3, 4, 2), CompanyQuotesLogic.past(quotes, Filter.ALL, "").map { it.id })
-        assertEquals(listOf(2), CompanyQuotesLogic.past(quotes, Filter.WON, "").map { it.id })
-        assertEquals(listOf(3, 4), CompanyQuotesLogic.past(quotes, Filter.NOT_CHOSEN, "").map { it.id })
+        assertEquals(listOf(2), CompanyQuotesLogic.past(quotes, Filter.ACCEPTED, "").map { it.id })
+        assertEquals(listOf(3, 4), CompanyQuotesLogic.past(quotes, Filter.DECLINED, "").map { it.id })
         assertEquals(listOf(2), CompanyQuotesLogic.past(quotes, Filter.ALL, "  deck ").map { it.id })
         assertEquals(listOf(4), CompanyQuotesLogic.past(quotes, Filter.ALL, "qqq").map { it.id })
-        assertTrue(CompanyQuotesLogic.past(quotes, Filter.WON, "tap").isEmpty())
+        assertTrue(CompanyQuotesLogic.past(quotes, Filter.ACCEPTED, "tap").isEmpty())
         assertEquals(listOf(1), CompanyQuotesLogic.waiting(quotes).map { it.id })
     }
 

@@ -152,17 +152,21 @@ object ChecklistLogic {
     enum class StepState { DONE, CURRENT, TODO }
     data class Step(val label: String, val state: StepState, val time: String? = null)
 
-    /// The submitted-but-unclaimed dead zone (`HeroPending.vue`).
-    fun pendingSteps(quoteMode: Boolean): List<Step> = listOf(
+    /// The submitted-but-unclaimed dead zone (`HeroPending.vue`). Every
+    /// mode runs on quotes now: pros quote, ZiVETT checks them, and the
+    /// BOOKER picks one — the pro never "accepts" the job on their own.
+    fun pendingSteps(): List<Step> = listOf(
         Step("Request submitted", StepState.DONE, "now"),
-        Step(if (quoteMode) "Collecting quotes from pros" else "Finding your nearest pro", StepState.CURRENT),
-        Step(if (quoteMode) "You choose who does the work" else "Pro accepts and heads out", StepState.TODO),
+        Step("Pros send their quotes", StepState.CURRENT),
+        Step("You pick a quote", StepState.TODO),
+        Step("Your pro heads out", StepState.TODO),
     )
 
-    /// Deliberately vague where the system can't promise (`HeroPending.vue`).
+    /// Deliberately vague where the system can't promise: quotes pass
+    /// through ZiVETT's review before the booker sees them (`HeroPending.vue`).
     fun pendingExpectation(quoteMode: Boolean): String =
-        if (quoteMode) "Most quotes land within 24 hours. We'll notify you the moment one arrives."
-        else "We're matching your job with the nearest verified pro. Usually under two minutes."
+        if (quoteMode) "Most quotes land within 24 hours. We'll notify you the moment yours are ready."
+        else "Pros near you are quoting now. We check every quote and notify you the moment yours are ready."
 
     private val progressStages = listOf(JobStatus.ARRIVED to "Arrived on-site", JobStatus.IN_PROGRESS to "Repair in progress", JobStatus.COMPLETED to "Work complete")
 

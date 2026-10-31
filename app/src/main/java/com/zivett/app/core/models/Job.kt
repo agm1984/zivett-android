@@ -45,8 +45,10 @@ enum class JobStatus(val wire: String, val label: String) {
         /// `JobStatus::customerCancellable()`.
         val customerCancellable: Set<JobStatus> = setOf(SUBMITTED, MATCHED, ACCEPTED, EN_ROUTE, ARRIVED, IN_PROGRESS)
 
-        /// `JobStatus::reviewable()`.
-        val reviewable: Set<JobStatus> = setOf(COMPLETED, INVOICED, WARRANTY_ACTIVE, WARRANTY_EXPIRED)
+        /// `JobStatus::reviewable()` — closed jobs only: the review form
+        /// appears once the invoice is paid (Pay & close first, then rate),
+        /// and a review never closes or charges anything (2026-10-29).
+        val reviewable: Set<JobStatus> = setOf(WARRANTY_ACTIVE, WARRANTY_EXPIRED)
     }
 }
 
@@ -114,7 +116,11 @@ data class Quote(
     /// When a settled quote was accepted/declined; null while pending (and
     /// on older servers).
     val decidedAt: Instant? = null,
+    /// Company-side only: the teammate who sent it (2026-10-29, additive).
+    val submittedBy: Submitter? = null,
 ) {
+    @Serializable data class Submitter(val id: Int, val name: String)
+
     /// `Payments::bookerBreakdown()`.
     @Serializable
     data class AuthorizationPreview(
@@ -287,7 +293,12 @@ data class AssignedTech(val id: Int, val name: String, val photoUrl: String? = n
 data class PropertyRef(val id: Int, val name: String)
 
 @Serializable
-data class CustomerRef(val name: String)
+data class CustomerRef(
+    val name: String,
+    /// Only for the ASSIGNED company while the job is accepted →
+    /// warranty_active (2026-10-29) — the tap-to-call link.
+    val phone: String? = null,
+)
 
 @Serializable
 data class AvailabilityWindow(val date: String, val window: String)
@@ -330,6 +341,9 @@ data class Invoice(
     val trustFeeCents: Int? = null,
     val companyReferralCreditCents: Int? = null,
     val netCents: Int? = null,
+    /// The monthly payout account fee this invoice's payout carried. Not
+    /// included in `netCents`.
+    val connectFeeCents: Int = 0,
     val job: JobSummary? = null,
     val detail: Detail? = null,
 ) {
@@ -452,7 +466,22 @@ data class Message(
     val mine: Boolean = false,
     val read: Boolean = false,
     val createdAt: Instant? = null,
-)
+    /// Who's who in a thread (`App\Support\ThreadMessages`, 2026-10-29):
+    /// "Homeowner", "Coastline PM · Property manager", "ZiVETT support".
+    /// Absent on older servers.
+    val senderLabel: String? = null,
+) {
+    companion object {
+        /// The line above the first bubble of each run from someone else
+        /// ("Mike R. · Harbour Plumbing · Tech"); null inside a run and on
+        /// your own messages (web `MessageThread.vue` showsSender).
+        fun senderLine(messages: List<Message>, index: Int): String? {
+            val message = messages[index]
+            if (message.mine || messages.getOrNull(index - 1)?.senderId == message.senderId) return null
+            return listOfNotNull(message.sender.takeIf { it.isNotBlank() }, message.senderLabel?.takeIf { it.isNotBlank() }).joinToString(" · ").ifEmpty { null }
+        }
+    }
+}
 
 /// `CustomerAddressResource`.
 @Serializable
@@ -535,6 +564,11 @@ data class AppNotification(
             if (!(route.startsWith("customer.jobs") || route.startsWith("business.requests") || route.startsWith("company.jobs"))) return null
             return routeParams?.get("id")?.stringValue
         }
+
+    /// Where a tap leads — the job, or a company tab for the non-job
+    /// routes (`PushRouting.target`); null = a no-op tap.
+    val target: com.zivett.app.core.push.PushTarget?
+        get() = com.zivett.app.core.push.PushRouting.target(routeName) { key -> routeParams?.get(key)?.stringValue }
 }
 
 /// A route param that may arrive as a number (legacy rows) or a string

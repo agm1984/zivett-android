@@ -87,6 +87,11 @@ object AppEvents {
     /// `https://…/app/stripe-return` page). The company shell lands on
     /// the dashboard, which consumes it and re-checks payout status.
     var stripeReturned: Boolean by mutableStateOf(false)
+
+    /// Bumped whenever an FCM push arrives while the process is alive —
+    /// the nav badges re-read on it (a push can beat the socket, or arrive
+    /// while the socket naps).
+    var pushReceived: Int by mutableIntStateOf(0)
 }
 
 @Suppress("unused")

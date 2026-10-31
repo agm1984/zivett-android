@@ -58,6 +58,8 @@ import com.zivett.app.features.customer.notifications.NotificationsScreen
 import com.zivett.app.features.customer.notifications.rememberNotificationsModel
 import com.zivett.app.features.shared.RoleShell
 import com.zivett.app.features.shared.shellTab
+import com.zivett.app.features.shared.NavBadgesModel
+import com.zivett.app.features.shared.rememberNavBadges
 import kotlinx.coroutines.launch
 
 /// The customer tab bar: Home · Jobs · Book · Messages · Account.
@@ -68,16 +70,21 @@ fun CustomerShell() {
     // read the same home payload's `unread_messages` — `lib/nav.js` does
     // the equivalent on the web.
     val homeModel = remember { CustomerHomeModel(environment.client) }
+    // Unread THREADS (`GET /api/nav-badges`); an older server without the
+    // endpoint falls back to the home payload's message count.
+    val navBadges = rememberNavBadges()
 
     val tabs = listOf(
         shellTab(CustomerHomeTab, "Home", Icons.Filled.Home),
         shellTab(CustomerJobsTab, "Jobs", Icons.Outlined.Work),
         shellTab(CustomerBookTab, "Book", Icons.Outlined.AddCircle),
-        shellTab(CustomerMessagesTab, "Messages", Icons.AutoMirrored.Outlined.Chat) { homeModel.home?.unreadMessages ?: 0 },
+        shellTab(CustomerMessagesTab, "Messages", Icons.AutoMirrored.Outlined.Chat) {
+            if (NavBadgesModel.MESSAGES in navBadges.counts) navBadges.count(NavBadgesModel.MESSAGES) else homeModel.home?.unreadMessages ?: 0
+        },
         shellTab(CustomerAccountTab, "Account", Icons.Outlined.Person),
     )
 
-    RoleShell(tabs, NotificationArea.CUSTOMER, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER)) }) { nav ->
+    RoleShell(tabs, NotificationArea.CUSTOMER, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER)) }, navBadges = navBadges) { nav ->
         composable<CustomerHomeTab> { CustomerHomeScreen(homeModel) }
         composable<CustomerJobsTab> { JobsScreen() }
         composable<CustomerBookTab> { BookJobScreen() }
@@ -85,7 +92,7 @@ fun CustomerShell() {
             // Reading the inbox clears the count server-side; re-read when
             // the user leaves Messages so the badge follows.
             val reloadScope = androidx.compose.runtime.rememberCoroutineScope()
-            androidx.compose.runtime.DisposableEffect(Unit) { onDispose { reloadScope.launch { homeModel.load() } } }
+            androidx.compose.runtime.DisposableEffect(Unit) { onDispose { reloadScope.launch { homeModel.load() }; navBadges.refreshSoon() } }
             MessagesScreen()
         }
         composable<CustomerAccountTab> { AccountHomeScreen() }
@@ -136,7 +143,10 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     composable<NotificationsRoute> { entry ->
         val area = Areas.notificationArea(entry.toRoute<NotificationsRoute>().area)
         val model = rememberNotificationsModel(area)
-        NotificationsScreen(model, onBack = { nav.popBackStack() }) { id ->
+        NotificationsScreen(model, onBack = { nav.popBackStack() }, openTarget = { target ->
+            // Only company notifications point anywhere but a job.
+            if (area == NotificationArea.COMPANY) com.zivett.app.features.company.openCompanyTarget(nav, target)
+        }) { id ->
             when (area) {
                 NotificationArea.COMPANY -> nav.navigate(com.zivett.app.app.CompanyJobRoute(id))
                 NotificationArea.BUSINESS -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS))

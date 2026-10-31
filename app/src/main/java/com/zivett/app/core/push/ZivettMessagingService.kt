@@ -24,13 +24,16 @@ class ZivettMessagingService : FirebaseMessagingService() {
         val title = data["title"] ?: message.notification?.title ?: "ZiVETT"
         val body = data["body"] ?: message.notification?.body ?: ""
 
-        val ref = PushRouting.jobRef(data)
-        android.util.Log.d(PushRouting.LOG_TAG, "received keys=${data.keys} route=${data["route_name"]} ref=$ref id=${message.messageId}")
+        // Main thread: Compose state is written from there.
+        android.os.Handler(android.os.Looper.getMainLooper()).post { com.zivett.app.app.AppEvents.pushReceived++ }
+
+        val target = PushRouting.target(data)
+        android.util.Log.d(PushRouting.LOG_TAG, "received keys=${data.keys} route=${data["route_name"]} target=$target id=${message.messageId}")
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            ref?.let { ref ->
+            if (target != null) {
                 putExtra(PushRouting.EXTRA_ROUTE_NAME, data["route_name"])
-                putExtra(PushRouting.EXTRA_ROUTE_ID, ref)
+                PushRouting.paramKey(target)?.let { putExtra(PushRouting.EXTRA_ROUTE_ID, it) }
             }
         }
         val pending = PendingIntent.getActivity(this, message.messageId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

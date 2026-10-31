@@ -270,7 +270,7 @@ object JobPresentation {
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) {
             val why = if (job.status == JobStatus.ARRIVED || job.status == JobStatus.IN_PROGRESS) "Covers your pro's crew time on site so far." else "Your pro has already committed to this job."
-            return "$why The fee is charged to your payment hold when you confirm."
+            return "$why The fee is charged to your saved card when you confirm."
         }
         val n = job.pendingQuotes.size
         return "Cancelling is free right now, but it can't be undone — the $n pending ${if (n == 1) "quote" else "quotes"} on this job will be declined."

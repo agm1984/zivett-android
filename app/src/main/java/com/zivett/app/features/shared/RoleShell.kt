@@ -32,6 +32,7 @@ import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.models.JobRefEndpoints
 import com.zivett.app.core.models.NotificationArea
 import com.zivett.app.core.push.PendingPushOpen
+import com.zivett.app.core.push.PushTarget
 import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZType
@@ -60,6 +61,11 @@ fun RoleShell(
     /// Back from Stripe's Connect onboarding (`AppEvents.stripeReturned`).
     /// Only the approved-company shell has somewhere to take it.
     onStripeReturn: ((NavHostController) -> Unit)? = null,
+    /// Non-job notification targets (company opportunities / quotes /
+    /// payouts) from a tapped push. Job targets go through `onPushJob`.
+    onPushTarget: (NavHostController, PushTarget) -> Unit = { _, _ -> },
+    /// The shell's tab-bar counts, provided to its screens as `LocalNavBadges`.
+    navBadges: NavBadgesModel? = null,
     graph: NavGraphBuilder.(NavHostController) -> Unit,
 ) {
     val nav = rememberNavController()
@@ -81,12 +87,14 @@ fun RoleShell(
     // A tapped push: resolve the job's public code to its id through
     // the area's endpoint, then open it. Cold launches park the ref
     // before any shell exists; warm taps flip the same state.
-    val pending = PendingPushOpen.ref
+    val pending = PendingPushOpen.target
     val pushScope = rememberCoroutineScope()
     LaunchedEffect(pending) {
-        val ref = pending ?: return@LaunchedEffect
+        val target = pending ?: return@LaunchedEffect
         if (pushArea == null) return@LaunchedEffect
         PendingPushOpen.take()
+        val ref = (target as? PushTarget.Job)?.ref
+        if (ref == null) { onPushTarget(nav, target); return@LaunchedEffect }
         // Consuming the ref re-keys this effect to null, which cancels it —
         // so the lookup runs on the shell's own scope, not the effect's.
         pushScope.launch {
@@ -107,7 +115,7 @@ fun RoleShell(
         if (onStripeReturn != null) onStripeReturn(nav) else AppEvents.stripeReturned = false
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalNav provides nav) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalNav provides nav, LocalNavBadges provides navBadges) {
         Scaffold(
             containerColor = colors.cream,
             bottomBar = {

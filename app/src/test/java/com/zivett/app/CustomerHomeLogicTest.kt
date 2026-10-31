@@ -126,11 +126,12 @@ class HomeHeroLogicTest {
         Quote(id = id, amountCents = 10_000 + id, status = QuoteStatus.PENDING, company = CompanySummary(id = id, name = "Company $id", plan = "pro", rating = rating, count = count))
 
     @Test fun pendingStepsPhraseTheQuoteFlow() {
-        val steps = ChecklistLogic.pendingSteps(quoteMode = true)
-        assertEquals(listOf("Request submitted", "Collecting quotes from pros", "You choose who does the work"), steps.map { it.label })
-        assertEquals(listOf(ChecklistLogic.StepState.DONE, ChecklistLogic.StepState.CURRENT, ChecklistLogic.StepState.TODO), steps.map { it.state })
+        val steps = ChecklistLogic.pendingSteps()
+        assertEquals(listOf("Request submitted", "Pros send their quotes", "You pick a quote", "Your pro heads out"), steps.map { it.label })
+        assertEquals(listOf(ChecklistLogic.StepState.DONE, ChecklistLogic.StepState.CURRENT, ChecklistLogic.StepState.TODO, ChecklistLogic.StepState.TODO), steps.map { it.state })
         assertEquals("now", steps[0].time)
-        assertEquals("Finding your nearest pro", ChecklistLogic.pendingSteps(false)[1].label)
+        // No promised dispatch time on any mode any more.
+        assertFalse(ChecklistLogic.pendingExpectation(false).contains("minutes"))
     }
 
     @Test fun progressChecklistTracksTheStage() {
