@@ -52,6 +52,12 @@ object QuoteLineLogic {
 
     fun total(lines: List<QuoteLineDraft>): Int = lines.sumOf { cents(it) }
 
+    /// The estimate implied by the labour lines, in the server's half-hour steps.
+    fun impliedHours(lines: List<QuoteLineDraft>, crew: Int): Double {
+        val labour = lines.filter { it.kind == QuoteLineKind.LABOUR }.sumOf { number(it.quantity) ?: 0.0 }
+        return kotlin.math.ceil(labour / maxOf(crew, 1) * 2) / 2
+    }
+
     fun quantityText(value: Double): String {
         val rounded = (value * 100).roundToInt() / 100.0
         return if (rounded == rounded.toInt().toDouble()) rounded.toInt().toString() else rounded.toString()
