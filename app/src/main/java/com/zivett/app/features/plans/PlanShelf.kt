@@ -22,7 +22,7 @@ object PlanShelf {
         if (plan.connectFeeCents > 0) "No plan fee" else "Free"
 
     fun freeDetail(plan: SubscriptionResponse.Plan): String =
-        if (plan.connectFeeCents > 0) "${Money.format(plan.connectFeeCents)}/month payout account fee, only in months you're paid"
+        if (plan.connectFeeCents > 0) "${Money.format(plan.connectFeeCents)}/month payout account fee"
         else "Nothing to pay"
 
     enum class Mode {

@@ -74,7 +74,7 @@ class PlanShelfTest {
         // Free means chosen through our API, whatever the store still lists.
         assertNull(card.productId)
         assertEquals("No plan fee", PlanShelf.freeHeadline(companyBasic))
-        assertEquals("$2.00/month payout account fee, only in months you're paid", PlanShelf.freeDetail(companyBasic))
+        assertEquals("$2.00/month payout account fee", PlanShelf.freeDetail(companyBasic))
 
         val businessBasic = SubscriptionResponse.Plan(2, "business_basic", "Basic", 0, 0, sortOrder = 1)
         assertEquals("Free", PlanShelf.freeHeadline(businessBasic))
