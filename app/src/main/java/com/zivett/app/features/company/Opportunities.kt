@@ -346,6 +346,8 @@ fun QuoteComposerSheet(
     var days by remember { mutableStateOf(existing?.estimatedDays?.toString() ?: "") }
     var validUntil by remember { mutableStateOf(existing?.validUntil) }
     var hours by remember { mutableStateOf(existing?.estimatedHours ?: 0.0) }
+    // Hours typed on a labour line fill in the estimate until it's set by hand.
+    var hoursFollowLabour by remember { mutableStateOf((existing?.estimatedHours ?: 0.0) == 0.0) }
     var crew by remember { mutableStateOf(existing?.crewSize ?: 1) }
     var message by remember { mutableStateOf(existing?.message ?: "") }
     var proposedKey by remember {
@@ -373,6 +375,7 @@ fun QuoteComposerSheet(
     val offeredWindows: List<CompanyWindow> = job.companyWindows ?: (job.availabilityWindows ?: emptyList()).map { CompanyWindow(it.date, it.window, true, 0) }
     val needsProposal = job.mode == "scheduled" && offeredWindows.isNotEmpty()
     val proposalMissing = needsProposal && (proposedKey == null || proposedKey == "flexible")
+    fun syncHours() { if (hoursFollowLabour) hours = QuoteLineLogic.impliedHours(lines, crew) }
     val totalCents = QuoteLineLogic.total(lines)
     val problem = QuoteLineLogic.problem(lines, hours, proposalMissing)
     val canSubmit = !sending && problem == null && rateCents != null
@@ -437,19 +440,19 @@ fun QuoteComposerSheet(
                 ZCaption("${job.category.name} rate ${Money.format(rateCents)}/hr")
                 if (saveRate != null && !editingRate) ZTextAction("Change") { startRateEdit() }
             }
+            Stepper("Estimated hours", if (hours == 0.0) "—" else hours.hoursLabel(), down = { hoursFollowLabour = false; hours = maxOf(0.0, ((hours - 0.5) * 2).roundToInt() / 2.0) }, up = { hoursFollowLabour = false; hours = minOf(100.0, maxOf(0.5, ((hours + 0.5) * 2).roundToInt() / 2.0)) })
+            Stepper("Crew", crew.toString(), down = { crew = maxOf(1, crew - 1); syncHours() }, up = { crew = minOf(20, crew + 1); syncHours() })
             ZHeadline("Line items")
             lines.forEach { line ->
                 key(line.id) {
                     QuoteLineEditor(
                         line,
-                        change = { updated -> lines = lines.map { if (it.id == line.id) updated else it } },
-                        remove = { lines = lines.filterNot { it.id == line.id } },
+                        change = { updated -> lines = lines.map { if (it.id == line.id) updated else it }; syncHours() },
+                        remove = { lines = lines.filterNot { it.id == line.id }; syncHours() },
                     )
                 }
             }
             ZButton("+ Add line item", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { lines = lines + QuoteLineDraft() }
-            Stepper("Estimated hours", if (hours == 0.0) "—" else hours.hoursLabel(), down = { hours = maxOf(0.0, ((hours - 0.5) * 2).roundToInt() / 2.0) }, up = { hours = minOf(100.0, maxOf(0.5, ((hours + 0.5) * 2).roundToInt() / 2.0)) })
-            Stepper("Crew", crew.toString(), down = { crew = maxOf(1, crew - 1) }, up = { crew = minOf(20, crew + 1) })
             ZCard(padding = ZSpacing.sm) {
                 MoneyRow("Quote total", totalCents)
                 MoneyRow("Commission (${CompanyPresentation.percent(commissionBps)})", -CompanyPresentation.commission(totalCents, commissionBps))
@@ -580,7 +583,7 @@ private fun QuoteLineEditor(line: QuoteLineDraft, change: (QuoteLineDraft) -> Un
         }
         ZTextField("", line.description, { change(line.copy(description = it)) }, placeholder = "Describe this line", corner = null)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ZTextField(if (line.kind == QuoteLineKind.LABOUR) "Hours" else "Qty", line.quantity, { change(line.copy(quantity = it, followsTime = false)) }, modifier = Modifier.width(76.dp), keyboardType = KeyboardType.Decimal)
+            ZTextField(if (line.kind == QuoteLineKind.LABOUR) "Total hours" else "Qty", line.quantity, { change(line.copy(quantity = it, followsTime = false)) }, modifier = Modifier.width(76.dp), keyboardType = KeyboardType.Decimal)
             ZTextField("Price $", line.unit, { change(line.copy(unit = it)) }, modifier = Modifier.width(96.dp), keyboardType = KeyboardType.Decimal)
             Spacer(Modifier.weight(1f))
             val cents = QuoteLineLogic.cents(line)

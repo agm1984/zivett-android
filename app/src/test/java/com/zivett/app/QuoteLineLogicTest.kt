@@ -38,6 +38,12 @@ class QuoteLineLogicTest {
         assertNull(QuoteLineLogic.problem(ready, 1.0, false))
     }
 
+    @Test fun labourHoursImplyTheEstimateInHalfHourSteps() {
+        assertEquals(3.0, QuoteLineLogic.impliedHours(listOf(line(QuoteLineKind.LABOUR, "3", "125"), line(QuoteLineKind.MATERIAL, "9", "5")), 1), 0.0)
+        assertEquals(2.5, QuoteLineLogic.impliedHours(listOf(line(QuoteLineKind.LABOUR, "5", "125")), 2), 0.0)
+        assertEquals(2.0, QuoteLineLogic.impliedHours(listOf(line(QuoteLineKind.LABOUR, "5", "125")), 3), 0.0)
+    }
+
     @Test fun aNewQuoteStartsWithLabourAtTheSavedRate() {
         val row = QuoteLineLogic.drafts(null, 12000).single()
         assertEquals(QuoteLineKind.LABOUR, row.kind)
