@@ -77,14 +77,14 @@ fun PayoutsScreen(onBack: () -> Unit) {
                                 }
                                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     ZMonoBody(Money.format(payout.amountCents), weight = FontWeight.Bold)
-                                    if (payout.connectFeeCents > 0) ZCaption("after ${Money.format(payout.connectFeeCents)} account fee")
+                                    if (payout.connectFeeCents > 0) ZCaption("after ${Money.format(payout.connectFeeCents)} account fees")
                                     val meta = CompanyPresentation.payoutBadge(payout.status)
                                     ZBadge(meta.label, meta.tone)
                                 }
                             }
                         }
                     }
-                    ZCaption("Each payout is your invoice subtotal minus the platform commission, plus 100% of any tip. Pass-through materials carry no commission. On a plan with a monthly payout account fee, your first payout of the month carries it, and a month with no payouts costs nothing.")
+                    ZCaption("Each payout is your invoice subtotal minus the platform commission, plus 100% of any tip. Pass-through materials carry no commission.")
                     Spacer(Modifier.padding(ZSpacing.lg))
                 }
             }
@@ -149,7 +149,7 @@ fun CompanyInvoiceDetailScreen(invoiceId: Int, onBack: () -> Unit) {
                             if (trustBps != null && trust != null && trust > 0) MoneyRow("Trust & support (${CompanyPresentation.percent(trustBps)})", -trust)
                             invoice.tipCents?.takeIf { it > 0 }?.let { MoneyRow("Tip — 100% yours", it, color = colors.success) }
                             invoice.companyReferralCreditCents?.takeIf { it > 0 }?.let { MoneyRow("Referral credit", it, color = colors.success) }
-                            if (invoice.connectFeeCents > 0) MoneyRow("Payout account fee", -invoice.connectFeeCents)
+                            if (invoice.connectFeeCents > 0) MoneyRow("Account fees", -invoice.connectFeeCents)
                             ZDivider()
                             MoneyRow("You receive", (invoice.netCents ?: 0) - invoice.connectFeeCents, strong = true, color = colors.success)
                             ZCaption(if (invoice.isPaid) "Settled — track it on your Payouts page." else "Queued as a payout once the booker pays or the invoice auto-settles.")
