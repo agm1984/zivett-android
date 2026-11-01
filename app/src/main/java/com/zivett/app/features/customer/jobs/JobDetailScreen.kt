@@ -247,9 +247,7 @@ private fun PriceCard(job: Job) {
             accepted != null -> {
                 ZMonoLarge(Money.format(accepted.amountCents))
                 ZCaption("Quoted price, agreed with your pro", tone = ZTextTone.SOFT)
-                val rate = accepted.hourlyRateCents; val hours = accepted.estimatedHours; val crew = accepted.crewSize
-                if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()} h × ${Money.format(rate)}/hr")
-                ZCaption("The invoice adds the trust & support fee and applicable taxes.")
+                com.zivett.app.features.shared.QuoteBreakdown(accepted)
             }
             label != null && job.quotesReleasedAt != null -> {
                 ZMonoLarge(label)
@@ -492,13 +490,11 @@ fun QuoteRow(index: Int, quote: Quote, showReviews: (() -> Unit)?, accept: () ->
             // What ZiVETT checked about this pro (ID, insurance, licence,
             // WorkSafeBC, background check…).
             VerificationBadges(quote.company?.verification)
-            val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
-            if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()} h × ${Money.format(rate)}/hr")
-            quote.proposedDate?.let { ZCaption("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", tone = ZTextTone.SOFT) }
             if (showReviews != null && quote.company?.rating != null) ZTextAction(JobPresentation.proLine(quote.company), onClick = showReviews) else ZCaption(JobPresentation.proLine(quote.company))
-            quote.message?.takeIf { it.isNotEmpty() }?.let { Text("“$it”", style = ZType.body.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = colors.inkSoft) }
-            if (!top) ZButton("Accept — ${Money.format(quote.amountCents)}", style = ZButtonStyle.OUTLINE, compact = true, onClick = accept)
+            com.zivett.app.features.shared.QuoteBreakdown(quote)
+            if (quote.expired == true) ZCaption("This quote has expired, so it can't be accepted. Contact ZiVETT support and we'll get you a fresh price.", color = colors.danger)
+            else if (!top) ZButton("Accept — ${Money.format(quote.amountCents)}", style = ZButtonStyle.OUTLINE, compact = true, onClick = accept)
         }
-        if (top) ZActionBand("Accept this quote — ${Money.format(quote.amountCents)}", flushBottom = true, radius = ZRadius.tile, onClick = accept)
+        if (top && quote.expired != true) ZActionBand("Accept this quote — ${Money.format(quote.amountCents)}", flushBottom = true, radius = ZRadius.tile, onClick = accept)
     }
 }

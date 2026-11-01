@@ -9,6 +9,7 @@ local Sail backend as customer, company, new company (through email
 verification), pending company, business, and new business.
 
 ## Foundation
+- [x] **Itemized quotes (2026-11-03, web `QuotePage.vue`).** Quoting is a full screen with line items (labour, flat price, materials, fee, discount), hours and crew, price firmness, valid until, days on site, what's not included and a note; every amount is recomputed by the server. Customers and My quotes see every line and term (`features/company/QuoteLineLogic.kt`, `features/shared/QuoteBreakdown.kt`); an expired quote can't be accepted. Not ported: web's shared drafts (leaving the screen discards a new quote) and the web's Valid-until date picker (7/14/30-day buttons instead).
 - [x] **Basic is sold through the store again, yearly only (2026-11-01).** About $57.65 in-app, netting the web's first-year $49 every year; the server writes no registration fee for a store purchase. The shelf needs no code for this: Basic isn't free any more, so it reads the product like any plan. Still manual: keep the Basic store product on sale at that price.
 - [x] Networking: `ApiRequest`/`ApiClient`/`HttpApiClient` with the same error mapping (401/403/404/409/422/429, `Conflict` carries the body for 3DS), `PreviewApiClient` for tests
 - [x] Token storage: AndroidKeyStore AES-GCM key wrapping the token in private prefs (the iOS Keychain equivalent)

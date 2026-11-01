@@ -64,7 +64,7 @@ data class SignupRoleOption(val role: UserRole, val code: String, val title: Str
     companion object {
         val all = listOf(
             SignupRoleOption(UserRole.CUSTOMER, "HM", "Homeowner / renter", "Book repairs & maintenance for your home", ZTone.INFO),
-            SignupRoleOption(UserRole.BUSINESS, "PM", "Business / property manager", "Manage repairs across multiple properties", ZTone.WARNING),
+            SignupRoleOption(UserRole.BUSINESS, "PM", "Business owner / property manager", "Manage repairs across multiple properties", ZTone.WARNING),
             SignupRoleOption(UserRole.COMPANY, "PR", "Skilled pro / company", "Get verified & receive qualified jobs", ZTone.SUCCESS),
         )
     }
