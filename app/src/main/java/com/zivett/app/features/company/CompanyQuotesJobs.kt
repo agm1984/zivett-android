@@ -56,6 +56,7 @@ import com.zivett.app.design.ZMonoBody
 import com.zivett.app.design.ZPageTitle
 import com.zivett.app.design.ZScreen
 import com.zivett.app.design.ZSpacing
+import com.zivett.app.design.ZTextAction
 import com.zivett.app.design.ZTextTone
 import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZToastBox
@@ -93,7 +94,7 @@ class CompanyQuotesModel(private val client: ApiClient) {
             toast = "Quote for ${quote.job?.code ?: "the job"} updated"
             return null
         } catch (error: ApiError) {
-            if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) return error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.message
+            if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) return error.errors.first("line_items") ?: error.errors.first("valid_until") ?: error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.message
             // Into the composer, which stays open: a toast + null closed it
             // as though the revision had been sent, losing the edit.
             return error.userMessage
@@ -227,9 +228,9 @@ private fun WaitingQuoteCard(quote: Quote, commissionBps: Int, now: Instant, onR
             Text(Money.format(quote.amountCents), style = money, color = colors.ink)
             ZCaption("You keep ≈ ${Money.format(CompanyQuotesLogic.youKeepCents(quote.amountCents, commissionBps))}", modifier = Modifier.padding(bottom = 2.dp))
         }
-        val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
-        if (rate != null && hours != null && crew != null) ZCaption("$crew × ${hours.hoursLabel()}h × ${Money.format(rate)}/hr", tone = ZTextTone.FAINT)
-        quote.proposedDate?.let { ZCaption("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", tone = ZTextTone.SOFT) }
+        var showDetails by remember { mutableStateOf(false) }
+        ZTextAction(if (showDetails) "Hide quote details" else "View quote details") { showDetails = !showDetails }
+        if (showDetails) com.zivett.app.features.shared.QuoteBreakdown(quote)
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
             ZBadge(CompanyQuotesLogic.waitingState(quote), if (quote.job?.quotesReleased == true) ZTone.INFO else ZTone.NEUTRAL)
             quote.createdAt?.let { ZCaption(CompanyQuotesLogic.sentAgo(it, now) + (quote.submittedBy?.let { by -> " by ${by.name}" } ?: ""), tone = ZTextTone.FAINT) }

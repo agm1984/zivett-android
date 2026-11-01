@@ -6,19 +6,27 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.input.KeyboardType
 import com.zivett.app.core.models.OrganizationRole
 import com.zivett.app.design.ZTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Icon
@@ -27,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -145,7 +154,7 @@ class OpportunitiesModel(private val client: ApiClient) {
             return null
         } catch (error: ApiError) {
             if (error is ApiError.Validation && error.errors.errors.isNotEmpty()) {
-                return error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.first("message") ?: error.errors.message
+                return error.errors.first("line_items") ?: error.errors.first("valid_until") ?: error.errors.first("proposed_date") ?: error.errors.first("estimated_hours") ?: error.errors.first("crew_size") ?: error.errors.first("message") ?: error.errors.message
             }
             // Only a 409 (quotes closed / already quoted) or a 404 means
             // the job is gone — drop the card. Everything else — offline,
@@ -331,6 +340,11 @@ fun QuoteComposerSheet(
 ) {
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
+    var lines by remember { mutableStateOf(QuoteLineLogic.drafts(existing, rateCents)) }
+    var pricing by remember { mutableStateOf(QuotePricingKind.of(existing?.pricingType) ?: QuotePricingKind.FIXED) }
+    var exclusions by remember { mutableStateOf(existing?.exclusions ?: "") }
+    var days by remember { mutableStateOf(existing?.estimatedDays?.toString() ?: "") }
+    var validUntil by remember { mutableStateOf(existing?.validUntil) }
     var hours by remember { mutableStateOf(existing?.estimatedHours ?: 0.0) }
     var crew by remember { mutableStateOf(existing?.crewSize ?: 1) }
     var message by remember { mutableStateOf(existing?.message ?: "") }
@@ -359,10 +373,20 @@ fun QuoteComposerSheet(
     val offeredWindows: List<CompanyWindow> = job.companyWindows ?: (job.availabilityWindows ?: emptyList()).map { CompanyWindow(it.date, it.window, true, 0) }
     val needsProposal = job.mode == "scheduled" && offeredWindows.isNotEmpty()
     val proposalMissing = needsProposal && (proposedKey == null || proposedKey == "flexible")
-    val totalCents = rateCents?.let { CompanyPresentation.quoteTotal(it, hours, crew) } ?: 0
-    val canSubmit = !sending && hours >= 0.5 && !proposalMissing && rateCents != null
+    val totalCents = QuoteLineLogic.total(lines)
+    val problem = QuoteLineLogic.problem(lines, hours, proposalMissing)
+    val canSubmit = !sending && problem == null && rateCents != null
+    // A labour row follows hours × crew until someone types its quantity.
+    val personHours = hours * crew
+    LaunchedEffect(personHours) {
+        lines = lines.map { if (it.followsTime) it.copy(quantity = if (personHours > 0) QuoteLineLogic.quantityText(personHours) else "") else it }
+    }
+    // A rate saved here reprices rows still following it.
+    LaunchedEffect(rateCents) {
+        if (rateCents != null) lines = lines.map { if (it.kind == QuoteLineKind.LABOUR && it.followsTime) it.copy(unit = QuoteLineLogic.dollarsText(rateCents)) else it }
+    }
 
-    ZSheet(onDismiss = onDismiss, title = if (existing == null) "Send your quote to ZiVETT" else "Revise your quote") {
+    QuotePage(onDismiss = onDismiss, title = if (existing == null) "Send your quote to ZiVETT" else "Revise your quote") {
         // What the booker told us — the structured facts stay visible while pricing.
         ZCard(padding = ZSpacing.sm) {
             ZBodyStrong(job.title)
@@ -413,18 +437,24 @@ fun QuoteComposerSheet(
                 ZCaption("${job.category.name} rate ${Money.format(rateCents)}/hr")
                 if (saveRate != null && !editingRate) ZTextAction("Change") { startRateEdit() }
             }
-            existing?.hourlyRateCents?.takeIf { it != rateCents }?.let { old ->
-                ZBanner("Your rate changed since this quote went out (${Money.format(old)}/hr → ${Money.format(rateCents)}/hr) — saving reprices at the new rate.", tone = ZTone.INFO)
+            ZHeadline("Line items")
+            lines.forEach { line ->
+                key(line.id) {
+                    QuoteLineEditor(
+                        line,
+                        change = { updated -> lines = lines.map { if (it.id == line.id) updated else it } },
+                        remove = { lines = lines.filterNot { it.id == line.id } },
+                    )
+                }
             }
+            ZButton("+ Add line item", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { lines = lines + QuoteLineDraft() }
             Stepper("Estimated hours", if (hours == 0.0) "—" else hours.hoursLabel(), down = { hours = maxOf(0.0, ((hours - 0.5) * 2).roundToInt() / 2.0) }, up = { hours = minOf(100.0, maxOf(0.5, ((hours + 0.5) * 2).roundToInt() / 2.0)) })
             Stepper("Crew", crew.toString(), down = { crew = maxOf(1, crew - 1) }, up = { crew = minOf(20, crew + 1) })
             ZCard(padding = ZSpacing.sm) {
-                if (hours >= 0.5) {
-                    MoneyRow("$crew × ${hours.hoursLabel()}h × ${Money.format(rateCents)}", totalCents)
-                    MoneyRow("Commission (${CompanyPresentation.percent(commissionBps)})", -CompanyPresentation.commission(totalCents, commissionBps))
-                    ZDivider()
-                    MoneyRow("You keep", totalCents - CompanyPresentation.commission(totalCents, commissionBps), strong = true, color = colors.success)
-                } else ZCaption("Set the hours and your total prices itself — rate × hours × crew.")
+                MoneyRow("Quote total", totalCents)
+                MoneyRow("Commission (${CompanyPresentation.percent(commissionBps)})", -CompanyPresentation.commission(totalCents, commissionBps))
+                ZDivider()
+                MoneyRow("You keep", totalCents - CompanyPresentation.commission(totalCents, commissionBps), strong = true, color = colors.success)
             }
         } else {
             ZBanner("Set your ${job.category.name} hourly rate${if (saveRate != null) "" else " on your Passport"} first — quotes are priced from it.", tone = ZTone.WARNING)
@@ -452,14 +482,39 @@ fun QuoteComposerSheet(
             }
         }
 
-        ZTextArea("What's included (optional)", message, { message = it }, placeholder = "Materials, timeline, what the price covers…", minLines = 3)
+        ZHeadline("How firm is this price?")
+        QuotePricingKind.entries.forEach { kind ->
+            val chosen = pricing == kind
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card)).background(colors.surface)
+                    .border(1.dp, if (chosen) colors.navy else colors.border, androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card))
+                    .clickable { pricing = kind }.padding(ZSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs),
+            ) {
+                androidx.compose.material3.RadioButton(selected = chosen, onClick = { pricing = kind })
+                Column(modifier = Modifier.weight(1f)) {
+                    ZBodyStrong(kind.label)
+                    ZCaption(kind.detail)
+                }
+            }
+        }
+        ZTextField("Days on site (optional)", days, { days = it.filter(Char::isDigit) }, keyboardType = KeyboardType.Number)
+        ZLabel("Valid until")
+        ZCaption(validUntil ?: "14 days from today")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(7L, 14L, 30L).forEach { count ->
+                ZButton("$count days", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { validUntil = QuoteLineLogic.dateText(count) }
+            }
+        }
+        ZTextArea("What's not included (optional)", exclusions, { exclusions = it }, placeholder = "Drywall repair, painting, hauling the old unit away…", minLines = 3)
+        ZTextArea("Note to the customer (optional)", message, { message = it }, placeholder = "Anything that helps them choose you", minLines = 3)
         ZCaption("The booker compares quotes and accepts one — acceptance assigns you the job and unlocks the exact address and access notes.", tone = ZTextTone.FAINT)
 
         // Payouts unready: the primary action IS going to set them up.
         if (!payoutsReady && setupPayouts != null) {
             ZButton("Set up payouts →", style = ZButtonStyle.SUCCESS, onClick = setupPayouts)
         } else {
-            ZButton(if (proposalMissing) "Pick an arrival window" else if (existing == null) "Send to ZiVETT" else "Save changes", style = ZButtonStyle.SUCCESS, loading = sending, enabled = canSubmit) {
+            ZButton(problem ?: if (existing == null) "Send to ZiVETT" else "Save changes", style = ZButtonStyle.SUCCESS, loading = sending, enabled = canSubmit) {
                 scope.launch {
                     sending = true; error = null
                     var date: String? = null; var window: String? = null
@@ -469,11 +524,68 @@ fun QuoteComposerSheet(
                         val parts = key.split("|")
                         date = parts.firstOrNull(); window = parts.getOrNull(1)
                     }
-                    val result = submit(QuoteBody(hours, crew, message.ifEmpty { null }, date, window))
+                    val result = submit(
+                        QuoteBody(
+                            hours, crew, message.ifEmpty { null }, date, window,
+                            lineItems = QuoteLineLogic.body(lines),
+                            pricingType = pricing.value,
+                            exclusions = exclusions.ifEmpty { null },
+                            estimatedDays = days.toIntOrNull(),
+                            validUntil = validUntil,
+                        ),
+                    )
                     sending = false
                     if (result != null) error = result else onDismiss()
                 }
             }
+        }
+    }
+}
+
+/// A full screen rather than a sheet: a quote is too much to build in one.
+@Composable
+private fun QuotePage(onDismiss: () -> Unit, title: String, content: @Composable ColumnScope.() -> Unit) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(ZTheme.colors.cream).statusBarsPadding().navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState()).padding(horizontal = ZSpacing.gutter).padding(bottom = ZSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(ZSpacing.md),
+        ) {
+            ZTextAction("Cancel", onClick = onDismiss)
+            ZTitle(title)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun QuoteLineEditor(line: QuoteLineDraft, change: (QuoteLineDraft) -> Unit, remove: () -> Unit) {
+    val colors = ZTheme.colors
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card)
+    var menuOpen by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(shape).background(colors.surface).border(1.dp, colors.border, shape).padding(ZSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box {
+            ZTextAction("${line.kind.label} ▾") { menuOpen = true }
+            androidx.compose.material3.DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                QuoteLineKind.entries.forEach { kind ->
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(kind.label) }, onClick = { change(line.copy(kind = kind)); menuOpen = false })
+                }
+            }
+        }
+        ZTextField("", line.description, { change(line.copy(description = it)) }, placeholder = "Describe this line", corner = null)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ZTextField(if (line.kind == QuoteLineKind.LABOUR) "Hours" else "Qty", line.quantity, { change(line.copy(quantity = it, followsTime = false)) }, modifier = Modifier.width(76.dp), keyboardType = KeyboardType.Decimal)
+            ZTextField("Price $", line.unit, { change(line.copy(unit = it)) }, modifier = Modifier.width(96.dp), keyboardType = KeyboardType.Decimal)
+            Spacer(Modifier.weight(1f))
+            val cents = QuoteLineLogic.cents(line)
+            ZBodyStrong((if (cents < 0) "−" else "") + Money.format(kotlin.math.abs(cents)))
+            IconButton(onClick = remove, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Close, contentDescription = "Remove this line", tint = colors.inkMuted) }
         }
     }
 }

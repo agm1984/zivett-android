@@ -97,6 +97,16 @@ data class CompanySummary(
 }
 
 /// `QuoteResource`.
+/// `QuoteResource.line_items`: the server computes every amount.
+@Serializable
+data class QuoteLine(
+    val type: String,
+    val description: String,
+    val quantity: Double,
+    val unitCents: Int,
+    val amountCents: Int,
+)
+
 @Serializable
 data class Quote(
     val id: Int,
@@ -104,6 +114,13 @@ data class Quote(
     val hourlyRateCents: Int? = null,
     val estimatedHours: Double? = null,
     val crewSize: Int? = null,
+    /// The itemized price; null on quotes sent before line items.
+    val lineItems: List<QuoteLine>? = null,
+    val pricingType: String? = null,
+    val estimatedDays: Int? = null,
+    val exclusions: String? = null,
+    val validUntil: String? = null,
+    val expired: Boolean? = null,
     val proposedDate: String? = null,
     val proposedWindow: String? = null,
     val message: String? = null,

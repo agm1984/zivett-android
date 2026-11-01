@@ -230,7 +230,16 @@ data class QuoteBody(
     val message: String? = null,
     val proposedDate: String? = null,
     val proposedWindow: String? = null,
+    val lineItems: List<QuoteLineBody>? = null,
+    val pricingType: String? = null,
+    val exclusions: String? = null,
+    val estimatedDays: Int? = null,
+    val validUntil: String? = null,
 )
+
+/// A line the app sends; the server computes its amount.
+@Serializable
+data class QuoteLineBody(val type: String, val description: String, val quantity: Double, val unitCents: Int)
 
 @Serializable data class ProfilePhotoResponse(val photoUrl: String? = null)
 

@@ -131,8 +131,7 @@ private fun QuoteOptionCard(job: Job, quote: Quote, index: Int, best: Boolean) {
         ) {
             Text("OPTION ${index + 1}", style = ZType.mono, color = colors.inkMuted)
             Text(Money.format(quote.amountCents), style = ZType.money.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = colors.navyDeep.takeIf { !colors.isDark } ?: colors.ink, modifier = Modifier.padding(top = 5.dp))
-            val rate = quote.hourlyRateCents; val hours = quote.estimatedHours; val crew = quote.crewSize
-            if (rate != null && hours != null && crew != null) Text("$crew ${if (crew == 1) "person" else "people"} × ${hours.hoursLabel()}h × ${Money.format(rate)}/hr", style = ZType.mono.copy(letterSpacing = 0.sp, fontWeight = FontWeight.Normal, fontSize = 12.5.sp), color = colors.inkMuted, modifier = Modifier.padding(top = 2.dp))
+            com.zivett.app.features.shared.QuotePresentation.summary(quote)?.let { Text(it, style = ZType.mono.copy(letterSpacing = 0.sp, fontWeight = FontWeight.Normal, fontSize = 12.5.sp), color = colors.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
             quote.proposedDate?.let { Text("Can arrive ${JobPresentation.windowSlot(it, quote.proposedWindow)}", style = ZType.caption, color = colors.inkSoft, modifier = Modifier.padding(top = 4.dp)) }
             Text(HomeHeroLogic.proLine(quote), style = ZType.caption.copy(fontSize = 12.sp), color = colors.inkMuted, modifier = Modifier.padding(top = ZSpacing.xs))
             quote.message?.takeIf { it.isNotEmpty() }?.let {
