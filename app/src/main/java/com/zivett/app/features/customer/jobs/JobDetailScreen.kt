@@ -248,7 +248,6 @@ private fun PriceCard(job: Job) {
                 ZMonoLarge(Money.format(accepted.amountCents))
                 ZCaption("Quoted price, agreed with your pro", tone = ZTextTone.SOFT)
                 com.zivett.app.features.shared.QuoteBreakdown(accepted)
-                ZCaption("The invoice adds the trust & support fee and applicable taxes.")
             }
             label != null && job.quotesReleasedAt != null -> {
                 ZMonoLarge(label)
