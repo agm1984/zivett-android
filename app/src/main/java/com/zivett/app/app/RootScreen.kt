@@ -82,8 +82,8 @@ private fun SignedInRouter(user: User) {
     }
 }
 
-/// Deep-charcoal brand moment matching the landing page: the checkmark
-/// tile over the light wordmark and gold-dash tagline, with one settled
+/// Deep-charcoal brand moment matching the landing page: the app icon
+/// over the light wordmark and gold-dash tagline, with one settled
 /// entrance. Deliberately the same in both appearances — the brand
 /// panel doesn't flip with the system theme.
 @Composable

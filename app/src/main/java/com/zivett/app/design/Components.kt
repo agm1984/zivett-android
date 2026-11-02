@@ -1,11 +1,13 @@
 package com.zivett.app.design
 
+import com.zivett.app.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,12 +82,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -99,7 +101,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -208,42 +209,18 @@ fun BrandWordmark(color: Color = ZTheme.colors.navy) {
     Text("ZiVETT", style = ZType.wordmark, color = color, modifier = Modifier.semantics { contentDescription = "ZiVETT" })
 }
 
-/// The ZiVETT mark — the app icon's checkmark tile, drawn natively so
-/// it's crisp at any size: deep charcoal tile, gold hairline border, gold
-/// gradient check. Deliberately identical in both appearances.
+/// The ZiVETT mark: the app icon itself (brand_mark.webp, written by
+/// resources/brand/generate.py in the web repo), so the splash and login
+/// screens can't drift from the launcher icon. Deliberately identical in
+/// both appearances.
 @Composable
 fun BrandMark(size: Dp = 96.dp) {
-    val goldGradient = Brush.verticalGradient(0f to Color(0xFFFFE27A), 0.45f to Color(0xFFD4AF37), 1f to Color(0xFFA97910))
-    val tileGradient = Brush.linearGradient(listOf(Color(0xFF151B23), Color(0xFF080C11)))
-    Canvas(modifier = Modifier.size(size)) {
-        val s = this.size.width
-        val radius = androidx.compose.ui.geometry.CornerRadius(s * 0.22f)
-        drawRoundRect(tileGradient, cornerRadius = radius)
-        val inset = s * 0.024f
-        drawRoundRect(
-            goldGradient,
-            topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
-            size = androidx.compose.ui.geometry.Size(s - inset * 2, s - inset * 2),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.20f),
-            style = Stroke(width = maxOf(1f, s * 0.02f)),
-        )
-        // The check, from the icon's 1024-space path, fitted into the padded box.
-        val pad = s * 0.16f
-        val box = s - pad * 2
-        val glyphW = 670f; val glyphH = 570f
-        val scale = minOf(box / glyphW, box / glyphH)
-        val offX = pad + (box - glyphW * scale) / 2
-        val offY = pad + (box - glyphH * scale) / 2
-        val points = listOf(248f to 500f, 405f to 702f, 790f to 265f, 850f to 330f, 405f to 835f, 180f to 545f)
-        val path = Path()
-        points.forEachIndexed { i, (x, y) ->
-            val px = offX + (x - 180f) * scale
-            val py = offY + (y - 265f) * scale
-            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-        }
-        path.close()
-        drawPath(path, goldGradient)
-    }
+    Image(
+        painter = painterResource(R.drawable.brand_mark),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.size(size).clip(RoundedCornerShape(size * 0.2237f)),
+    )
 }
 
 /// The quiet "← Back to home" link the auth pages open with.

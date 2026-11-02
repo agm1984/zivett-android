@@ -133,12 +133,13 @@ fun AcceptInvitationScreen(nav: NavHostController, token: String) {
                 model.bannerError?.let { ZBanner(it, tone = ZTone.DANGER) }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-                    ZTextField("First name", model.form.firstName, { model.form = model.form.copy(firstName = it) }, Modifier.weight(1f), "Amara", model.fieldErrors["first_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
-                    ZTextField("Last name", model.form.lastName, { model.form = model.form.copy(lastName = it) }, Modifier.weight(1f), "Okafor", model.fieldErrors["last_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
+                    ZTextField("First name", model.form.firstName, { model.form = model.form.copy(firstName = it) }, Modifier.weight(1f), error = model.fieldErrors["first_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
+                    ZTextField("Last name", model.form.lastName, { model.form = model.form.copy(lastName = it) }, Modifier.weight(1f), error = model.fieldErrors["last_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
                 }
 
-                ZTextField("Phone", model.phone, { model.phone = it }, placeholder = "(555) 012-3456", error = model.fieldErrors["phone"], keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
-                ZTextField("Password", model.form.password, { model.form = model.form.copy(password = it) }, placeholder = "At least 8 characters", error = model.fieldErrors["password"], secure = true, imeAction = ImeAction.Done)
+                ZTextField("Phone", model.phone, { model.phone = it }, error = model.fieldErrors["phone"], keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
+                ZTextField("Password", model.form.password, { model.form = model.form.copy(password = it) }, error = model.fieldErrors["password"], secure = true, imeAction = ImeAction.Done)
+                if (model.fieldErrors["password"] == null) ZCaption("At least 8 characters")
 
                 if (model.requiresPhoto) {
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {

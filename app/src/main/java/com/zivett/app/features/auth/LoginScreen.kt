@@ -95,7 +95,7 @@ fun LoginScreen(nav: NavHostController) {
 
         form.bannerError?.let { ZBanner(it, tone = ZTone.DANGER) }
 
-        ZTextField("Email", form.email, { form.email = it }, placeholder = "you@example.com", error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, onImeAction = { passwordFocus.requestFocus() })
+        ZTextField("Email", form.email, { form.email = it }, error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, onImeAction = { passwordFocus.requestFocus() })
 
         // The keyboard's ✓ logs in: in landscape on a tablet the keyboard
         // covers the button.
