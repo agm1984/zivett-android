@@ -121,7 +121,7 @@ fun VerifyEmailScreen() {
 
         model.notice?.let { ZBanner(it, tone = ZTone.SUCCESS) }
 
-        ZTextField("Verification code", model.code, { model.code = it }, placeholder = "123456", error = model.error, keyboardType = KeyboardType.NumberPassword)
+        ZTextField("Verification code", model.code, { model.code = it }, error = model.error, keyboardType = KeyboardType.NumberPassword)
 
         ZButton("Verify", loading = model.submitting, enabled = model.canSubmit) { scope.launch { model.submit(environment.session, environment.client) } }
 

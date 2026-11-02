@@ -83,7 +83,7 @@ fun ForgotPasswordScreen(nav: NavHostController) {
         if (status != null) {
             ZBanner(status, tone = ZTone.SUCCESS)
         } else {
-            ZTextField("Email", model.email, { model.email = it }, placeholder = "you@example.com", error = model.error, keyboardType = KeyboardType.Email)
+            ZTextField("Email", model.email, { model.email = it }, error = model.error, keyboardType = KeyboardType.Email)
             ZButton("Send reset link", loading = model.submitting, enabled = model.canSubmit) { scope.launch { model.submit(environment.client) } }
         }
 

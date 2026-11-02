@@ -193,13 +193,14 @@ fun SignupScreen(nav: NavHostController, initialRole: UserRole?) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-            ZTextField("First name", form.form.firstName, { form.form = form.form.copy(firstName = it) }, Modifier.weight(1f), "Amara", form.fieldErrors["first_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
-            ZTextField("Last name", form.form.lastName, { form.form = form.form.copy(lastName = it) }, Modifier.weight(1f), "Okafor", form.fieldErrors["last_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
+            ZTextField("First name", form.form.firstName, { form.form = form.form.copy(firstName = it) }, Modifier.weight(1f), error = form.fieldErrors["first_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
+            ZTextField("Last name", form.form.lastName, { form.form = form.form.copy(lastName = it) }, Modifier.weight(1f), error = form.fieldErrors["last_name"], capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
         }
 
-        ZTextField("Email", form.form.email, { form.form = form.form.copy(email = it) }, placeholder = "you@example.com", error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
-        ZTextField("Phone", form.phone, { form.phone = it }, placeholder = "(555) 012-3456", error = form.fieldErrors["phone"], keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
-        ZTextField("Password", form.form.password, { form.form = form.form.copy(password = it) }, placeholder = "At least 8 characters", error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Done)
+        ZTextField("Email", form.form.email, { form.form = form.form.copy(email = it) }, error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+        ZTextField("Phone", form.phone, { form.phone = it }, error = form.fieldErrors["phone"], keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
+        ZTextField("Password", form.form.password, { form.form = form.form.copy(password = it) }, error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Done)
+        if (form.fieldErrors["password"] == null) ZCaption("At least 8 characters")
 
         ZCheckbox(form.form.terms, { form.form = form.form.copy(terms = it) }) { TermsConsent() }
         form.fieldErrors["terms"]?.let { ZCaption(it, color = colors.danger) }
