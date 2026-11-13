@@ -162,21 +162,27 @@ class CalendarDispatchTest {
 
     // Filter + board
 
-    @Test fun theTechFilterPicksCrewOrUnassigned() {
-        val jobs = calendar().jobs
-        assertEquals(listOf(7), CalendarLogic.filtered(jobs, TechFilter.Member(4)).map { it.id })
-        assertEquals(listOf(8), CalendarLogic.filtered(jobs, TechFilter.Unassigned).map { it.id })
+    @Test fun theTeamFilterTicksPeopleAndNoTechYet() {
+        val calendar = calendar()
+        val jobs = calendar.jobs
+        val onlyAna = TechFilter.Everyone.only(4, calendar.team)
+        assertEquals(listOf(7), CalendarLogic.filtered(jobs, onlyAna).map { it.id })
+        assertEquals(listOf(8), CalendarLogic.filtered(jobs, TechFilter(hidden = setOf(3, 4))).map { it.id })
         assertEquals(2, CalendarLogic.filtered(jobs, TechFilter.Everyone).size)
+        // A crew job stays while anyone on it is ticked.
+        assertEquals(listOf(7, 8), CalendarLogic.filtered(jobs, TechFilter.Everyone.toggled(3)).map { it.id })
+        assertEquals(listOf(7), CalendarLogic.filtered(jobs, TechFilter.Everyone.toggledUnassigned()).map { it.id })
+        assertTrue(TechFilter.Everyone.toggled(3).toggled(3).everyone)
     }
 
     @Test fun aCrewJobSitsOnEveryCrewMembersRow() {
         val rows = CalendarLogic.boardRows(calendar())
-        assertEquals(listOf("Mike R.", "Ana P.", "Unassigned"), rows.map { it.label })
+        assertEquals(listOf("Mike R.", "Ana P.", "No tech yet"), rows.map { it.label })
         assertEquals(listOf(7), rows[0].jobsByDate["2026-10-27"]?.map { it.id })
         assertEquals(listOf(7), rows[1].jobsByDate["2026-10-27"]?.map { it.id })
         assertEquals(listOf(8), rows[2].jobsByDate["2026-10-27"]?.map { it.id })
-        assertEquals(listOf("Ana P."), CalendarLogic.boardRows(calendar(), TechFilter.Member(4)).map { it.label })
-        assertEquals(listOf("Unassigned"), CalendarLogic.boardRows(calendar(), TechFilter.Unassigned).map { it.label })
+        assertEquals(listOf("Ana P."), CalendarLogic.boardRows(calendar(), TechFilter.Everyone.only(4, calendar().team)).map { it.label })
+        assertEquals(listOf("No tech yet"), CalendarLogic.boardRows(calendar(), TechFilter(hidden = setOf(3, 4))).map { it.label })
     }
 
     @Test fun aMemberBoardHasNoEmptyUnassignedRow() {

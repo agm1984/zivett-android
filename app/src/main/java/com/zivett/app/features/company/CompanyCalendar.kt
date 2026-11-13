@@ -20,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SegmentedButton
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zivett.app.app.CompanyJobRoute
+import com.zivett.app.app.OwnJobRoute
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.models.AvailabilityResponse
@@ -94,11 +97,13 @@ import java.util.Locale
 /// tool: a month grid or a week board over the same payload, a day sheet
 /// for everything about one date, and (admins) the availability settings.
 class CompanyCalendarModel(private val client: ApiClient, today: LocalDate = LocalDate.now()) {
-    enum class Mode { MONTH, WEEK }
+    enum class Mode { MONTH, WEEK, LIST }
 
     var mode by mutableStateOf(Mode.MONTH)
     var month by mutableStateOf(YearMonth.from(today))
     var weekStart by mutableStateOf(CalendarLogic.weekStart(today))
+    /// The List view's first day — the next fortnight from today.
+    var listStart by mutableStateOf(today)
     var state by mutableStateOf<Loadable<CompanyCalendar>>(Loadable.Loading)
     var filter by mutableStateOf<TechFilter>(TechFilter.Everyone)
     var toast by mutableStateOf<String?>(null)
@@ -108,30 +113,46 @@ class CompanyCalendarModel(private val client: ApiClient, today: LocalDate = Loc
 
     suspend fun load() {
         state = state.reloaded {
-            if (mode == Mode.MONTH) client.send(CompanyEndpoints.monthCalendar(CalendarLogic.monthKey(month)))
-            else client.send(CompanyEndpoints.weekCalendar(CalendarLogic.dateKey(weekStart)))
+            when (mode) {
+                Mode.MONTH -> client.send(CompanyEndpoints.monthCalendar(CalendarLogic.monthKey(month)))
+                Mode.WEEK -> client.send(CompanyEndpoints.weekCalendar(CalendarLogic.dateKey(weekStart)))
+                Mode.LIST -> client.send(CompanyEndpoints.rangeCalendar(CalendarLogic.dateKey(listStart), CalendarLogic.LIST_DAYS))
+            }
         }
     }
 
     suspend fun shift(delta: Int) {
-        if (mode == Mode.MONTH) month = month.plusMonths(delta.toLong()) else weekStart = weekStart.plusWeeks(delta.toLong())
+        when (mode) {
+            Mode.MONTH -> month = month.plusMonths(delta.toLong())
+            Mode.WEEK -> weekStart = weekStart.plusWeeks(delta.toLong())
+            Mode.LIST -> listStart = listStart.plusDays(delta.toLong() * CalendarLogic.LIST_DAYS)
+        }
         state = Loadable.Loading
         load()
     }
 
     /// Switching keeps the place: a month opens on its first week (this
-    /// week when it's the current month); a week opens its month.
+    /// week when it's the current month); a week opens its month; the list
+    /// starts today when the place shown includes today, else at its start.
     suspend fun switchTo(next: Mode, today: LocalDate = LocalDate.now()) {
         if (next == mode) return
-        if (next == Mode.WEEK) weekStart = CalendarLogic.weekStart(if (YearMonth.from(today) == month) today else month.atDay(1))
-        else month = YearMonth.from(weekStart)
+        val anchor = when (mode) {
+            Mode.MONTH -> if (YearMonth.from(today) == month) today else month.atDay(1)
+            Mode.WEEK -> if (CalendarLogic.weekStart(today) == weekStart) today else weekStart
+            Mode.LIST -> listStart
+        }
+        when (next) {
+            Mode.WEEK -> weekStart = CalendarLogic.weekStart(anchor)
+            Mode.MONTH -> month = YearMonth.from(anchor)
+            Mode.LIST -> listStart = anchor
+        }
         mode = next
         state = Loadable.Loading
         load()
     }
 
     suspend fun goToday(today: LocalDate = LocalDate.now()) {
-        month = YearMonth.from(today); weekStart = CalendarLogic.weekStart(today)
+        month = YearMonth.from(today); weekStart = CalendarLogic.weekStart(today); listStart = today
         state = Loadable.Loading
         load()
     }
@@ -207,45 +228,66 @@ fun CompanyCalendarScreen(onBack: () -> Unit) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     LaunchedEffect(model) { model.load() }
 
+    // Own jobs open their crew page; busy placeholders open nothing.
+    fun openEntry(job: CalendarJob) {
+        when {
+            job.busy -> Unit
+            job.isOwn -> nav.navigate(OwnJobRoute(job.id))
+            else -> nav.navigate(CompanyJobRoute(job.id))
+        }
+    }
+
     Column {
         ZTopBar("Calendar", onBack = onBack) {
             if (model.calendar?.canManage == true) IconButton(onClick = { sheet = CalendarSheet.Settings }) { Icon(Icons.Outlined.Tune, contentDescription = "Calendar settings", tint = colors.ink) }
         }
         ZToastBox(model.toast, { model.toast = null }) {
             ZScreen(onRefresh = { model.load() }) {
+                val modes = listOf(CompanyCalendarModel.Mode.MONTH to "Month", CompanyCalendarModel.Mode.WEEK to "Week", CompanyCalendarModel.Mode.LIST to "List")
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(selected = model.mode == CompanyCalendarModel.Mode.MONTH, onClick = { scope.launch { model.switchTo(CompanyCalendarModel.Mode.MONTH) } }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Month") }
-                    SegmentedButton(selected = model.mode == CompanyCalendarModel.Mode.WEEK, onClick = { scope.launch { model.switchTo(CompanyCalendarModel.Mode.WEEK) } }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Week") }
+                    modes.forEachIndexed { index, (mode, label) ->
+                        SegmentedButton(selected = model.mode == mode, onClick = { scope.launch { model.switchTo(mode) } }, shape = SegmentedButtonDefaults.itemShape(index, modes.size)) { Text(label) }
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val week = model.mode == CompanyCalendarModel.Mode.WEEK
-                    IconButton(onClick = { scope.launch { model.shift(-1) } }) { Icon(Icons.Filled.ChevronLeft, contentDescription = if (week) "Previous week" else "Previous month", tint = colors.ink) }
+                    val unit = when (model.mode) { CompanyCalendarModel.Mode.MONTH -> "month"; CompanyCalendarModel.Mode.WEEK -> "week"; CompanyCalendarModel.Mode.LIST -> "two weeks" }
+                    IconButton(onClick = { scope.launch { model.shift(-1) } }) { Icon(Icons.Filled.ChevronLeft, contentDescription = "Previous $unit", tint = colors.ink) }
                     Spacer(Modifier.weight(1f))
-                    ZHeadline(if (week) CalendarLogic.weekLabel(model.weekStart) else model.month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)))
+                    ZHeadline(
+                        when (model.mode) {
+                            CompanyCalendarModel.Mode.MONTH -> model.month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US))
+                            CompanyCalendarModel.Mode.WEEK -> CalendarLogic.weekLabel(model.weekStart)
+                            CompanyCalendarModel.Mode.LIST -> CalendarLogic.rangeLabel(model.listStart)
+                        },
+                    )
                     Spacer(Modifier.weight(1f))
                     ZTextAction("Today") { scope.launch { model.goToday() } }
-                    IconButton(onClick = { scope.launch { model.shift(1) } }) { Icon(Icons.Filled.ChevronRight, contentDescription = if (week) "Next week" else "Next month", tint = colors.ink) }
+                    IconButton(onClick = { scope.launch { model.shift(1) } }) { Icon(Icons.Filled.ChevronRight, contentDescription = "Next $unit", tint = colors.ink) }
                 }
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { calendar ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                        if (calendar.canManage && calendar.team.size > 1) TechFilterRow(calendar, model.filter) { model.filter = it }
-                        if (model.mode == CompanyCalendarModel.Mode.MONTH) {
-                            MonthGrid(calendar, model.month, model.filter, today, wide) { sheet = CalendarSheet.Day(it) }
-                            Legend()
-                            ZCaption("Tap a day for its jobs, map, openings, time off and blocks.")
-                            val attention = CalendarLogic.filtered(calendar.jobs, model.filter).filter { CalendarLogic.warns(it) && it.date >= today }
-                            if (attention.isNotEmpty()) {
-                                ZSectionHeader("Needs attention")
-                                for (job in attention) CalendarJobRow(job) { nav.navigate(CompanyJobRoute(job.id)) }
+                        if (calendar.canManage && calendar.team.size > 1) TeamFilterCard(calendar, model.filter) { model.filter = it }
+                        when (model.mode) {
+                            CompanyCalendarModel.Mode.MONTH -> {
+                                MonthGrid(calendar, model.month, model.filter, today, wide) { sheet = CalendarSheet.Day(it) }
+                                Legend()
+                                ZCaption("Tap a day for its jobs, map, openings, time off and blocks. Jobs wear their lead's colour.")
+                                val entries = CalendarLogic.filtered(calendar.entries, model.filter).filter { !it.busy }
+                                val attention = entries.filter { CalendarLogic.warns(it) && it.date >= today }
+                                if (attention.isNotEmpty()) {
+                                    ZSectionHeader("Needs attention")
+                                    for (job in attention) CalendarJobRow(job, calendar) { openEntry(job) }
+                                }
+                                val jobs = entries.filter { !CalendarLogic.warns(it) || it.date < today }.sortedWith(compareBy<CalendarJob> { it.date }.then(CalendarLogic.visitOrder))
+                                if (jobs.isNotEmpty()) {
+                                    ZSectionHeader("This month")
+                                    for (job in jobs) CalendarJobRow(job, calendar) { openEntry(job) }
+                                }
                             }
-                            val jobs = CalendarLogic.filtered(calendar.jobs, model.filter).filter { !CalendarLogic.warns(it) || it.date < today }
-                            if (jobs.isNotEmpty()) {
-                                ZSectionHeader("This month")
-                                for (job in jobs) CalendarJobRow(job) { nav.navigate(CompanyJobRoute(job.id)) }
-                            }
-                        } else {
-                            if (wide) WeekBoardGrid(calendar, model.weekStart, model.filter, today, onDay = { sheet = CalendarSheet.Day(it) }, onJob = { nav.navigate(CompanyJobRoute(it)) })
-                            else WeekBoardList(calendar, model.weekStart, model.filter, today, onDay = { sheet = CalendarSheet.Day(it) }, onJob = { nav.navigate(CompanyJobRoute(it)) })
+                            CompanyCalendarModel.Mode.WEEK ->
+                                if (wide) WeekBoardGrid(calendar, model.weekStart, model.filter, today, onDay = { sheet = CalendarSheet.Day(it) }, onJob = { openEntry(it) })
+                                else WeekBoardList(calendar, model.weekStart, model.filter, today, onDay = { sheet = CalendarSheet.Day(it) }, onJob = { openEntry(it) })
+                            CompanyCalendarModel.Mode.LIST -> AgendaList(calendar, model.listStart, model.filter, today, onDay = { sheet = CalendarSheet.Day(it) }, onJob = { openEntry(it) })
                         }
                         Spacer(Modifier.padding(ZSpacing.lg))
                     }
@@ -259,7 +301,7 @@ fun CompanyCalendarScreen(onBack: () -> Unit) {
         is CalendarSheet.Day -> if (calendar != null) CalendarDaySheet(
             date = current.date, calendar = calendar, model = model, me = environment.session.user?.id, today = today,
             onDismiss = { sheet = null },
-            onOpenJob = { sheet = null; nav.navigate(CompanyJobRoute(it)) },
+            onOpenJob = { job -> sheet = null; openEntry(job) },
             onMove = { job -> sheet = CalendarSheet.Move(job.id, job.code, current.date) },
             onStart = { job -> sheet = CalendarSheet.Start(job.id, current.date) },
             onQuote = { opening -> sheet = CalendarSheet.Quote(opening.id, current.date) },
@@ -278,17 +320,46 @@ fun CompanyCalendarScreen(onBack: () -> Unit) {
     }
 }
 
+/// A person's calendar colour (`CalendarLogic.colorIndex`), grey for nobody.
 @Composable
-private fun TechFilterRow(calendar: CompanyCalendar, filter: TechFilter, onChange: (TechFilter) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        FilterChip(selected = filter == TechFilter.Everyone, onClick = { onChange(TechFilter.Everyone) }, label = { Text("Everyone") })
-        for (member in calendar.team) {
-            FilterChip(
-                selected = filter == TechFilter.Member(member.id), onClick = { onChange(TechFilter.Member(member.id)) }, label = { Text(member.display) },
-                leadingIcon = { ZPhotoAvatar(member.photoUrl, member.display.take(1), 20.dp) },
-            )
+fun techColor(index: Int?): Color {
+    val colors = ZTheme.colors
+    return index?.let { colors.techColors[it % colors.techColors.size] } ?: colors.noTech
+}
+
+@Composable
+fun leadColor(calendar: CompanyCalendar, job: CalendarJob): Color = techColor(CalendarLogic.leadColorIndex(calendar, job, ZTheme.colors.techColors.size))
+
+/// Admins: a tick per person (their colour beside it) + "No tech yet",
+/// folded to one line until opened.
+@Composable
+private fun TeamFilterCard(calendar: CompanyCalendar, filter: TechFilter, onChange: (TechFilter) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val colors = ZTheme.colors
+    val shown = calendar.team.count { filter.shows(it.id) }
+    ZCard(padding = ZSpacing.sm) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+            ZBodyStrong("Team", modifier = Modifier.weight(1f))
+            ZCaption(if (filter.everyone) "Showing everyone" else "Showing $shown of ${calendar.team.size}${if (filter.hideUnassigned) "" else " + no tech yet"}")
+            Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (open) "Hide team" else "Show team", tint = colors.inkMuted)
         }
-        FilterChip(selected = filter == TechFilter.Unassigned, onClick = { onChange(TechFilter.Unassigned) }, label = { Text("Unassigned") })
+        if (open) {
+            for (member in calendar.team) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                    Checkbox(checked = filter.shows(member.id), onCheckedChange = { onChange(filter.toggled(member.id)) })
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(techColor(CalendarLogic.colorIndex(calendar.team, member.id, colors.techColors.size))))
+                    ZPhotoAvatar(member.photoUrl, member.display.take(1), 24.dp)
+                    ZCaption(member.display, color = colors.ink, modifier = Modifier.weight(1f), maxLines = 1)
+                    ZTextAction("Only") { onChange(filter.only(member.id, calendar.team)) }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                Checkbox(checked = !filter.hideUnassigned, onCheckedChange = { onChange(filter.toggledUnassigned()) })
+                Box(Modifier.size(10.dp).clip(CircleShape).background(colors.noTech))
+                ZCaption("No tech yet", color = colors.ink, modifier = Modifier.weight(1f))
+            }
+            if (!filter.everyone) ZTextAction("Show everyone") { onChange(TechFilter.Everyone) }
+        }
     }
 }
 
@@ -296,7 +367,8 @@ private fun TechFilterRow(calendar: CompanyCalendar, filter: TechFilter, onChang
 private fun Legend() {
     val colors = ZTheme.colors
     com.zivett.app.design.ZFlowRow(spacing = ZSpacing.sm) {
-        LegendSwatch(colors.navy, "Job"); LegendSwatch(colors.warningSoft, "Needs action", border = colors.warning)
+        LegendSwatch(colors.techColors.first(), "ZiVETT job (lead's colour)"); LegendSwatch(colors.techColors.first().copy(alpha = 0.18f), "Own job", border = colors.techColors.first())
+        LegendSwatch(colors.surfaceSunken, "Busy"); LegendSwatch(colors.warningSoft, "Needs action", border = colors.warning)
         LegendSwatch(Color.Transparent, "Proposed / moving", dashed = true); LegendSwatch(colors.dangerSoft, "Blocked"); LegendSwatch(colors.surfaceSunken, "Off day")
     }
 }
@@ -359,7 +431,7 @@ private fun MonthGrid(calendar: CompanyCalendar, month: YearMonth, filter: TechF
                             if (anyOff) Box(Modifier.size(5.dp).clip(CircleShape).background(colors.inkMuted))
                         }
                         var shown = 0
-                        for (job in jobs.take(perCell)) { JobChip(job, wide); shown++ }
+                        for (job in jobs.take(perCell)) { JobChip(job, wide, leadColor(calendar, job)); shown++ }
                         for (move in moves.take(perCell - shown)) { GhostChip("→${CalendarChips.chipLabel(move.window, move.jobCode)}"); shown++ }
                         for (row in tentative.take(maxOf(0, perCell - shown))) { GhostChip(CalendarChips.chipLabel(row.window, row.jobCode, tentative = true)); shown++ }
                         val overflow = jobs.size + moves.size + tentative.size - shown
@@ -374,25 +446,44 @@ private fun MonthGrid(calendar: CompanyCalendar, month: YearMonth, filter: TechF
     }
 }
 
-/// A month-cell job: the lead's face + window initial + code. Jobs still
-/// waiting on a crew, a start, or overdue to set off get the warning tint.
+/// How a job's chip is painted: ZiVETT jobs solid in their lead's colour,
+/// own jobs a tint of it with a border, busy slots a quiet grey, and work
+/// waiting on a crew / a start / overdue the warning tint.
+data class ChipLook(val fill: Color, val border: Color?, val text: Color)
+
 @Composable
-private fun JobChip(job: CalendarJob, wide: Boolean) {
+fun chipLook(job: CalendarJob, color: Color): ChipLook {
     val colors = ZTheme.colors
-    val warn = CalendarLogic.warns(job)
+    return when {
+        job.busy -> ChipLook(colors.surfaceSunken, null, colors.inkMuted)
+        CalendarLogic.warns(job) -> ChipLook(colors.warningSoft, if (job.overdue) colors.danger else colors.warning, colors.ink)
+        job.isOwn -> ChipLook(color.copy(alpha = 0.18f), color, colors.ink)
+        else -> ChipLook(color, null, Color.White)
+    }
+}
+
+/// A month-cell job: the lead's face + window initial (or the planned
+/// time on a wide screen) + code, in the lead's colour.
+@Composable
+private fun JobChip(job: CalendarJob, wide: Boolean, color: Color) {
+    val look = chipLook(job, color)
     val lead = job.lead
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp).clip(RoundedCornerShape(4.dp))
-            .background(if (warn) colors.warningSoft else colors.navy)
-            .then(if (warn) Modifier.border(1.dp, if (job.overdue) colors.danger else colors.warning, RoundedCornerShape(4.dp)) else Modifier)
+            .background(look.fill)
+            .then(if (look.border != null) Modifier.border(1.dp, look.border, RoundedCornerShape(4.dp)) else Modifier)
             .padding(horizontal = 2.dp, vertical = 1.5.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (lead != null) ZPhotoAvatar(lead.photoUrl, lead.name.take(1), if (wide) 14.dp else 11.dp)
         Text(
-            if (wide) "${CalendarLogic.windowTag(job.window).take(1)} · ${job.code ?: "—"}" else CalendarChips.chipLabel(job.window, job.code),
+            when {
+                job.busy -> "Busy"
+                wide -> "${job.clockTime?.let { MyDayLogic.formatClock(it).replace(" ", "") } ?: CalendarLogic.windowTag(job.window).take(1)} · ${job.code ?: "—"}"
+                else -> CalendarChips.chipLabel(job.window, job.code)
+            },
             style = ZType.mono.copy(fontSize = if (wide) 10.sp else 8.sp, letterSpacing = 0.sp),
-            color = if (warn) colors.ink else colors.onBrand, maxLines = 1, overflow = TextOverflow.Clip,
+            color = look.text, maxLines = 1, overflow = TextOverflow.Clip,
         )
     }
 }
@@ -406,15 +497,17 @@ private fun GhostChip(label: String) {
     )
 }
 
-/// A list row for one job: window + code, title, lead's face, flag.
+/// A list row for one job: the lead's colour, faces, title, when (with
+/// the planned time), lead; own jobs say so; busy slots don't open.
 @Composable
-fun CalendarJobRow(job: CalendarJob, onClick: () -> Unit) {
-    ZCard(padding = ZSpacing.sm, onClick = onClick) {
+fun CalendarJobRow(job: CalendarJob, calendar: CompanyCalendar, onClick: () -> Unit) {
+    ZCard(padding = ZSpacing.sm, onClick = if (job.busy) null else onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-            CrewFaces(job, 28.dp)
+            Box(Modifier.size(10.dp).clip(CircleShape).background(if (job.busy) ZTheme.colors.inkFaint else leadColor(calendar, job)))
+            if (!job.busy) CrewFaces(job, 28.dp)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 ZBodyStrong(job.title, maxLines = 1)
-                ZCaption(listOfNotNull(job.code, CalendarLogic.slotLine(job.date, job.window), job.lead?.name).joinToString(" · "), maxLines = 1)
+                ZCaption(listOfNotNull(job.code, CalendarLogic.whenLine(job), job.lead?.name).joinToString(" · "), maxLines = 1)
             }
             val flag = CalendarLogic.flag(job)
             if (flag != null) ZBadge(flag.label, flag.tone) else CalendarStatusBadge(job)
@@ -451,7 +544,7 @@ fun CrewFaces(job: CalendarJob, size: Dp) {
 /// days; cells list that tech's jobs; time off shades the cell "Off";
 /// headers show each window's load against the cap.
 @Composable
-private fun WeekBoardGrid(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, today: String, onDay: (String) -> Unit, onJob: (Int) -> Unit) {
+private fun WeekBoardGrid(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, today: String, onDay: (String) -> Unit, onJob: (CalendarJob) -> Unit) {
     val colors = ZTheme.colors
     val days = CalendarLogic.weekDays(start)
     val rows = CalendarLogic.boardRows(calendar, filter)
@@ -482,7 +575,7 @@ private fun WeekBoardGrid(calendar: CompanyCalendar, start: LocalDate, filter: T
                         verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         off?.let { Text(it, style = ZType.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = colors.inkMuted, maxLines = 1) }
-                        for (job in jobs) BoardChip(job) { onJob(job.id) }
+                        for (job in jobs) BoardChip(job, leadColor(calendar, job)) { onJob(job) }
                     }
                 }
             }
@@ -508,24 +601,23 @@ private fun DayHeader(calendar: CompanyCalendar, day: LocalDate, key: String, to
     }
 }
 
-/// A board cell entry: window tag + code (warning-tinted when it needs action).
+/// A board cell entry: the time (or window) + code, in the lead's colour.
 @Composable
-private fun BoardChip(job: CalendarJob, onClick: () -> Unit) {
-    val colors = ZTheme.colors
-    val warn = CalendarLogic.warns(job)
+private fun BoardChip(job: CalendarJob, color: Color, onClick: () -> Unit) {
+    val look = chipLook(job, color)
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(if (warn) colors.warningSoft else colors.navy)
-            .then(if (warn) Modifier.border(1.dp, if (job.overdue) colors.danger else colors.warning, RoundedCornerShape(4.dp)) else Modifier)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(look.fill)
+            .then(if (look.border != null) Modifier.border(1.dp, look.border, RoundedCornerShape(4.dp)) else Modifier)
             .clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
-        Text(CalendarLogic.windowTag(job.window), style = ZType.caption.copy(fontSize = 9.sp), color = if (warn) colors.inkSoft else colors.onBrand.copy(alpha = 0.8f), maxLines = 1)
-        Text(job.code ?: job.title, style = ZType.mono.copy(fontSize = 9.sp, letterSpacing = 0.sp), color = if (warn) colors.ink else colors.onBrand, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(CalendarLogic.timeTag(job) + if (job.isOwn) " · Own" else "", style = ZType.caption.copy(fontSize = 9.sp), color = look.text.copy(alpha = 0.8f), maxLines = 1)
+        Text(job.code ?: job.title, style = ZType.mono.copy(fontSize = 9.sp, letterSpacing = 0.sp), color = look.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 /// Phones: the same board as one card per day, grouped by tech.
 @Composable
-private fun WeekBoardList(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, today: String, onDay: (String) -> Unit, onJob: (Int) -> Unit) {
+private fun WeekBoardList(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, today: String, onDay: (String) -> Unit, onJob: (CalendarJob) -> Unit) {
     val colors = ZTheme.colors
     val rows = CalendarLogic.boardRows(calendar, filter)
     for (day in CalendarLogic.weekDays(start)) {
@@ -553,16 +645,50 @@ private fun WeekBoardList(calendar: CompanyCalendar, start: LocalDate, filter: T
                 }
                 for (job in jobs) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).clickable { onJob(job.id) }.padding(start = 28.dp, top = 2.dp, bottom = 2.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).clickable { onJob(job) }.padding(start = 28.dp, top = 2.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        ZMono(CalendarLogic.windowTag(job.window))
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(leadColor(calendar, job)))
+                        ZMono(CalendarLogic.timeTag(job))
+                        if (job.isOwn) ZBadge("Own")
                         ZCaption(listOfNotNull(job.code, job.title).joinToString(" · "), color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
                         CalendarLogic.flag(job)?.let { ZBadge(it.label, it.tone) }
                     }
                 }
             }
             if (!any) ZCaption("Nothing booked")
+        }
+    }
+}
+
+/// The List view: the next fortnight, one card per day that has work,
+/// visits in order — the phone's best overview (web `CalendarAgenda`).
+@Composable
+private fun AgendaList(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, today: String, onDay: (String) -> Unit, onJob: (CalendarJob) -> Unit) {
+    val colors = ZTheme.colors
+    val days = CalendarLogic.agenda(calendar, start, filter)
+    if (days.isEmpty()) ZCaption("Nothing booked in these two weeks.")
+    for ((date, jobs) in days) {
+        ZCard(padding = ZSpacing.sm) {
+            Row(modifier = Modifier.fillMaxWidth().clickable { onDay(date) }, verticalAlignment = Alignment.CenterVertically) {
+                ZBodyStrong(CalendarLogic.dayTitle(date) + if (date == today) " · Today" else "", color = if (date < today) colors.inkMuted else null, modifier = Modifier.weight(1f))
+                ZCaption(if (jobs.size == 1) "1 job" else "${jobs.size} jobs")
+                Icon(Icons.Filled.ChevronRight, contentDescription = "Open day", tint = colors.inkMuted)
+            }
+            for (job in jobs) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).then(if (job.busy) Modifier else Modifier.clickable { onJob(job) }).padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs),
+                ) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(if (job.busy) colors.inkFaint else leadColor(calendar, job)))
+                    ZMono(CalendarLogic.timeTag(job), modifier = Modifier.width(64.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        ZCaption(listOfNotNull(job.code, job.title).joinToString(" · "), color = colors.ink, maxLines = 1)
+                        if (!job.busy) ZCaption(job.crew.takeIf { it.isNotEmpty() }?.let { crew -> CompanyPresentation.nameList(crew.map { it.name }) } ?: "No tech yet", maxLines = 1)
+                    }
+                    CalendarLogic.flag(job)?.let { ZBadge(it.label, it.tone) } ?: CalendarStatusBadge(job)
+                }
+            }
         }
     }
 }

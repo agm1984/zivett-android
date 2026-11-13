@@ -49,6 +49,12 @@ data class ZColors(
     /// status fills — adaptive because those fills flip light in dark
     /// mode. NOT for gold fills; those take `navyDeep` text.
     val onBrand: Color,
+    /// One colour per team member on the calendar (web `TECH_COLORS`, team
+    /// order, cycling); jobs wear their LEAD's. Saturated mid-tones that
+    /// carry white text on either ground; dark mode lifts them a step.
+    val techColors: List<Color>,
+    /// A job with nobody on it yet (web `NO_TECH_COLOR`).
+    val noTech: Color,
     val isDark: Boolean,
 ) {
     fun tone(tone: ZTone): Pair<Color, Color> = when (tone) {
@@ -69,6 +75,11 @@ data class ZColors(
             border = Color(0xFFE3E1DA), borderStrong = Color(0xFFD9D6CD), borderSoft = Color(0xFFEDEBE4),
             ink = Color(0xFF16181D), inkSoft = Color(0xFF54565F), inkMuted = Color(0xFF8A8578), inkFaint = Color(0xFFA6A399), label = Color(0xFF4A4D57),
             onBrand = Color(0xFFFFFFFF),
+            techColors = listOf(
+                Color(0xFF2563EB), Color(0xFF16A34A), Color(0xFFC2410C), Color(0xFF7C3AED), Color(0xFFDB2777),
+                Color(0xFF0E7490), Color(0xFF4D7C0F), Color(0xFF4F46E5), Color(0xFFB45309), Color(0xFFBE123C),
+            ),
+            noTech = Color(0xFF6B7280),
             isDark = false,
         )
 
@@ -81,6 +92,11 @@ data class ZColors(
             border = Color(0xFF2F323B), borderStrong = Color(0xFF3A3E48), borderSoft = Color(0xFF292C34),
             ink = Color(0xFFF2F0EA), inkSoft = Color(0xFFB9B7AF), inkMuted = Color(0xFF8E8B83), inkFaint = Color(0xFF6E6C66), label = Color(0xFFC5C3BC),
             onBrand = Color(0xFF0F1115),
+            techColors = listOf(
+                Color(0xFF3B82F6), Color(0xFF22A35A), Color(0xFFD9541C), Color(0xFF8B5CF6), Color(0xFFE0457F),
+                Color(0xFF1B8AA6), Color(0xFF5E8F16), Color(0xFF6366F1), Color(0xFFC9700F), Color(0xFFD12A4E),
+            ),
+            noTech = Color(0xFF7C8494),
             isDark = true,
         )
 

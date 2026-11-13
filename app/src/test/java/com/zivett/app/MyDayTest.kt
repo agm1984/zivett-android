@@ -276,4 +276,63 @@ class MyDayTest {
         assertEquals("Job started — you're clocked in", model.toast)
         assertEquals(listOf("POST api/company/own-jobs/12/status"), client.sent)
     }
+
+    // The calendar's colours, times and List view
+
+    private val dispatch = JsonCoding.json.decodeFromString<CompanyCalendar>(
+        """{"month": "2026-11",
+           "jobs": [
+             {"id": 7, "code": "Z-A", "title": "Leaky tap", "status": "accepted", "date": "2026-11-12", "window": "afternoon", "arrival_time": "13:30", "span": [810, 930],
+              "crew": [{"id": 4, "name": "Ana P."}]},
+             {"id": 8, "code": "Z-B", "title": "Burst pipe", "status": "accepted", "date": "2026-11-12", "window": null, "crew": []},
+             {"id": 9, "code": "Z-C", "title": "Fence", "status": "accepted", "date": "2026-11-20", "window": "morning", "crew": [{"id": 77, "name": "Jo K."}]}
+           ],
+           "own_jobs": [
+             {"id": 7, "busy": false, "code": "J-1", "title": "Gutters", "status": "scheduled", "crew": [{"id": 3, "name": "Mike Ross"}],
+              "date": "2026-11-12", "window": "morning", "start_time": "09:00", "span": [540, 660]},
+             {"id": "busy-2", "busy": true, "date": "2026-11-13", "window": "evening", "span": [1020, 1260]}
+           ],
+           "team": [{"id": 3, "name": "Mike Ross", "short_name": "Mike R."}, {"id": 4, "name": "Ana Patel", "short_name": "Ana P."}],
+           "can_manage": true}""",
+    )
+
+    @Test fun jobsWearTheirLeadsColourInTeamOrder() {
+        val (tap, burst, fence) = dispatch.jobs
+        assertEquals(1, com.zivett.app.features.company.CalendarLogic.leadColorIndex(dispatch, tap))
+        assertNull(com.zivett.app.features.company.CalendarLogic.leadColorIndex(dispatch, burst))
+        // A lead outside the visible roster still gets a stable colour.
+        assertEquals(7, com.zivett.app.features.company.CalendarLogic.leadColorIndex(dispatch, fence))
+        assertEquals(0, com.zivett.app.features.company.CalendarLogic.colorIndex(dispatch.team, 3))
+    }
+
+    @Test fun aDayRunsInVisitOrderWithOwnJobsBesideZivettOnes() {
+        val day = com.zivett.app.features.company.CalendarLogic.jobsOn(dispatch, "2026-11-12")
+        assertEquals(listOf("Z-B", "J-1", "Z-A"), day.map { it.code })
+        assertEquals("9:00 am", com.zivett.app.features.company.CalendarLogic.timeTag(day[1]))
+        assertEquals("Now", com.zivett.app.features.company.CalendarLogic.timeTag(day[0]))
+        assertEquals("Thu, Nov 12 · Afternoon · around 1:30 pm", com.zivett.app.features.company.CalendarLogic.whenLine(day[2]))
+        // The own job and the ZiVETT job share id 7 — both still map.
+        val located = day.map { it.copy(lat = 49.1, lng = -123.9) }
+        assertEquals(listOf("Z-B", "J-1", "Z-A"), com.zivett.app.features.company.CalendarLogic.stops(located).map { it.job.code })
+    }
+
+    @Test fun ownJobsSitOnTheirCrewsBoardRowsAndBusySlotsStayOff() {
+        val rows = com.zivett.app.features.company.CalendarLogic.boardRows(dispatch)
+        assertEquals(listOf("Mike R.", "Ana P.", "No tech yet"), rows.map { it.label })
+        assertEquals(listOf("J-1"), rows[0].jobsByDate["2026-11-12"]?.map { it.code })
+        assertTrue(rows.none { row -> row.jobsByDate.values.flatten().any { it.busy } })
+    }
+
+    @Test fun theListViewGroupsTheFortnightByDay() {
+        val start = LocalDate.of(2026, 11, 12)
+        val agenda = com.zivett.app.features.company.CalendarLogic.agenda(dispatch, start, com.zivett.app.features.company.CalendarLogic.TechFilter.Everyone)
+        assertEquals(listOf("2026-11-12", "2026-11-13", "2026-11-20"), agenda.map { it.first })
+        assertTrue(agenda[1].second.single().busy)
+        assertEquals("Nov 12 – 25", com.zivett.app.features.company.CalendarLogic.rangeLabel(start))
+        assertEquals("Nov 26 – Dec 9", com.zivett.app.features.company.CalendarLogic.rangeLabel(start.plusDays(14)))
+        // Hiding Ana keeps the busy slot (no crew to judge) but drops her job.
+        val noAna = com.zivett.app.features.company.CalendarLogic.TechFilter(hidden = setOf(4))
+        assertEquals(listOf("Z-B", "J-1"), com.zivett.app.features.company.CalendarLogic.jobsOn(dispatch, "2026-11-12", noAna).map { it.code })
+        assertEquals(CompanyEndpoints.rangeCalendar("2026-11-12", 30).query, listOf("start" to "2026-11-12", "days" to "14"))
+    }
 }
