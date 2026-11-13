@@ -83,6 +83,9 @@ data class User(
     /// it's the assigned-tech face: without one they can't self-assign,
     /// so going en route on an unassigned job opens the picker instead.
     val photoUrl: String? = null,
+    /// Company members: a field tech (true) vs office staff. Field techs
+    /// who aren't org admins open on My day. Defaults on (older server).
+    val takesJobs: Boolean = true,
 ) {
     val isEmailVerified: Boolean get() = emailVerifiedAt != null
     val isPhoneVerified: Boolean get() = phoneVerifiedAt != null

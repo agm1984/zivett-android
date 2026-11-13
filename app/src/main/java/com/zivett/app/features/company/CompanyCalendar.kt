@@ -417,8 +417,18 @@ fun CalendarJobRow(job: CalendarJob, onClick: () -> Unit) {
                 ZCaption(listOfNotNull(job.code, CalendarLogic.slotLine(job.date, job.window), job.lead?.name).joinToString(" · "), maxLines = 1)
             }
             val flag = CalendarLogic.flag(job)
-            if (flag != null) ZBadge(flag.label, flag.tone) else JobStatusBadge(job.status)
+            if (flag != null) ZBadge(flag.label, flag.tone) else CalendarStatusBadge(job)
         }
+    }
+}
+
+/// A ZiVETT job's status, an own job's ("Own · Scheduled"), or "Busy".
+@Composable
+fun CalendarStatusBadge(job: CalendarJob) {
+    when {
+        job.busy -> ZBadge("Busy")
+        job.isOwn -> ZBadge("Own · ${com.zivett.app.core.models.OwnJobStatus.label(job.ownStatus ?: com.zivett.app.core.models.OwnJobStatus.SCHEDULED)}", com.zivett.app.design.ZTone.INFO)
+        else -> job.status?.let { JobStatusBadge(it) }
     }
 }
 

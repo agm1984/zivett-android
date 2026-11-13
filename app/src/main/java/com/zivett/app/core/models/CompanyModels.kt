@@ -277,6 +277,10 @@ data class RosterMember(
     /// Booked off for the job's slot — auto-assignment skips them, but a
     /// dispatcher can still pick them by hand ("Off that day").
     val off: Boolean = false,
+    /// Already on another job (ZiVETT or own) overlapping this one's slot
+    /// (2026-11-12) — never auto-picked, still pickable by hand ("Busy
+    /// then"). Absent on an older server.
+    val busy: List<BusyBooking> = emptyList(),
 ) {
     /// Who "Auto-assign next" (and acceptance) may pick.
     val isAutoPickable: Boolean get() = autoPickable ?: (assignable && takesJobs)
@@ -290,7 +294,9 @@ val AssignmentRoster.nobodyAssignable: Boolean get() = members.none { it.assigna
 
 /// Photos exist, but everyone who has one is marked as office staff — so
 /// acceptance assigned nobody and "Auto-assign next" has no one to offer.
-val AssignmentRoster.noFieldTechs: Boolean get() = members.any { it.assignable } && members.none { it.isAutoPickable }
+/// Not "nobody auto-pickable": a team that's all off or busy that slot does
+/// take jobs — the badges say why (web `CrewPickerModal`).
+val AssignmentRoster.noFieldTechs: Boolean get() = members.any { it.assignable } && members.none { it.assignable && it.takesJobs }
 
 /// Fewer teammates have a photo than the quote's crew needs — the crew
 /// can't be completed until someone adds one.
@@ -393,6 +399,8 @@ object CompanyEndpoints {
     fun monthCalendar(month: String? = null) = ApiRequest.get<CompanyCalendar>("api/company/calendar", month?.let { listOf("month" to it) } ?: emptyList())
     /// The Monday–Sunday week around `day` (Y-m-d).
     fun weekCalendar(day: String) = ApiRequest.get<CompanyCalendar>("api/company/calendar", listOf("week" to day))
+    /// `days` (1–14) from `start` (Y-m-d) — the List view's fortnight.
+    fun rangeCalendar(start: String, days: Int) = ApiRequest.get<CompanyCalendar>("api/company/calendar", listOf("start" to start, "days" to days.coerceIn(1, 14).toString()))
     /// Admins for anyone; a member only for themselves (else 403).
     fun addTimeOff(userId: Int, date: String, window: String? = null) = ApiRequest.post<TimeOffResponse, TimeOffBody>("api/company/time-off", TimeOffBody(userId, date, window))
     fun removeTimeOff(id: Int) = ApiRequest.empty(Method.DELETE, "api/company/time-off/$id")

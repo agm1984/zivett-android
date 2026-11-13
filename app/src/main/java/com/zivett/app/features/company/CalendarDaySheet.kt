@@ -197,7 +197,7 @@ fun CalendarDaySheet(
                         ZBodyStrong(job.title, maxLines = 1)
                         ZCaption(listOfNotNull(CalendarLogic.windowTag(job.window), job.code).joinToString(" · "))
                     }
-                    JobStatusBadge(job.status)
+                    CalendarStatusBadge(job)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                     CrewFaces(job, 26.dp)
