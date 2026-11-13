@@ -57,8 +57,11 @@ data class Organization(
     val suspendedAt: Instant? = null,
     /// 'pro' | 'elite' | 'premium' — the tier badge the org wears.
     val planBadge: String? = null,
+    /// Business tools switched on — the team clock and My hours exist.
+    val businessToolsEnabledAt: Instant? = null,
 ) {
     val isApproved: Boolean get() = approvedAt != null
+    val hasBusinessTools: Boolean get() = businessToolsEnabledAt != null
     val isSuspended: Boolean get() = suspendedAt != null
 }
 

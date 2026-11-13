@@ -20,10 +20,13 @@ data class MyDay(
     val date: String,
     val isToday: Boolean = false,
     val jobs: List<DayJob> = emptyList(),
-    /// The clock the person left running, wherever it is — the strip on top.
+    /// The JOB TIMER the person left running, wherever it is — the strip on top.
     val clock: RunningClock? = null,
-    /// Business tools is on for the org: own jobs carry clock buttons.
+    /// Business tools is on for the org: own jobs carry job timer buttons.
     val canClock: Boolean = false,
+    /// The team clock (my working day, breaks) — `TeamShifts::state`.
+    /// Null from a server older than 2026-11-12.
+    val shift: ClockState? = null,
 ) {
     @Serializable
     data class RunningClock(val jobId: Int, val code: String? = null, val title: String? = null, val startedAt: Instant? = null)
