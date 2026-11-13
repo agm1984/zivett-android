@@ -7,7 +7,17 @@ import com.zivett.app.core.models.MyDay
 import com.zivett.app.core.models.OwnJobResponse
 import com.zivett.app.core.models.RosterMember
 import com.zivett.app.core.models.User
+import com.zivett.app.core.auth.Access
+import com.zivett.app.core.models.CompanyEndpoints
+import com.zivett.app.core.models.MyDayEndpoints
 import com.zivett.app.core.network.JsonCoding
+import com.zivett.app.core.network.PreviewApiClient
+import com.zivett.app.features.company.MyDayLogic
+import com.zivett.app.features.company.MyDayModel
+import kotlinx.coroutines.test.runTest
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -136,5 +146,99 @@ class MyDayTest {
         val base = """"id": 4, "title": "Sink", "status": "accepted", "category": {"id": 1, "code": "PL", "slug": "plumbing", "name": "Plumbing"}"""
         assertEquals("09:30", JsonCoding.json.decodeFromString<Job>("""{$base, "arrival_time": "09:30"}""").arrivalTime)
         assertNull(JsonCoding.json.decodeFromString<Job>("{$base}").arrivalTime)
+    }
+
+    // My day's rules
+
+    private fun job(json: String) = JsonCoding.json.decodeFromString<DayJob>(json)
+
+    @Test fun clocksReadLikeTheWeb() {
+        assertEquals("9:30 am", MyDayLogic.formatClock("09:30"))
+        assertEquals("12:00 pm", MyDayLogic.formatClock("12:00"))
+        assertEquals("12:15 am", MyDayLogic.formatClock("00:15"))
+        assertEquals("", MyDayLogic.formatClock(null))
+        assertEquals("09:30", MyDayLogic.clock(570))
+    }
+
+    @Test fun theWhenLineFallsBackFromSpanToWindowToAnyTime() {
+        assertEquals("9:30 am – 11:30 am", MyDayLogic.timeLine(job("""{"id": 1, "time": "09:30", "span": [570, 690], "window": "morning"}""")))
+        assertEquals("Around 9:30 am", MyDayLogic.timeLine(job("""{"id": 1, "time": "09:30"}""")))
+        assertEquals("Morning (8am–12pm)", MyDayLogic.timeLine(job("""{"id": 1, "span": [480, 720], "window": "morning"}""")))
+        assertEquals("Any time today", MyDayLogic.timeLine(job("""{"id": 1}""")))
+        assertEquals("Any time", MyDayLogic.timeLine(job("""{"id": 1}"""), isToday = false))
+    }
+
+    @Test fun cardLinesNameTheRestOfTheCrewAndTheWayThere() {
+        val tap = JsonCoding.json.decodeFromString<MyDay>(day).jobs[0]
+        assertEquals("Z-AAA111 · Plumbing", MyDayLogic.codeLine(tap))
+        assertEquals("Suite 4, 1 Front St, Nanaimo BC V9R 1A1", MyDayLogic.addressLine(tap))
+        assertNull(MyDayLogic.crewLine(tap, 3))
+        assertEquals("With Mike R.", MyDayLogic.crewLine(tap, 9))
+        assertEquals("With Mike R. and Ana P.", MyDayLogic.crewLine(job("""{"id": 1, "crew": [{"id": 3, "name": "Mike R."}, {"id": 4, "name": "Ana P."}, {"id": 5, "name": "Me"}]}"""), 5))
+        assertEquals("https://www.google.com/maps/dir/?api=1&destination=49.17,-123.94", MyDayLogic.directionsUrl(49.17, -123.94, "x"))
+        assertEquals("https://www.google.com/maps/dir/?api=1&destination=9+Bay+Rd", MyDayLogic.directionsUrl(null, null, "9 Bay Rd"))
+        assertNull(MyDayLogic.directionsUrl(null, null, " "))
+        assertEquals("Accepted", MyDayLogic.status(tap).label)
+        assertEquals("Scheduled", MyDayLogic.status(JsonCoding.json.decodeFromString<MyDay>(day).jobs[1]).label)
+    }
+
+    @Test fun theClockStripCountsUp() {
+        val clock = JsonCoding.json.decodeFromString<MyDay>(day).clock!!
+        assertEquals("Clocked in on J-1042 · Gutter clean", MyDayLogic.clockTitle(clock))
+        val now = Instant.parse("2026-11-12T18:17:00Z")
+        assertEquals("since 5:12 pm · 1 h 05 min", MyDayLogic.clockSince(clock, now, ZoneOffset.UTC))
+        assertEquals("12 min", MyDayLogic.elapsed(Instant.parse("2026-11-12T18:05:00Z"), now))
+    }
+
+    @Test fun clockButtonsRideOpenOwnJobsWithBusinessTools() {
+        val decoded = JsonCoding.json.decodeFromString<MyDay>(day)
+        assertFalse(MyDayLogic.showsClock(decoded.jobs[0], decoded))
+        assertTrue(MyDayLogic.showsClock(decoded.jobs[1], decoded))
+        assertFalse(MyDayLogic.showsClock(decoded.jobs[1], decoded.copy(canClock = false)))
+    }
+
+    @Test fun onMyWayOpensTheJobPageEverythingElsePostsHere() {
+        assertTrue(MyDayLogic.opensJobToAdvance(DayJob.Next("advance", "en_route", "On my way")))
+        assertFalse(MyDayLogic.opensJobToAdvance(DayJob.Next("advance", "arrived", "I've arrived")))
+        assertFalse(MyDayLogic.opensJobToAdvance(DayJob.Next("own_status", "in_progress", "Start job")))
+    }
+
+    @Test fun dayTitlesAreRelativeNearToday() {
+        val today = LocalDate.of(2026, 11, 12)
+        assertEquals("Today", MyDayLogic.dayTitle(today, today))
+        assertEquals("Tomorrow", MyDayLogic.dayTitle(today.plusDays(1), today))
+        assertEquals("Yesterday", MyDayLogic.dayTitle(today.minusDays(1), today))
+        assertEquals("Monday, November 16", MyDayLogic.dayTitle(today.plusDays(4), today))
+    }
+
+    @Test fun fieldTechsOpenOnMyDay() {
+        fun user(role: String, takes: Boolean, approved: Boolean = true) = JsonCoding.json.decodeFromString<User>(
+            """{"id": 1, "first_name": "A", "last_name": "B", "name": "A B", "email": "a@b.c", "role": "company", "organization_role": "$role",
+               "takes_jobs": $takes, "organization": {"id": 1, "type": "company", "name": "X"${if (approved) ", \"approved_at\": \"2026-10-01T00:00:00Z\"" else ""}}}""",
+        )
+        assertTrue(Access.opensOnMyDay(user("member", true)))
+        assertFalse(Access.opensOnMyDay(user("member", false)))
+        assertFalse(Access.opensOnMyDay(user("admin", true)))
+        assertFalse(Access.opensOnMyDay(user("member", true, approved = false)))
+    }
+
+    @Test fun theModelStepsDaysAndReloadsAfterEveryAction() = runTest {
+        val today = JsonCoding.json.decodeFromString<MyDay>(day)
+        val client = PreviewApiClient(mapOf(MyDayEndpoints.day().path to today))
+        val model = MyDayModel(client)
+        model.load()
+        assertEquals(2, model.day?.jobs?.size)
+        model.shift(1)
+        assertEquals(LocalDate.of(2026, 11, 13), model.date)
+        model.goToday()
+        assertNull(model.date)
+        client.sent.clear()
+        model.advance(today.jobs[0])
+        assertEquals(listOf("POST ${CompanyEndpoints.advance(7).path}", "GET ${MyDayEndpoints.day().path}"), client.sent)
+        client.sent.clear()
+        client.responses[MyDayEndpoints.clockIn(12).path] = OwnJobResponse(com.zivett.app.core.models.OwnJob(id = 12))
+        model.clockIn(today.jobs[1])
+        assertEquals("POST api/company/own-jobs/12/clock-in", client.sent.first())
+        assertEquals("Clocked in on J-1042", model.toast)
     }
 }

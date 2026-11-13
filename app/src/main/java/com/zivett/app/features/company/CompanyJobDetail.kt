@@ -278,7 +278,7 @@ class LiveLocationSharer(private val context: Context) {
 sealed interface CompanyJobSheet { object ChangeOrder : CompanyJobSheet; object Report : CompanyJobSheet; object Withdraw : CompanyJobSheet; object Assign : CompanyJobSheet; object Start : CompanyJobSheet; object Move : CompanyJobSheet }
 
 @Composable
-fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () -> Unit) {
+fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen: Boolean = false, onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val nav = LocalNav.current
     val context = LocalContext.current
@@ -340,6 +340,17 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, onBack: () ->
             if (job.status == JobStatus.EN_ROUTE && CompanyPresentation.onCrew(job, user) && !sharer.sharing) { startSharing(); model.toast = null }
             else if (job.status != JobStatus.EN_ROUTE && sharer.sharing) sharer.stop()
         }
+    }
+
+    // My day's "On my way" lands here and marks it en route once — so the
+    // same advance → live-location path runs as the button below.
+    var advancedOnOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val loadedJob = model.job
+    LaunchedEffect(loadedJob != null) {
+        val job = loadedJob ?: return@LaunchedEffect
+        if (!advanceOnOpen || advancedOnOpen) return@LaunchedEffect
+        advancedOnOpen = true
+        if (job.status == JobStatus.ACCEPTED && CompanyPresentation.jobAction(job, user) is CompanyPresentation.JobAction.Advance) advance()
     }
 
     val beforePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { uris -> if (uris.isNotEmpty()) scope.launch { model.uploadEvidence("before", PhotoImport.jpegData(context, uris)) } }
