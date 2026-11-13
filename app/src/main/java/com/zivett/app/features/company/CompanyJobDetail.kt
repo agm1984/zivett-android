@@ -78,6 +78,7 @@ import com.zivett.app.design.ZCard
 import com.zivett.app.design.ZCheckbox
 import com.zivett.app.design.ZChoiceTile
 import com.zivett.app.design.ZDivider
+import com.zivett.app.design.ZDropdown
 import com.zivett.app.design.ZHeadline
 import com.zivett.app.design.ZHeroPanel
 import com.zivett.app.design.ZIconTile
@@ -216,6 +217,17 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
             return dispute
         } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
         return null
+    }
+
+    /// The planned arrival inside the agreed window (org admins); null =
+    /// any time. Setting one tells the customer.
+    suspend fun setArrival(time: String?) {
+        if (busy) return
+        busy = true
+        try {
+            state = Loadable.Loaded(client.send(com.zivett.app.core.models.MyDayEndpoints.setArrival(jobId, time)).job)
+            toast = time?.let { "Arrival planned for ${MyDayLogic.formatClock(it)} — the customer is told" } ?: "Arrival back to any time in the window"
+        } catch (e: ApiError) { toast = e.first("arrival_time") ?: e.userMessage } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
     }
 
     /// Takes back the pending ask to move the visit.
@@ -413,6 +425,22 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                                         tone = ZTextTone.SOFT,
                                     )
                                     if (canAssign) ZButton(if (isCrew) "Assign the crew" else "Assign a tech", compact = true, fullWidth = false) { sheet = CompanyJobSheet.Assign }
+                                }
+                            }
+                            // The planned arrival inside the agreed window: admins pick a
+                            // quarter hour (the customer is told); everyone else reads it.
+                            if (CompanyPresentation.plansArrival(job)) {
+                                ZDivider()
+                                if (isAdmin) {
+                                    val window = job.scheduledWindow?.let { JobPresentation.windowLabel(it) } ?: ""
+                                    ZDropdown(
+                                        "Planned arrival", job.arrivalTime ?: "",
+                                        listOf("" to "Any time · $window") + CompanyPresentation.arrivalOptions(job.scheduledWindow).map { it to MyDayLogic.formatClock(it) },
+                                    ) { value -> if (value != (job.arrivalTime ?: "") && !model.busy) scope.launch { model.setArrival(value.ifEmpty { null }) } }
+                                    ZCaption("Inside the window the customer agreed. They're told the time.")
+                                } else {
+                                    ZMono("Planned arrival")
+                                    ZBody(CompanyPresentation.arrivalLabel(job))
                                 }
                             }
                         }

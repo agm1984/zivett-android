@@ -335,4 +335,49 @@ class MyDayTest {
         assertEquals(listOf("Z-B", "J-1"), com.zivett.app.features.company.CalendarLogic.jobsOn(dispatch, "2026-11-12", noAna).map { it.code })
         assertEquals(CompanyEndpoints.rangeCalendar("2026-11-12", 30).query, listOf("start" to "2026-11-12", "days" to "14"))
     }
+
+    // Planned arrival
+
+    private fun zivettJob(extra: String) = JsonCoding.json.decodeFromString<Job>(
+        """{"id": 4, "title": "Sink", "status": "accepted", "mode": "scheduled", "scheduled_date": "2026-11-14", "scheduled_window": "morning",
+           "category": {"id": 1, "code": "PL", "slug": "plumbing", "name": "Plumbing"}$extra}""",
+    )
+
+    @Test fun arrivalsArePlannedOnTheQuarterHourInsideTheWindow() {
+        val options = com.zivett.app.features.company.CompanyPresentation.arrivalOptions("morning")
+        assertEquals(16, options.size)
+        assertEquals("08:00", options.first())
+        assertEquals("11:45", options.last())
+        assertEquals("12:00", com.zivett.app.features.company.CompanyPresentation.arrivalOptions("afternoon").first())
+        assertEquals("20:45", com.zivett.app.features.company.CompanyPresentation.arrivalOptions("evening").last())
+        assertTrue(com.zivett.app.features.company.CompanyPresentation.arrivalOptions(null).isEmpty())
+    }
+
+    @Test fun onlyAcceptedOrEnRouteSlottedJobsTakeAPlannedArrival() {
+        assertTrue(com.zivett.app.features.company.CompanyPresentation.plansArrival(zivettJob("")))
+        assertFalse(com.zivett.app.features.company.CompanyPresentation.plansArrival(zivettJob(""", "mode": "instant"""")))
+        assertFalse(com.zivett.app.features.company.CompanyPresentation.plansArrival(zivettJob("").copy(status = com.zivett.app.core.models.JobStatus.ARRIVED)))
+        assertFalse(com.zivett.app.features.company.CompanyPresentation.plansArrival(zivettJob("").copy(scheduledWindow = null)))
+        assertEquals("Any time · Morning (8am–12pm)", com.zivett.app.features.company.CompanyPresentation.arrivalLabel(zivettJob("")))
+        assertEquals("Around 9:30 am", com.zivett.app.features.company.CompanyPresentation.arrivalLabel(zivettJob(""", "arrival_time": "09:30"""")))
+    }
+
+    @Test fun theBookerIsToldWhoArrivesWhen() {
+        assertNull(com.zivett.app.features.customer.jobs.JobPresentation.arrivalPlanLine(zivettJob("")))
+        assertEquals(
+            "Mike R. plans to arrive around 9:30 am",
+            com.zivett.app.features.customer.jobs.JobPresentation.arrivalPlanLine(zivettJob(""", "arrival_time": "09:30", "assigned_tech": {"id": 3, "name": "Mike R."}""")),
+        )
+        assertEquals(
+            "Harbour Plumbing plans to arrive around 1:15 pm",
+            com.zivett.app.features.customer.jobs.JobPresentation.arrivalPlanLine(zivettJob(""", "arrival_time": "13:15", "company": {"id": 9, "name": "Harbour Plumbing"}""")),
+        )
+    }
+
+    @Test fun settingAnArrivalSendsAnExplicitNullToClearIt() {
+        val request = MyDayEndpoints.setArrival(4, null)
+        assertEquals("api/company/jobs/4/arrival", request.path)
+        assertEquals("""{"arrival_time":null}""", request.body?.decodeToString())
+        assertEquals("""{"arrival_time":"09:30"}""", MyDayEndpoints.setArrival(4, "09:30").body?.decodeToString())
+    }
 }
