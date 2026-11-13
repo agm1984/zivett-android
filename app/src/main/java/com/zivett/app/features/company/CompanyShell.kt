@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Work
@@ -44,6 +45,7 @@ import com.zivett.app.app.CompanyDashboardRoute
 import com.zivett.app.app.CompanyDashboardTab
 import com.zivett.app.app.CompanyMyDayTab
 import com.zivett.app.app.MyDayRoute
+import com.zivett.app.app.MyHoursRoute
 import com.zivett.app.app.OwnJobRoute
 import com.zivett.app.core.auth.Access
 import com.zivett.app.app.CompanyInvoiceRoute
@@ -160,6 +162,7 @@ fun CompanyShell(approved: Boolean) {
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
         composable<CompanyMyDayTab> { BellScreen("My day") { MyDayScreen() } }
         composable<MyDayRoute> { BellScreen("My day", onBack = { nav.popBackStack() }) { MyDayScreen() } }
+        composable<MyHoursRoute> { MyHoursScreen { nav.popBackStack() } }
         composable<OwnJobRoute> { entry -> OwnJobScreen(entry.toRoute<OwnJobRoute>().jobId) { nav.popBackStack() } }
         composable<CompanyDashboardRoute> { BellScreen("Dashboard", onBack = { nav.popBackStack() }) { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
@@ -248,6 +251,11 @@ fun CompanyMoreScreen() {
                 // Whichever of My day / Dashboard isn't a tab for this person.
                 if (fieldTech) AccountLink("Dashboard", "Your company at a glance", Icons.Filled.Home) { nav.navigate(CompanyDashboardRoute) }
                 else AccountLink("My day", "The jobs you're on, in the order you'll do them", Icons.Outlined.Today) { nav.navigate(MyDayRoute) }
+                // The team clock's pay period — Business tools companies only.
+                if (user.organization?.hasBusinessTools == true) {
+                    ZDivider(Modifier.padding(start = 60.dp))
+                    AccountLink("My hours", "Your pay period on the clock, and fixing a day", Icons.Outlined.Schedule) { nav.navigate(MyHoursRoute) }
+                }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Calendar", "Confirmed jobs, proposals, blocked days", Icons.Outlined.CalendarMonth) { nav.navigate(CompanyCalendarRoute) }
                 ZDivider(Modifier.padding(start = 60.dp))

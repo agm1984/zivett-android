@@ -10,6 +10,9 @@ import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.PreviewApiClient
 import com.zivett.app.features.company.MyDayModel
+import com.zivett.app.features.company.MyHoursModel
+import com.zivett.app.features.company.ShiftForm
+import com.zivett.app.core.network.ValidationErrors
 import com.zivett.app.features.company.TeamClockLogic
 import java.time.Instant
 import java.time.LocalDate
@@ -181,5 +184,66 @@ class TeamClockTest {
         assertTrue(TeamClockLogic.totals(MyHours.Totals(doubleMinutes = 30)).any { it.first == "Double time" })
         assertEquals("Mon, Nov 9 – Sun, Nov 22", TeamClockLogic.periodHeading(MyHours.Period("2026-11-09", "2026-11-22")))
         assertEquals("incl. 2 h overtime", TeamClockLogic.dayOvertime(MyHours.Day("2026-11-12", overtimeMinutes = 120)))
+    }
+
+    // The add / fix sheet
+
+    private val pacific = ZoneId.of("America/Vancouver")
+
+    @Test fun aLateShiftBodyEndsOnTheNextDay() {
+        val form = ShiftForm(day = LocalDate.of(2026, 11, 12), start = LocalTime.of(18, 0), end = LocalTime.of(2, 30), breakText = "30", note = " Forgot ")
+        val body = form.body("2026-11-09", pacific)
+        assertEquals("2026-11-13T02:00:00Z", body.startedAt)
+        assertEquals("2026-11-13T10:30:00Z", body.endedAt)
+        assertEquals(30, body.breakMinutes)
+        assertEquals("Forgot", body.note)
+        assertEquals("Paid time: 8 h — ends the next day", form.paidLine(pacific))
+        assertEquals("Paid time: 8 h", form.copy(start = LocalTime.of(8, 0), end = LocalTime.of(16, 30)).paidLine(pacific))
+    }
+
+    @Test fun theNoteIsRequiredAndAnOpenShiftMayStayOpen() {
+        val adding = ShiftForm.adding(LocalDate.of(2026, 11, 12))
+        assertFalse(adding.canSave)
+        assertTrue(adding.copy(note = "Forgot").canSave)
+        val shift = JsonCoding.json.decodeFromString<ClockState>(state).shift!!
+        val fixing = ShiftForm.fixing(shift, ZoneOffset.UTC)
+        assertEquals(5, fixing.shiftId)
+        assertEquals(LocalTime.of(15, 2), fixing.start)
+        assertNull(fixing.end)
+        assertTrue(fixing.stillOpen && fixing.copy(note = "Started earlier").canSave)
+        assertNull(fixing.copy(note = "x").body(null, ZoneOffset.UTC).endedAt)
+    }
+
+    @Test fun savingShowsTheServersRefusalInline() = runTest {
+        val client = PreviewApiClient()
+        val model = MyHoursModel(client)
+        model.openAdd()
+        model.form = model.form!!.copy(note = "Forgot to clock in")
+        client.errors[ClockEndpoints.addShift(model.form!!.body(null)).path] =
+            ApiError.Validation(ValidationErrors("Those hours overlap another shift.", mapOf("started_at" to listOf("Those hours overlap another shift."))))
+        assertFalse(model.save())
+        assertEquals("Those hours overlap another shift.", model.fieldErrors["started_at"])
+        assertNull(model.formError)
+        assertTrue(model.form != null)
+
+        // An approved period: a 422 with no field is the message itself.
+        model.openFix(JsonCoding.json.decodeFromString<ClockState>(state).shift!!)
+        model.form = model.form!!.copy(note = "x")
+        client.errors["api/company/my-hours/shifts/5"] = ApiError.Validation(ValidationErrors("This pay period is approved. Ask a company admin to change it."))
+        assertFalse(model.save())
+        assertEquals("This pay period is approved. Ask a company admin to change it.", model.formError)
+    }
+
+    @Test fun savingTakesTheNewPeriodAndCloses() = runTest {
+        val hours = MyHours(period = MyHours.Period("2026-11-09", "2026-11-22"))
+        val client = PreviewApiClient(mapOf("api/company/my-hours/shifts" to hours))
+        val model = MyHoursModel(client)
+        model.openAdd()
+        model.form = model.form!!.copy(note = "Forgot")
+        assertTrue(model.save())
+        assertNull(model.form)
+        assertEquals("Day added — the office will check it", model.toast)
+        assertEquals("2026-11-09", model.hours?.period?.start)
+        assertEquals("POST api/company/my-hours/shifts", client.sent.single())
     }
 }

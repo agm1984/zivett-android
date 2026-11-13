@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.zivett.app.app.CompanyJobRoute
 import com.zivett.app.app.LocalAppEnvironment
+import com.zivett.app.app.MyHoursRoute
 import com.zivett.app.app.OwnJobRoute
 import com.zivett.app.core.Loadable
 import com.zivett.app.core.models.ClockEndpoints
@@ -333,6 +334,7 @@ fun MyDayScreen() {
                     onResume = { scope.launch { model.endBreak() } },
                     onEnd = { confirmingEnd = true },
                 )
+                ZTextAction("My hours this pay period →", modifier = Modifier.align(Alignment.End)) { nav.navigate(MyHoursRoute) }
             }
 
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { day ->

@@ -69,6 +69,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class CompanyJobRoute(val jobId: Int, val openStart: Boolean = false, val advanceOnOpen: Boolean = false)
 /// My day pushed from More (org admins; field techs have it as a tab).
 @Serializable object MyDayRoute
+/// My hours — the person's pay period on the team clock (Business tools).
+@Serializable object MyHoursRoute
 /// The dashboard pushed from More (field techs, whose first tab is My day).
 @Serializable object CompanyDashboardRoute
 /// One of the company's own (Business tools) jobs, as its crew sees it.
