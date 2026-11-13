@@ -42,6 +42,7 @@ import com.zivett.app.design.ZSpacing
 import com.zivett.app.design.ZSpinner
 import com.zivett.app.design.ZTextAction
 import com.zivett.app.design.ZTextTone
+import com.zivett.app.design.ZTheme
 import com.zivett.app.design.ZTone
 import com.zivett.app.features.shared.LocalNav
 import kotlinx.coroutines.launch
@@ -132,8 +133,11 @@ fun CrewPickerSheet(
                                 // Booked off for this slot: auto-assignment skipped
                                 // them, but the dispatcher can still pick them.
                                 if (member.off) ZBadge("Off that day", ZTone.WARNING)
+                                // Already on another job then: never auto-picked, still pickable.
+                                if (member.busy.isNotEmpty()) ZBadge("Busy then", ZTone.WARNING)
                             }
                             ZCaption(if (member.needsPhoto) "Needs a profile photo before they can be assigned" else "${member.openJobs} open ${if (member.openJobs == 1) "job" else "jobs"}")
+                            CompanyPresentation.busyLine(member.busy)?.let { ZCaption(it, color = ZTheme.colors.warning, maxLines = 2) }
                         }
                         if (confirms && isCrew && slot == 0) ZBadge("Lead", ZTone.SUCCESS)
                         else if (confirms && slot >= 0) ZBadge(if (isCrew) "Crew" else "Going", ZTone.SUCCESS)

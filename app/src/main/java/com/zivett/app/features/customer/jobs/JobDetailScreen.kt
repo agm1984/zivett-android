@@ -306,7 +306,7 @@ private fun ProCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
                 }
             }
             job.scheduledDate?.takeIf { job.status in setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED) }?.let {
-                ZBanner("Arriving ${JobPresentation.arrivalLabel(it, job.scheduledWindow)}", tone = ZTone.INFO)
+                ZBanner("Arriving ${JobPresentation.arrivalLabel(it, job.scheduledWindow)}" + (JobPresentation.arrivalPlanLine(job)?.let { line -> "\n$line" } ?: ""), tone = ZTone.INFO)
             }
             ZCaption("Identity, license & insurance verified by ZiVETT.")
             if (job.status != JobStatus.CANCELLED) {

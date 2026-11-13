@@ -210,6 +210,14 @@ object JobPresentation {
         return "$day — ${windowLabel(window)}"
     }
 
+    /// "Mike R. plans to arrive around 9:30 am" — under the arrival banner
+    /// once the pro's dispatcher plans a time (2026-11-12).
+    fun arrivalPlanLine(job: Job): String? {
+        val time = job.arrivalTime ?: return null
+        val who = job.assignedTech?.name ?: job.company?.name ?: "Your pro"
+        return "$who plans to arrive around ${com.zivett.app.features.company.MyDayLogic.formatClock(time)}"
+    }
+
     // Warranty copy (`lib/warranty.js`) — never hardcode a number.
 
     fun warrantyLength(days: Int?): String? {

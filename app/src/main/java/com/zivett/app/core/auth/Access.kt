@@ -69,6 +69,14 @@ object Access {
         }
     }
 
+    /// A field tech — an approved company's MEMBER who takes jobs — opens
+    /// on My day (web `roleHome`): where to be and what to press, before
+    /// anything about the business. Admins and office staff keep the
+    /// dashboard; admins reach My day from More.
+    fun opensOnMyDay(user: User): Boolean =
+        user.role == UserRole.COMPANY && user.organization?.isApproved == true &&
+            user.organizationRole != OrganizationRole.ADMIN && user.takesJobs
+
     private fun isLive(destination: Destination): Boolean = when (destination) {
         Destination.Customer, Destination.Business, is Destination.Company -> true
         else -> false

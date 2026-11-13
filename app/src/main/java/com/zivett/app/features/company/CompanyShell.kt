@@ -20,6 +20,8 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.Text
@@ -39,7 +41,13 @@ import androidx.navigation.toRoute
 import com.zivett.app.app.Areas
 import com.zivett.app.app.CompanyAccountTab
 import com.zivett.app.app.CompanyCalendarRoute
+import com.zivett.app.app.CompanyDashboardRoute
 import com.zivett.app.app.CompanyDashboardTab
+import com.zivett.app.app.CompanyMyDayTab
+import com.zivett.app.app.MyDayRoute
+import com.zivett.app.app.MyHoursRoute
+import com.zivett.app.app.OwnJobRoute
+import com.zivett.app.core.auth.Access
 import com.zivett.app.app.CompanyInvoiceRoute
 import com.zivett.app.app.CompanyInvoicesRoute
 import com.zivett.app.app.CompanyJobRoute
@@ -106,9 +114,13 @@ fun CompanyShell(approved: Boolean) {
     val isAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
 
     val navBadges = rememberNavBadges()
+    // Field techs open on My day (web `roleHome`); their Dashboard moves
+    // into More so the bar stays at five.
+    val fieldTech = environment.session.user?.let { Access.opensOnMyDay(it) } == true
     val tabs = when {
         approved -> listOf(
-            shellTab(CompanyDashboardTab, "Dashboard", Icons.Filled.Home),
+            if (fieldTech) shellTab(CompanyMyDayTab, "My day", Icons.Outlined.Today)
+            else shellTab(CompanyDashboardTab, "Dashboard", Icons.Filled.Home),
             // New feed jobs since this member last looked (`GET /api/nav-badges`).
             shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome) { navBadges.count(NavBadgesModel.OPPORTUNITIES) },
             shellTab(CompanyQuotesTab, "Quotes", Icons.Outlined.Description),
@@ -134,7 +146,7 @@ fun CompanyShell(approved: Boolean) {
     // Back from Stripe's onboarding: the dashboard owns the payout-status
     // re-check (and its "Set up payouts" card), so land there.
     val onStripeReturn: ((androidx.navigation.NavHostController) -> Unit)? = if (!approved) null else { nav ->
-        nav.navigate(CompanyDashboardTab) {
+        nav.navigate(if (fieldTech) CompanyDashboardRoute else CompanyDashboardTab) {
             popUpTo(nav.graph.findStartDestination().id) { saveState = false }
             launchSingleTop = true
         }
@@ -144,10 +156,15 @@ fun CompanyShell(approved: Boolean) {
         tabs, NotificationArea.COMPANY,
         onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) },
         onStripeReturn = onStripeReturn,
-        onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target) },
+        onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target, myDayIsTab = fieldTech) },
         navBadges = navBadges,
     ) { nav ->
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
+        composable<CompanyMyDayTab> { BellScreen("My day") { MyDayScreen() } }
+        composable<MyDayRoute> { BellScreen("My day", onBack = { nav.popBackStack() }) { MyDayScreen() } }
+        composable<MyHoursRoute> { MyHoursScreen { nav.popBackStack() } }
+        composable<OwnJobRoute> { entry -> OwnJobScreen(entry.toRoute<OwnJobRoute>().jobId) { nav.popBackStack() } }
+        composable<CompanyDashboardRoute> { BellScreen("Dashboard", onBack = { nav.popBackStack() }) { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
         composable<CompanyQuotesTab> { BellScreen("Quotes") { CompanyQuotesScreen() } }
         composable<CompanyJobsTab> { BellScreen("Jobs") { CompanyActiveJobsScreen() } }
@@ -164,7 +181,7 @@ fun CompanyShell(approved: Boolean) {
             })
         }
 
-        composable<CompanyJobRoute> { entry -> entry.toRoute<CompanyJobRoute>().let { route -> CompanyJobDetailScreen(route.jobId, route.openStart) { nav.popBackStack() } } }
+        composable<CompanyJobRoute> { entry -> entry.toRoute<CompanyJobRoute>().let { route -> CompanyJobDetailScreen(route.jobId, route.openStart, route.advanceOnOpen) { nav.popBackStack() } } }
         composable<OpportunitiesRoute> { BellScreen("Opportunities", onBack = { nav.popBackStack() }) { OpportunitiesScreen() } }
         composable<CompanyQuotesRoute> { BellScreen("My quotes", onBack = { nav.popBackStack() }) { CompanyQuotesScreen() } }
         composable<CompanyCalendarRoute> { CompanyCalendarScreen { nav.popBackStack() } }
@@ -181,9 +198,11 @@ fun CompanyShell(approved: Boolean) {
 
 /// A non-job notification's destination (web `lib/notificationRoute.js`):
 /// new job near you → the feed (composer open for that job), quote
-/// released → My quotes, payout sent / payouts set up → Payouts. Tabs are
-/// switched the way the bar switches them.
-fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget) {
+/// released → My quotes, payout sent / payouts set up → Payouts, put on
+/// an own job → that job's crew page, the team clock's nudges → My day
+/// (the tab for field techs, pushed for everyone else) re-read on today.
+/// Tabs are switched the way the bar switches them.
+fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget, myDayIsTab: Boolean = false) {
     fun tab(route: Any) = nav.navigate(route) {
         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
@@ -193,6 +212,11 @@ fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTa
         is PushTarget.Opportunities -> { PendingOpportunity.code = target.jobCode; tab(CompanyOpportunitiesTab) }
         PushTarget.Quotes -> tab(CompanyQuotesTab)
         PushTarget.Payouts -> nav.navigate(PayoutsRoute)
+        is PushTarget.OwnJob -> nav.navigate(OwnJobRoute(target.id))
+        PushTarget.MyDay -> {
+            MyDayRefresh.request()
+            if (myDayIsTab) tab(CompanyMyDayTab) else nav.navigate(MyDayRoute) { launchSingleTop = true }
+        }
         is PushTarget.Job -> {}
     }
 }
@@ -219,6 +243,7 @@ fun CompanyMoreScreen() {
     var loggingOut by remember { mutableStateOf(false) }
     val user = environment.session.user ?: return
     val isAdmin = user.organizationRole == OrganizationRole.ADMIN
+    val fieldTech = Access.opensOnMyDay(user)
 
     Column {
         ZTopBar("More")
@@ -228,6 +253,15 @@ fun CompanyMoreScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { ZTitle(user.organization?.name ?: user.name); ZMono("Verified Pro") }
             }
             ZCard(padding = 0.dp) {
+                // Whichever of My day / Dashboard isn't a tab for this person.
+                if (fieldTech) AccountLink("Dashboard", "Your company at a glance", Icons.Filled.Home) { nav.navigate(CompanyDashboardRoute) }
+                else AccountLink("My day", "The jobs you're on, in the order you'll do them", Icons.Outlined.Today) { nav.navigate(MyDayRoute) }
+                // The team clock's pay period — Business tools companies only.
+                if (user.organization?.hasBusinessTools == true) {
+                    ZDivider(Modifier.padding(start = 60.dp))
+                    AccountLink("My hours", "Your pay period on the clock, and fixing a day", Icons.Outlined.Schedule) { nav.navigate(MyHoursRoute) }
+                }
+                ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Calendar", "Confirmed jobs, proposals, blocked days", Icons.Outlined.CalendarMonth) { nav.navigate(CompanyCalendarRoute) }
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Invoices", "What your completed jobs billed", Icons.Outlined.Description) { nav.navigate(CompanyInvoicesRoute) }

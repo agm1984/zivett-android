@@ -33,6 +33,8 @@ import kotlinx.serialization.Serializable
 @Serializable object CompanySetupTab
 @Serializable object CompanyTeamTab
 @Serializable object CompanyAccountTab
+/// Field techs' first tab: the jobs they're on today, in visit order.
+@Serializable object CompanyMyDayTab
 
 // Shared booker screens (`area` is "customer" or "business").
 @Serializable data class JobDetailRoute(val jobId: Int, val area: String)
@@ -62,7 +64,17 @@ import kotlinx.serialization.Serializable
 
 // Company.
 /// `openStart`: land on the Start job picker (the web's `?start=1`).
-@Serializable data class CompanyJobRoute(val jobId: Int, val openStart: Boolean = false)
+/// `advanceOnOpen`: My day's "On my way" — mark it en route on arrival so
+/// the page's live-location sharer starts (the web's `?go=1`).
+@Serializable data class CompanyJobRoute(val jobId: Int, val openStart: Boolean = false, val advanceOnOpen: Boolean = false)
+/// My day pushed from More (org admins; field techs have it as a tab).
+@Serializable object MyDayRoute
+/// My hours — the person's pay period on the team clock (Business tools).
+@Serializable object MyHoursRoute
+/// The dashboard pushed from More (field techs, whose first tab is My day).
+@Serializable object CompanyDashboardRoute
+/// One of the company's own (Business tools) jobs, as its crew sees it.
+@Serializable data class OwnJobRoute(val jobId: Int)
 @Serializable object CompanyCalendarRoute
 @Serializable object CompanyInvoicesRoute
 @Serializable data class CompanyInvoiceRoute(val invoiceId: Int)

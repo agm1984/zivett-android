@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,7 +84,7 @@ fun CalendarDaySheet(
     me: Int?,
     today: String,
     onDismiss: () -> Unit,
-    onOpenJob: (Int) -> Unit,
+    onOpenJob: (CalendarJob) -> Unit,
     onMove: (CalendarJob) -> Unit,
     onStart: (CalendarJob) -> Unit,
     onQuote: (CompanyCalendar.Opening) -> Unit,
@@ -188,16 +189,28 @@ fun CalendarDaySheet(
 
         // Jobs
         ZHeadline(if (jobs.isEmpty()) "No jobs this day" else "Jobs (${jobs.size})")
-        val numbers = stops.associate { it.job.id to it.number }
+        // Keyed by the row itself: own and ZiVETT ids can coincide.
+        val numbers = stops.associate { it.job to it.number }
         for (job in jobs) {
-            ZCard(padding = ZSpacing.sm, onClick = { onOpenJob(job.id) }) {
+            if (job.busy) {
+                // An own job the viewer can't open: the slot is taken, nothing more.
+                ZCard(padding = ZSpacing.sm) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                        ZCaption(CalendarLogic.timeTag(job), modifier = Modifier.weight(1f))
+                        CalendarStatusBadge(job)
+                    }
+                }
+                continue
+            }
+            ZCard(padding = ZSpacing.sm, onClick = { onOpenJob(job) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                    numbers[job.id]?.let { StopNumber(it) }
+                    numbers[job]?.let { StopNumber(it) }
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(leadColor(calendar, job)))
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         ZBodyStrong(job.title, maxLines = 1)
-                        ZCaption(listOfNotNull(CalendarLogic.windowTag(job.window), job.code).joinToString(" · "))
+                        ZCaption(listOfNotNull(CalendarLogic.timeTag(job).let { tag -> if (job.arrivalTime != null) "Around $tag" else tag }, job.code).joinToString(" · "))
                     }
-                    JobStatusBadge(job.status)
+                    CalendarStatusBadge(job)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                     CrewFaces(job, 26.dp)

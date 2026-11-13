@@ -51,14 +51,27 @@ data class CompanyCalendar(
     val base: Base? = null,
     val canManage: Boolean = false,
     val canQuote: Boolean = false,
+    /// The company's own (Business tools) jobs on their slots — full rows
+    /// for people who may open them, `busy` placeholders (when, nothing
+    /// else) for the rest. Absent before 2026-11-12. A row that doesn't
+    /// decode is dropped.
+    @Serializable(with = OwnCalendarJobsSerializer::class) val ownJobs: List<OwnCalendarJob> = emptyList(),
+    /// Whether full own-job rows open (Business tools, or on the crew).
+    val canOpenOwnJobs: Boolean = false,
 ) {
+    /// ZiVETT jobs and own jobs as ONE list — what the grid, the board, the
+    /// day sheet and the map read. Busy placeholders get negative ids (they
+    /// never open).
+    val entries: List<CalendarJob> get() = jobs + ownJobs.mapIndexed { index, row -> row.toCalendarJob(index) }
+
     /// Fields mirror `CalendarController::jobRow`.
     @Serializable
     data class CalendarJob(
         val id: Int,
         val code: String? = null,
-        val title: String,
-        val status: JobStatus,
+        val title: String = "",
+        /// Null on own jobs (their lifecycle is `ownStatus`).
+        val status: JobStatus? = null,
         val mode: String? = null,
         /// Scheduled date, or the acceptance day for instant work — the
         /// server drops rows with neither.
@@ -78,8 +91,66 @@ data class CompanyCalendar(
         /// Accepted, nobody en route, past the progress SLA's nudge.
         val overdue: Boolean = false,
         val movable: Boolean = false,
+        /// The dispatcher's planned arrival inside the window ("09:30").
+        val arrivalTime: String? = null,
+        /// The accepted quote's estimated hours.
+        val hours: Double? = null,
+        /// [start, end] minutes from midnight (`TechSchedule::jobSpan`).
+        val span: List<Int>? = null,
+        // Set only on rows made from `own_jobs` (never on the wire for
+        // ZiVETT jobs): `kind` = "own", `ownStatus` its ProJobStatus,
+        // `busy` = a placeholder with no detail, `startTime` its start.
+        val kind: String = DayJob.KIND_JOB,
+        val ownStatus: String? = null,
+        val busy: Boolean = false,
+        val startTime: String? = null,
     ) {
         val lead: CrewTech? get() = crew.firstOrNull()
+        val isOwn: Boolean get() = kind == DayJob.KIND_OWN
+        /// Planned arrival (ZiVETT) or start time (own).
+        val clockTime: String? get() = arrivalTime ?: startTime
+    }
+
+    /// One `own_jobs` row (`ProJobPayload::calendarRow`). A `busy: true`
+    /// row's id is a string ("busy-12") and it carries only the slot.
+    @Serializable
+    data class OwnCalendarJob(
+        val id: RouteParam,
+        val busy: Boolean = false,
+        val code: String? = null,
+        val title: String? = null,
+        val status: String? = null,
+        val customerName: String? = null,
+        val address: String? = null,
+        val lat: Double? = null,
+        val lng: Double? = null,
+        val categoryCode: String? = null,
+        val crew: List<CrewTech> = emptyList(),
+        val mine: Boolean = false,
+        val date: String,
+        val window: String? = null,
+        val startTime: String? = null,
+        val estimatedHours: Double? = null,
+        val span: List<Int>? = null,
+    ) {
+        fun toCalendarJob(index: Int): CalendarJob = CalendarJob(
+            id = if (busy) -(index + 1) else (id.intValue ?: -(index + 1)),
+            code = if (busy) null else code,
+            title = if (busy) "Busy" else title.orEmpty(),
+            date = date,
+            window = window,
+            categoryCode = categoryCode,
+            address = address,
+            lat = lat,
+            lng = lng,
+            crew = crew,
+            hours = estimatedHours,
+            span = span,
+            kind = DayJob.KIND_OWN,
+            ownStatus = status,
+            busy = busy,
+            startTime = startTime,
+        )
     }
 
     @Serializable data class CrewTech(val id: Int, val name: String, val photoUrl: String? = null)
@@ -157,6 +228,21 @@ data class RescheduleSlots(val slots: List<Slot> = emptyList(), val rescheduleRe
 }
 
 @Serializable data class RescheduleBody(val date: String, val window: String, val reason: String? = null)
+
+/// The calendar's `own_jobs`, dropping rows that don't decode rather than
+/// failing the whole calendar.
+object OwnCalendarJobsSerializer : KSerializer<List<CompanyCalendar.OwnCalendarJob>> {
+    private val delegate = ListSerializer(CompanyCalendar.OwnCalendarJob.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<CompanyCalendar.OwnCalendarJob> {
+        val input = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
+        val element = input.decodeJsonElement() as? JsonArray ?: return emptyList()
+        return element.mapNotNull { row -> runCatching { JsonCoding.json.decodeFromJsonElement(CompanyCalendar.OwnCalendarJob.serializer(), row) }.getOrNull() }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<CompanyCalendar.OwnCalendarJob>) = delegate.serialize(encoder, value)
+}
 
 /// The calendar's `openings`: an object of date → rows, or `[]` when PHP
 /// had nothing to key. A row that doesn't decode is dropped rather than

@@ -42,6 +42,34 @@ object CompanyPresentation {
         callUri(job.customer?.phone) != null && job.status in setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE, JobStatus.ARRIVED, JobStatus.IN_PROGRESS)
 
     /// `onCrew`: the user is one of the techs going (lead or crew).
+    // Planned arrival (web `AssignTechCard`, `ArrivalTimes`)
+
+    /// `TechSchedule::WINDOWS` in minutes from midnight.
+    private val windowMinutes = mapOf("morning" to (8 * 60 to 12 * 60), "afternoon" to (12 * 60 to 17 * 60), "evening" to (17 * 60 to 21 * 60))
+
+    /// The dispatcher can plan an arrival only before the crew is on site,
+    /// on a non-instant job with an agreed slot.
+    fun plansArrival(job: Job): Boolean =
+        job.scheduledDate != null && job.scheduledWindow != null && job.mode != "instant" &&
+            job.status in setOf(JobStatus.ACCEPTED, JobStatus.EN_ROUTE)
+
+    /// Every quarter hour a crew can arrive in a window: "08:00" … "11:45".
+    fun arrivalOptions(window: String?): List<String> {
+        val (from, to) = windowMinutes[window] ?: return emptyList()
+        return (from until to step 15).map { MyDayLogic.clock(it) }
+    }
+
+    /// "Any time · Morning (8am–12pm)" / "Around 9:30 am".
+    fun arrivalLabel(job: Job): String = job.arrivalTime?.let { "Around ${MyDayLogic.formatClock(it)}" }
+        ?: "Any time · ${job.scheduledWindow?.let { JobPresentation.windowLabel(it) } ?: "in the window"}"
+
+    /// "On J-1042 · 9:00 am – 11:00 am" — the jobs a teammate is already on
+    /// during this one's slot (web `CrewPickerModal.busyLine`).
+    fun busyLine(busy: List<com.zivett.app.core.models.BusyBooking>): String? = busy.takeIf { it.isNotEmpty() }?.joinToString("; ") { booking ->
+        val times = listOfNotNull(booking.start, booking.end).map { MyDayLogic.formatClock(it) }.joinToString(" – ")
+        listOfNotNull("On ${booking.code ?: booking.title ?: "another job"}", times.ifEmpty { null }).joinToString(" · ")
+    }
+
     fun onCrew(job: Job, user: User?): Boolean = user != null && job.isAssigned(user.id)
 
     /// The company-side primary action (`companyJobAction` in lib/jobs.js),

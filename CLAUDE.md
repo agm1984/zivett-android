@@ -161,6 +161,63 @@ the booker answers on the job page's `RescheduleCard`
 `[]` for empty objects: `load` uses `PhpRatesSerializer`, `openings`
 its own `OpeningsSerializer` (drops undecodable rows).
 
+**Dispatch additions (2026-11-12).** The calendar reads ONE list,
+`CompanyCalendar.entries` = ZiVETT `jobs` + `own_jobs` (Business tools,
+`OwnCalendarJobsSerializer` drops bad rows) mapped to `CalendarJob` with
+`kind = "own"`, `ownStatus`, `startTime`; a `busy: true` row (string id
+"busy-12", slot only) becomes a negative-id "Busy" chip that never opens.
+`status` is nullable for that reason — render through
+`CalendarStatusBadge`, open through the screen's `openEntry` (own →
+`OwnJobRoute`, ZiVETT → `CompanyJobRoute`). Jobs wear their LEAD's colour
+(`ZColors.techColors`, team order, cycling; a lead off the roster falls
+back to id mod 10; nobody = `noTech`) via `CalendarLogic.colorIndex` /
+`leadColor`. The filter is `TechFilter(hidden, hideUnassigned)` (a tick per
+person + "No tech yet", "Only"); the board's row is "No tech yet" and shows
+only when the range has unassigned work. Month | Week | List — List is
+`?start=&days=14` (`rangeCalendar`, `CalendarLogic.agenda`). Days sort by
+`CalendarLogic.visitOrder` (instant, then span start, then window).
+
+## My day & own jobs (2026-11-12)
+
+`features/company/MyDay.kt` (`MyDayModel` + `MyDayLogic`) reads
+`GET /api/company/my-day?date=` (`core/models/MyDayModels.kt`). Field techs
+(`Access.opensOnMyDay`: approved company, member, `takes_jobs`) get it as
+the FIRST tab with Dashboard moved into More; admins and office staff get
+a My day row in More. A card's `next`: `advance` to en_route opens
+`CompanyJobRoute(advanceOnOpen = true)` so the job page's own advance →
+live-location path runs; other `advance` steps and `own_status` post from
+My day; `start` opens the Start job picker (`openStart`); `waiting` is
+text. Every action re-reads the day; it also refetches on resume and on
+`NavBadgesModel.liveEvents`. `features/company/OwnJob.kt` is the crew view
+of an own job (`GET /api/company/own-jobs/{id}`, start/finish, the job
+timer — `own-jobs/{id}/clock-in|out`, worded "Start/Stop job timer"); `company.own-jobs.show` notifications route there
+(`PushTarget.OwnJob`). Planned arrival: `PATCH .../jobs/{id}/arrival`
+(explicit null clears) from the company job page's crew card;
+`JobPresentation.arrivalPlanLine` on the booker's arrival banner. Crew
+picker members carry `busy` ("Busy then" + `CompanyPresentation.busyLine`).
+`MyDayTest`.
+
+## Team clock & My hours (2026-11-12)
+
+Two clocks, never blurred: the TEAM CLOCK is the person's working day
+(`api/company/clock` in/out/break, `TeamShifts` server-side) and the JOB
+TIMER is where that time went on an own job. Wording follows the web —
+"Start my day / Take a break / End my day" vs "Start / Stop job timer".
+Models in `core/models/ClockModels.kt`; Business tools companies only —
+`ApiClient.clockState()` reads a 404 as disabled, `MyDay.shift` carries
+the same state, `Organization.hasBusinessTools` gates the More row. All
+wording and maths is `TeamClockLogic` (`features/company/TeamClock.kt`,
+`ClockCard`, `EndDayDialog`); `MyDayModel` owns the clock actions
+(`clock`, `clockLoadedAt` anchors the ticking minutes). My hours is
+`features/company/MyHours.kt` (`MyHoursModel`, `ShiftForm`: an end at or
+before the start is the NEXT day, the note is required, `date` = the
+viewed period's start so the answer stays on it; a 422 shows inline —
+per field, or the message alone for an approved period). The server
+starts a forgotten day at the first work action and closes a forgotten
+one after 14 h; its "Still working?" / "We clocked you out" pushes route
+`company.my-day` → `PushTarget.MyDay` → My day on today
+(`MyDayRefresh`). `TeamClockTest`.
+
 ## My quotes (2026-10-25)
 
 Contract: `docs/mobile-api.md` "My quotes". `CompanyQuotesScreen`

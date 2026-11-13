@@ -229,6 +229,9 @@ data class Job(
     val urgency: String? = null,
     val scheduledDate: String? = null,
     val scheduledWindow: String? = null,
+    /// The company's planned arrival inside the agreed window ("09:30"),
+    /// set by its dispatcher (2026-11-12); null = any time in the window.
+    val arrivalTime: String? = null,
     val availabilityWindows: List<AvailabilityWindow>? = null,
     val status: JobStatus,
     val estimateMin: Int? = null,

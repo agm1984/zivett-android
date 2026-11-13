@@ -93,50 +93,123 @@ object CalendarLogic {
 
     fun warns(job: CalendarJob): Boolean = job.overdue || job.needsCrew || job.needsStart
 
-    // Tech filter
+    // Team filter (admins): a tick per person + "No tech yet"
 
-    sealed interface TechFilter {
-        data object Everyone : TechFilter
-        data object Unassigned : TechFilter
-        data class Member(val id: Int) : TechFilter
+    /// Who's shown: everyone not `hidden`, plus jobs with nobody on them
+    /// unless `hideUnassigned`. Busy placeholders (an own job you may not
+    /// open) always show — they say a slot is taken.
+    data class TechFilter(val hidden: Set<Int> = emptySet(), val hideUnassigned: Boolean = false) {
+        val everyone: Boolean get() = hidden.isEmpty() && !hideUnassigned
+
+        fun shows(memberId: Int): Boolean = memberId !in hidden
+
+        fun toggled(memberId: Int): TechFilter = copy(hidden = if (memberId in hidden) hidden - memberId else hidden + memberId)
+        fun toggledUnassigned(): TechFilter = copy(hideUnassigned = !hideUnassigned)
+
+        /// "Only" one person (the web sidebar's shortcut).
+        fun only(memberId: Int, team: List<CompanyCalendar.CalendarMember>): TechFilter =
+            TechFilter(hidden = team.map { it.id }.filter { it != memberId }.toSet(), hideUnassigned = true)
+
+        companion object {
+            val Everyone = TechFilter()
+        }
     }
 
-    fun matches(job: CalendarJob, filter: TechFilter): Boolean = when (filter) {
-        TechFilter.Everyone -> true
-        TechFilter.Unassigned -> job.crew.isEmpty()
-        is TechFilter.Member -> job.crew.any { it.id == filter.id }
+    fun matches(job: CalendarJob, filter: TechFilter): Boolean = when {
+        job.busy -> true
+        job.crew.isEmpty() -> !filter.hideUnassigned
+        else -> job.crew.any { filter.shows(it.id) }
     }
 
     fun filtered(jobs: List<CalendarJob>, filter: TechFilter): List<CalendarJob> = jobs.filter { matches(it, filter) }
 
+    /// A day's visits, ZiVETT and own, in the order they'll happen: placed
+    /// times first by their start, then window order.
     fun jobsOn(calendar: CompanyCalendar, date: String, filter: TechFilter = TechFilter.Everyone): List<CalendarJob> =
-        calendar.jobs.filter { it.date == date && matches(it, filter) }.sortedBy { windowOrder(it.window) }
+        calendar.entries.filter { it.date == date && matches(it, filter) }.sortedWith(visitOrder)
+
+    /// Instant ("Now") first, then by the visit's start minute (span), then
+    /// window order — the web's agenda sort.
+    val visitOrder: Comparator<CalendarJob> = compareBy({ if (it.window == null && !it.isOwn) 0 else 1 }, { it.span?.firstOrNull() ?: windowStart(it.window) }, { windowOrder(it.window) })
+
+    /// `TechSchedule::WINDOWS` start minute; unknown windows sort last.
+    fun windowStart(window: String?): Int = when (window) {
+        "morning" -> 8 * 60
+        "afternoon" -> 12 * 60
+        "evening" -> 17 * 60
+        null -> 0
+        else -> 24 * 60
+    }
+
+    // Colours: one per team member, jobs wear their lead's
+
+    /// Index into the tech palette for `userId` — team order, cycling; a
+    /// lead outside the visible roster (a member's payload carries only
+    /// themselves) falls back to their id. Null = nobody (grey).
+    fun colorIndex(team: List<CompanyCalendar.CalendarMember>, userId: Int?, size: Int = 10): Int? {
+        userId ?: return null
+        val at = team.indexOfFirst { it.id == userId }
+        return if (at >= 0) at % size else Math.floorMod(userId, size)
+    }
+
+    fun leadColorIndex(calendar: CompanyCalendar, job: CalendarJob, size: Int = 10): Int? = colorIndex(calendar.team, job.lead?.id, size)
+
+    // Time of day
+
+    /// "9:30 am" when a time is planned (arrival or own-job start), else
+    /// the window tag ("Morning", "Now").
+    fun timeTag(job: CalendarJob): String = job.clockTime?.let { MyDayLogic.formatClock(it) } ?: windowTag(job.window)
+
+    /// The list rows' when line: "Thu, Nov 12 · Morning · around 9:30 am".
+    fun whenLine(job: CalendarJob): String {
+        val slot = slotLine(job.date, job.window)
+        val time = job.clockTime?.let { MyDayLogic.formatClock(it) } ?: return slot
+        return if (job.isOwn) "$slot · $time" else "$slot · around $time"
+    }
 
     // Week board
 
-    /// One row of the dispatch board: a team member (null = Unassigned)
+    /// One row of the dispatch board: a team member (null = No tech yet)
     /// and their jobs per date. A crew job sits on every crew member's row.
     data class BoardRow(val member: CompanyCalendar.CalendarMember?, val jobsByDate: Map<String, List<CalendarJob>>) {
-        val label: String get() = member?.display ?: "Unassigned"
+        val label: String get() = member?.display ?: "No tech yet"
     }
 
     fun boardRows(calendar: CompanyCalendar, filter: TechFilter = TechFilter.Everyone): List<BoardRow> {
         val rows = mutableListOf<BoardRow>()
+        val placed = calendar.entries.filter { !it.busy }
         for (member in calendar.team) {
-            if (filter is TechFilter.Member && filter.id != member.id) continue
-            if (filter == TechFilter.Unassigned) continue
-            val mine = calendar.jobs.filter { job -> job.crew.any { it.id == member.id } }
-            rows += BoardRow(member, mine.groupBy { it.date }.mapValues { (_, list) -> list.sortedBy { windowOrder(it.window) } })
+            if (!filter.shows(member.id)) continue
+            val mine = placed.filter { job -> job.crew.any { it.id == member.id } }
+            rows += BoardRow(member, mine.groupBy { it.date }.mapValues { (_, list) -> list.sortedWith(visitOrder) })
         }
-        if (filter == TechFilter.Everyone || filter == TechFilter.Unassigned) {
-            val unassigned = calendar.jobs.filter { it.crew.isEmpty() }
-            // Only admins see unassigned work (a member's payload is just theirs).
-            if (calendar.canManage || unassigned.isNotEmpty()) {
-                rows += BoardRow(null, unassigned.groupBy { it.date }.mapValues { (_, list) -> list.sortedBy { windowOrder(it.window) } })
+        if (!filter.hideUnassigned) {
+            val unassigned = placed.filter { it.crew.isEmpty() }
+            // Only when that range has work with nobody on it (web review #13).
+            if (unassigned.isNotEmpty()) {
+                rows += BoardRow(null, unassigned.groupBy { it.date }.mapValues { (_, list) -> list.sortedWith(visitOrder) })
             }
         }
         return rows
     }
+
+    // List view (the next fortnight)
+
+    const val LIST_DAYS = 14
+
+    /// "Nov 12 – 25" / "Nov 26 – Dec 9".
+    fun rangeLabel(start: LocalDate, days: Int = LIST_DAYS): String {
+        val end = start.plusDays(days - 1L)
+        val tail = if (end.month == start.month) end.dayOfMonth.toString() else weekTitle.format(end)
+        return "${weekTitle.format(start)} – $tail"
+    }
+
+    /// The days in the range that have something on them, each with its
+    /// visits in order.
+    fun agenda(calendar: CompanyCalendar, start: LocalDate, filter: TechFilter, days: Int = LIST_DAYS): List<Pair<String, List<CalendarJob>>> =
+        (0L until days).map { dateKey(start.plusDays(it)) }
+            .map { date -> date to jobsOn(calendar, date, filter) }
+            .filter { (_, jobs) -> jobs.isNotEmpty() }
 
     // Time off
 
@@ -223,8 +296,8 @@ object CalendarLogic {
 
     /// The day's located jobs in window order, numbered from 1.
     fun stops(jobs: List<CalendarJob>): List<Stop> =
-        jobs.sortedBy { windowOrder(it.window) }
-            .filter { it.lat != null && it.lng != null }
+        jobs.sortedWith(visitOrder)
+            .filter { !it.busy && it.lat != null && it.lng != null }
             .mapIndexed { i, job -> Stop(i + 1, job, job.lat!!, job.lng!!) }
 
     /// Straight-line legs: base → stop 1 → stop 2 …; without a base the
