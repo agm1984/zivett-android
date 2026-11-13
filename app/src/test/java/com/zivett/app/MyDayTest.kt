@@ -186,9 +186,9 @@ class MyDayTest {
 
     @Test fun theClockStripCountsUp() {
         val clock = JsonCoding.json.decodeFromString<MyDay>(day).clock!!
-        assertEquals("Clocked in on J-1042 · Gutter clean", MyDayLogic.clockTitle(clock))
+        assertEquals("Job timer running on J-1042 · Gutter clean", MyDayLogic.clockTitle(clock))
         val now = Instant.parse("2026-11-12T18:17:00Z")
-        assertEquals("since 5:12 pm · 1 h 05 min", MyDayLogic.clockSince(clock, now, ZoneOffset.UTC))
+        assertEquals("Since 5:12 pm · 1 h 05 min", MyDayLogic.clockSince(clock, now, ZoneOffset.UTC))
         assertEquals("12 min", MyDayLogic.elapsed(Instant.parse("2026-11-12T18:05:00Z"), now))
     }
 
@@ -197,6 +197,10 @@ class MyDayTest {
         assertFalse(MyDayLogic.showsClock(decoded.jobs[0], decoded))
         assertTrue(MyDayLogic.showsClock(decoded.jobs[1], decoded))
         assertFalse(MyDayLogic.showsClock(decoded.jobs[1], decoded.copy(canClock = false)))
+        // Job timer: Start only once the job is in progress (web), Stop while it runs.
+        assertNull(MyDayLogic.jobTimerButton(decoded.jobs[1], decoded))
+        assertEquals("Start job timer", MyDayLogic.jobTimerButton(decoded.jobs[1].copy(status = "in_progress"), decoded))
+        assertEquals("Stop job timer", MyDayLogic.jobTimerButton(decoded.jobs[1].copy(clock = DayJob.JobClock(running = true)), decoded))
     }
 
     @Test fun onMyWayOpensTheJobPageEverythingElsePostsHere() {
@@ -241,7 +245,7 @@ class MyDayTest {
         client.responses[MyDayEndpoints.clockIn(12).path] = OwnJobResponse(com.zivett.app.core.models.OwnJob(id = 12))
         model.clockIn(today.jobs[1])
         assertEquals("POST api/company/own-jobs/12/clock-in", client.sent.first())
-        assertEquals("Clocked in on J-1042", model.toast)
+        assertEquals("Job timer started on J-1042", model.toast)
     }
 
     // The own job page
@@ -275,7 +279,7 @@ class MyDayTest {
         val model = com.zivett.app.features.company.OwnJobModel(12, client)
         model.setStatus("in_progress")
         assertEquals("in_progress", model.job?.status)
-        assertEquals("Job started — you're clocked in", model.toast)
+        assertEquals("Job started — the job timer is running", model.toast)
         assertEquals(listOf("POST api/company/own-jobs/12/status"), client.sent)
     }
 

@@ -27,6 +27,8 @@ import com.zivett.app.app.CompanyJobRoute
 import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.OwnJobRoute
 import com.zivett.app.core.Loadable
+import com.zivett.app.core.models.ClockEndpoints
+import com.zivett.app.core.models.ClockState
 import com.zivett.app.core.models.CompanyEndpoints
 import com.zivett.app.core.models.DayJob
 import com.zivett.app.core.models.JobStatus
@@ -131,15 +133,16 @@ object MyDayLogic {
         return if (minutes < 60) "$minutes min" else String.format(Locale.US, "%d h %02d min", minutes / 60, minutes % 60)
     }
 
-    /// "Clocked in on J-1042 · Gutter clean".
+    /// "Job timer running on J-1042 · Gutter clean" — the per-job clock,
+    /// worded apart from the team clock's working day.
     fun clockTitle(clock: MyDay.RunningClock): String =
-        "Clocked in on " + listOfNotNull(clock.code, clock.title).joinToString(" · ").ifEmpty { "a job" }
+        "Job timer running on " + listOfNotNull(clock.code, clock.title).joinToString(" · ").ifEmpty { "a job" }
 
-    /// "since 9:12 am · 1 h 05 min".
+    /// "Since 9:12 am · 1 h 05 min".
     fun clockSince(clock: MyDay.RunningClock, now: Instant, zone: ZoneId = ZoneId.systemDefault()): String? {
         val started = clock.startedAt ?: return null
         val at = DateTimeFormatter.ofPattern("h:mm a", Locale.US).withZone(zone).format(started).lowercase(Locale.US)
-        return "since $at · ${elapsed(started, now)}"
+        return "Since $at · ${elapsed(started, now)}"
     }
 
     private val longDay = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.US)
@@ -159,8 +162,17 @@ object MyDayLogic {
         else -> "${day.jobs.size} jobs"
     }
 
-    /// Clock buttons ride open own jobs when the org has Business tools.
+    /// Job timer buttons ride open own jobs when the org has Business tools.
     fun showsClock(job: DayJob, day: MyDay): Boolean = job.isOwn && job.clock != null && day.canClock
+
+    /// The job timer button: Stop while it runs, Start once the job is in
+    /// progress (web `MyDay.vue`), else none.
+    fun jobTimerButton(job: DayJob, day: MyDay): String? = when {
+        !showsClock(job, day) -> null
+        job.clock?.running == true -> "Stop job timer"
+        job.status == OwnJobStatus.IN_PROGRESS -> "Start job timer"
+        else -> null
+    }
 
     /// "On my way" goes through the job page, which starts live location
     /// sharing; every other step posts from here.
@@ -180,11 +192,49 @@ class MyDayModel(private val client: ApiClient) {
         private set
     var toast by mutableStateOf<String?>(null)
 
+    /// The team clock (my working day) — from the day, then each clock
+    /// action's answer. `clockLoadedAt` anchors the ticking minutes.
+    var clock by mutableStateOf<ClockState?>(null)
+        private set
+    var clockLoadedAt by mutableStateOf(Instant.now())
+        private set
+    var clockBusy by mutableStateOf(false)
+        private set
+
     val day: MyDay? get() = state.value
 
     suspend fun load() {
         state = state.reloaded { client.send(MyDayEndpoints.day(date?.let { CalendarLogic.dateKey(it) })) }
+        state.value?.shift?.let { applyClock(it) }
     }
+
+    private fun applyClock(value: ClockState) {
+        clock = value
+        clockLoadedAt = Instant.now()
+    }
+
+    /// Start / end the day and breaks; each answers with the clock state,
+    /// then the day re-reads (ending the day stops a job timer too).
+    private suspend fun dayClock(success: String, operation: suspend () -> ClockState) {
+        if (clockBusy) return
+        clockBusy = true
+        try {
+            applyClock(operation())
+            toast = success
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            toast = e.userMessage
+        } finally {
+            clockBusy = false
+        }
+        load()
+    }
+
+    suspend fun startDay() = dayClock("You're clocked in — have a good day") { client.send(ClockEndpoints.clockIn()) }
+    suspend fun endDay() = dayClock("Clocked out — your hours are saved") { client.send(ClockEndpoints.clockOut()) }
+    suspend fun startBreak() = dayClock("On a break") { client.send(ClockEndpoints.startBreak()) }
+    suspend fun endBreak() = dayClock("Back on the clock") { client.send(ClockEndpoints.endBreak()) }
 
     /// The loaded day, else what was asked for.
     private fun current(): LocalDate? = day?.date?.let { CalendarLogic.parse(it) } ?: date
@@ -224,13 +274,14 @@ class MyDayModel(private val client: ApiClient) {
     /// The ZiVETT job's next stage (arrived, start work, work complete).
     suspend fun advance(job: DayJob) = act(job, null) { client.send(CompanyEndpoints.advance(job.id)) }
 
-    /// An own job's Start (clocks you in) or Finish (stops every clock).
-    suspend fun ownStatus(job: DayJob, status: String) = act(job, if (status == OwnJobStatus.COMPLETED) "${job.code ?: job.title} finished" else null) {
+    /// An own job's Start (starts your job timer) or Finish (stops every one).
+    suspend fun ownStatus(job: DayJob, status: String) = act(job, if (status == OwnJobStatus.COMPLETED) "${job.code ?: job.title} finished" else "${job.code ?: job.title} started — the job timer is running") {
         client.send(MyDayEndpoints.ownJobStatus(job.id, status))
     }
 
-    suspend fun clockIn(job: DayJob) = act(job, "Clocked in on ${job.code ?: job.title}") { client.send(MyDayEndpoints.clockIn(job.id)) }
-    suspend fun clockOut(jobId: Int, label: String?) = act(null, "Clocked out${label?.let { " of $it" } ?: ""}") { client.send(MyDayEndpoints.clockOut(jobId)) }
+    /// The job timer (own jobs) — where the day's time went.
+    suspend fun clockIn(job: DayJob) = act(job, "Job timer started on ${job.code ?: job.title}") { client.send(MyDayEndpoints.clockIn(job.id)) }
+    suspend fun clockOut(jobId: Int) = act(null, "Job timer stopped — your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)) }
 }
 
 @Composable
@@ -252,10 +303,11 @@ fun MyDayScreen() {
     val liveEvents = LocalNavBadges.current?.liveEvents ?: 0
     LaunchedEffect(liveEvents) { if (liveEvents > 0) model.load() }
 
-    // The running clock's minutes tick while it's on screen.
+    // The running clocks' minutes tick while they're on screen.
     var now by remember { mutableStateOf(Instant.now()) }
-    val running = model.day?.clock != null
+    val running = model.day?.clock != null || model.clock?.clockedIn == true
     LaunchedEffect(running) { while (running) { now = Instant.now(); delay(30_000) } }
+    var confirmingEnd by remember { mutableStateOf(false) }
 
     ZToastBox(model.toast, { model.toast = null }) {
         ZScreen(onRefresh = { model.load() }) {
@@ -272,9 +324,20 @@ fun MyDayScreen() {
             }
             if (!isToday) ZTextAction("Back to today", modifier = Modifier.align(Alignment.CenterHorizontally)) { scope.launch { model.goToday() } }
 
+            // My working day (the team clock) — today only, Business tools only.
+            model.clock?.takeIf { it.enabled && isToday }?.let { clock ->
+                ClockCard(
+                    clock, model.clockLoadedAt, now, model.clockBusy,
+                    onStart = { scope.launch { model.startDay() } },
+                    onBreak = { scope.launch { model.startBreak() } },
+                    onResume = { scope.launch { model.endBreak() } },
+                    onEnd = { confirmingEnd = true },
+                )
+            }
+
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { day ->
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                    day.clock?.let { clock -> ClockStrip(clock, now, model.working != null) { scope.launch { model.clockOut(clock.jobId, clock.code) } } }
+                    day.clock?.let { clock -> ClockStrip(clock, now, model.working != null) { scope.launch { model.clockOut(clock.jobId) } } }
                     if (day.jobs.isEmpty()) {
                         ZEmptyState(Icons.Outlined.Today, if (isToday) "Nothing on today" else "Nothing booked", "Jobs you're on show up here in the order you'll do them.")
                     }
@@ -290,7 +353,7 @@ fun MyDayScreen() {
                                 }
                             },
                             onClockIn = { scope.launch { model.clockIn(job) } },
-                            onClockOut = { scope.launch { model.clockOut(job.id, job.code) } },
+                            onClockOut = { scope.launch { model.clockOut(job.id) } },
                             onCall = { phone -> CompanyPresentation.callUri(phone)?.let { openUrl(context, it) } },
                             onDirections = { MyDayLogic.directionsUrl(job.lat, job.lng, job.address)?.let { openUrl(context, it) } },
                             onOpen = { if (job.isOwn) nav.navigate(OwnJobRoute(job.id)) else nav.navigate(CompanyJobRoute(job.id)) },
@@ -301,9 +364,10 @@ fun MyDayScreen() {
             }
         }
     }
+    if (confirmingEnd) EndDayDialog(onConfirm = { confirmingEnd = false; scope.launch { model.endDay() } }, onDismiss = { confirmingEnd = false })
 }
 
-/// "Clocked in on J-1042 · Gutter clean — since 9:12 am · 1 h 05 min".
+/// "Job timer running on J-1042 · Gutter clean — Since 9:12 am · 1 h 05 min".
 @Composable
 private fun ClockStrip(clock: MyDay.RunningClock, now: Instant, busy: Boolean, onClockOut: () -> Unit) {
     val colors = ZTheme.colors
@@ -313,7 +377,7 @@ private fun ClockStrip(clock: MyDay.RunningClock, now: Instant, busy: Boolean, o
                 ZBodyStrong(MyDayLogic.clockTitle(clock), maxLines = 2)
                 MyDayLogic.clockSince(clock, now)?.let { ZCaption(it, color = colors.success) }
             }
-            ZButton("Clock out", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, loading = busy, onClick = onClockOut)
+            ZButton("Stop timer", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, loading = busy, onClick = onClockOut)
         }
     }
 }
@@ -363,9 +427,8 @@ private fun DayJobCard(
             else ZButton(next.label, style = ZButtonStyle.SUCCESS, loading = working, enabled = !anyWorking || working) { onNext(next) }
         }
         ZFlowRow(spacing = ZSpacing.xs) {
-            if (MyDayLogic.showsClock(job, day)) {
-                if (job.clock?.running == true) ZButton("Clock out", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !anyWorking, onClick = onClockOut)
-                else ZButton("Clock in", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !anyWorking, onClick = onClockIn)
+            MyDayLogic.jobTimerButton(job, day)?.let { label ->
+                ZButton(label, style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !anyWorking, onClick = if (job.clock?.running == true) onClockOut else onClockIn)
             }
             if (MyDayLogic.directionsUrl(job.lat, job.lng, job.address) != null) ZButton("Directions", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, onClick = onDirections)
             ZButton("Open job", style = ZButtonStyle.GHOST, compact = true, fullWidth = false, onClick = onOpen)

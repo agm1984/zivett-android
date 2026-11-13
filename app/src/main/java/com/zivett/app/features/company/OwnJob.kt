@@ -67,7 +67,7 @@ object OwnJobLogic {
         else -> null
     }
 
-    /// The crew clocks in on open jobs.
+    /// The crew runs a job timer on open jobs.
     fun showsClock(job: OwnJob, me: Int?): Boolean = isOpen(job) && job.onCrew(me)
 
     fun statusTone(status: String): ZTone = when (status) {
@@ -92,7 +92,7 @@ object OwnJobLogic {
     /// "1 h 05 min" / "34 min" — a time entry's length.
     fun minutes(total: Int): String = if (total < 60) "$total min" else String.format(Locale.US, "%d h %02d min", total / 60, total % 60)
 
-    /// The total logged, running clocks included.
+    /// The total logged, running timers included.
     fun totalMinutes(job: OwnJob): Int = job.time.sumOf { it.minutes }
 }
 
@@ -124,13 +124,14 @@ class OwnJobModel(val jobId: Int, private val client: ApiClient) {
         }
     }
 
-    /// Starting clocks you in; finishing stops every clock on the job.
-    suspend fun setStatus(status: String) = act(if (status == OwnJobStatus.COMPLETED) "Job finished — your time is on the timesheet" else "Job started — you're clocked in") {
+    /// Starting runs your job timer; finishing stops every one on the job.
+    suspend fun setStatus(status: String) = act(if (status == OwnJobStatus.COMPLETED) "Job finished — your time is on the job" else "Job started — the job timer is running") {
         client.send(MyDayEndpoints.ownJobStatus(jobId, status)).job
     }
 
-    suspend fun clockIn() = act("Clocked in") { client.send(MyDayEndpoints.clockIn(jobId)).job }
-    suspend fun clockOut() = act("Clocked out") { client.send(MyDayEndpoints.clockOut(jobId)).job }
+    /// The job timer — not the working day (that's My day's clock card).
+    suspend fun clockIn() = act("Job timer started on ${job?.code ?: "this job"}") { client.send(MyDayEndpoints.clockIn(jobId)).job }
+    suspend fun clockOut() = act("Job timer stopped — your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)).job }
 }
 
 /// One of the company's own jobs as its crew sees it
@@ -174,21 +175,21 @@ fun OwnJobScreen(jobId: Int, onBack: () -> Unit) {
                             )
                         }
 
-                        // What to press: Start / Finish, and the person's clock.
+                        // What to press: Start / Finish, and the person's job timer.
                         val next = OwnJobLogic.nextStatus(job)
                         val clock = OwnJobLogic.showsClock(job, me)
                         if (next != null || clock) {
                             ZCard {
                                 next?.let { (status, label) ->
                                     ZButton(label, style = ZButtonStyle.SUCCESS, loading = model.busy) { scope.launch { model.setStatus(status) } }
-                                    ZCaption(if (status == OwnJobStatus.IN_PROGRESS) "Starting clocks you in." else "Finishing stops every clock on this job.")
+                                    ZCaption(if (status == OwnJobStatus.IN_PROGRESS) "Starting runs your job timer." else "Finishing stops every job timer on this job.")
                                 }
                                 if (clock) {
                                     val running = job.clockRunning(me)
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-                                        ZBodyStrong(if (running) "You're clocked in" else "You're not clocked in", modifier = Modifier.weight(1f))
-                                        if (running) ZButton("Clock out", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.clockOut() } }
-                                        else ZButton("Clock in", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.clockIn() } }
+                                        ZBodyStrong(if (running) "Your job timer is running" else "Your job timer isn't running", modifier = Modifier.weight(1f))
+                                        if (running) ZButton("Stop job timer", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.clockOut() } }
+                                        else ZButton("Start job timer", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.clockIn() } }
                                     }
                                 }
                             }
@@ -231,7 +232,7 @@ fun OwnJobScreen(jobId: Int, onBack: () -> Unit) {
                                 ZHeadline("Time", modifier = Modifier.weight(1f))
                                 if (job.time.isNotEmpty()) ZCaption(OwnJobLogic.minutes(OwnJobLogic.totalMinutes(job)))
                             }
-                            if (job.time.isEmpty()) ZCaption("No time logged yet. Starting the job or clocking in starts the clock.")
+                            if (job.time.isEmpty()) ZCaption("No time logged yet. Starting the job or the job timer logs time here.")
                             for (entry in job.time) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                                     ZPhotoAvatar(entry.user?.photoUrl, entry.user?.name?.take(1) ?: "?", 28.dp)
@@ -239,7 +240,7 @@ fun OwnJobScreen(jobId: Int, onBack: () -> Unit) {
                                         ZBodyStrong(entry.user?.name ?: "Teammate", maxLines = 1)
                                         ZCaption(listOfNotNull(entry.workedOn?.let { CalendarLogic.dayTitle(it) }, entry.note?.takeIf { it.isNotBlank() }).joinToString(" · "), maxLines = 2)
                                     }
-                                    if (entry.running) ZBadge("Clock running", ZTone.SUCCESS)
+                                    if (entry.running) ZBadge("Timer running", ZTone.SUCCESS)
                                     ZCaption(OwnJobLogic.minutes(entry.minutes), color = com.zivett.app.design.ZTheme.colors.ink)
                                 }
                             }

@@ -9,6 +9,13 @@ import com.zivett.app.core.models.clockState
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.JsonCoding
 import com.zivett.app.core.network.PreviewApiClient
+import com.zivett.app.features.company.MyDayModel
+import com.zivett.app.features.company.TeamClockLogic
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -78,5 +85,101 @@ class TeamClockTest {
         assertTrue(body.contains("\"started_at\""))
         assertTrue(body.contains("\"break_minutes\":30"))
         assertFalse(body.contains("note"))
+    }
+
+    // Formatting (web lib/payroll.js formatDuration)
+
+    @Test fun durationsReadTheWayTheWebWritesThem() {
+        assertEquals("—", TeamClockLogic.formatDuration(0))
+        assertEquals("45 min", TeamClockLogic.formatDuration(45))
+        assertEquals("7 h", TeamClockLogic.formatDuration(420))
+        assertEquals("7 h 05 min", TeamClockLogic.formatDuration(425))
+        assertEquals("7 h 30 min", TeamClockLogic.formatDuration(450))
+        assertEquals("25 h 01 min", TeamClockLogic.formatDuration(1501))
+        assertEquals("0 min", TeamClockLogic.durationOrZero(0))
+    }
+
+    // The clock card
+
+    @Test fun theCardSaysWhereTheDayStands() {
+        val now = Instant.parse("2026-11-12T18:12:00Z")
+        val off = ClockState(enabled = true)
+        assertEquals("You're not clocked in", TeamClockLogic.cardTitle(off, now, ZoneOffset.UTC))
+        assertEquals("Clock in when your working day starts.", TeamClockLogic.cardLine(off, now, now))
+        assertEquals("2 h paid today", TeamClockLogic.cardLine(off.copy(todayMinutes = 120), now, now))
+
+        val on = JsonCoding.json.decodeFromString<ClockState>(state).copy(onBreak = false, breakStartedAt = null)
+        assertEquals("On the clock since 3:02 pm", TeamClockLogic.cardTitle(on, now, ZoneOffset.UTC))
+        // Ticks: 190 read 30 minutes ago → 220.
+        assertEquals("3 h 40 min paid today", TeamClockLogic.cardLine(on, now.minusSeconds(30 * 60), now))
+        assertTrue(TeamClockLogic.startedByWork(on))
+
+        val onBreak = JsonCoding.json.decodeFromString<ClockState>(state)
+        assertEquals("On a break · 12 min", TeamClockLogic.cardTitle(onBreak, now, ZoneOffset.UTC))
+        // A break doesn't tick the paid minutes.
+        assertEquals("3 h 10 min paid today", TeamClockLogic.cardLine(onBreak, now.minusSeconds(30 * 60), now))
+        assertEquals("On a break · 0 min", TeamClockLogic.cardTitle(onBreak.copy(breakStartedAt = now), now, ZoneOffset.UTC))
+    }
+
+    @Test fun myDayClockActionsPostThenReread() = runTest {
+        val clock = JsonCoding.json.decodeFromString<ClockState>(state)
+        val day = MyDay(date = "2026-11-12", isToday = true, shift = ClockState(enabled = true))
+        val client = PreviewApiClient(mapOf("api/company/my-day" to day, ClockEndpoints.clockIn().path to clock))
+        val model = MyDayModel(client)
+        model.load()
+        assertFalse(model.clock!!.clockedIn)
+        client.sent.clear()
+        model.startDay()
+        assertEquals(listOf("POST api/company/clock/in", "GET api/company/my-day"), client.sent)
+        assertEquals("You're clocked in — have a good day", model.toast)
+        client.sent.clear()
+        client.responses[ClockEndpoints.endBreak().path] = clock
+        model.endBreak()
+        assertEquals("DELETE api/company/clock/break", client.sent.first())
+        assertEquals("Back on the clock", model.toast)
+    }
+
+    // Adding a missed day (web ShiftModal.vue)
+
+    @Test fun anEndBeforeTheStartRunsIntoTheNextDay() {
+        val day = LocalDate.of(2026, 11, 12)
+        val zone = ZoneId.of("America/Vancouver")
+        val late = TeamClockLogic.endMoment(day, LocalTime.of(18, 0), LocalTime.of(2, 30), zone)
+        assertEquals(LocalDate.of(2026, 11, 13), late.toLocalDate())
+        assertTrue(TeamClockLogic.endsNextDay(LocalTime.of(18, 0), LocalTime.of(2, 30)))
+        assertEquals(8 * 60, TeamClockLogic.paidMinutes(day, LocalTime.of(18, 0), LocalTime.of(2, 30), 30, zone))
+        // Same time = a full 24 h, as on the web (end <= start).
+        assertTrue(TeamClockLogic.endsNextDay(LocalTime.of(8, 0), LocalTime.of(8, 0)))
+        // An ordinary day stays on its date.
+        assertFalse(TeamClockLogic.endsNextDay(LocalTime.of(8, 0), LocalTime.of(16, 30)))
+        assertEquals(day, TeamClockLogic.endMoment(day, LocalTime.of(8, 0), LocalTime.of(16, 30), zone).toLocalDate())
+        assertEquals(8 * 60, TeamClockLogic.paidMinutes(day, LocalTime.of(8, 0), LocalTime.of(16, 30), 30, zone))
+        // A break longer than the shift never goes negative.
+        assertEquals(0, TeamClockLogic.paidMinutes(day, LocalTime.of(8, 0), LocalTime.of(9, 0), 90, zone))
+        // ISO in UTC for the server: 6 pm Pacific (PST) = 02:00Z next day.
+        assertEquals("2026-11-13T02:00:00Z", TeamClockLogic.iso(day, LocalTime.of(18, 0), zone))
+    }
+
+    @Test fun myHoursWordsShiftsTotalsAndRules() {
+        val shift = JsonCoding.json.decodeFromString<ClockState>(state).shift!!
+        assertEquals(listOf("Started at your first job step"), TeamClockLogic.flags(shift))
+        assertEquals(
+            listOf("Started at your first job step", "Closed automatically — you forgot to clock out", "Times changed"),
+            TeamClockLogic.flags(shift.copy(endSource = "auto", edited = true)),
+        )
+        assertEquals(listOf("Added after the fact"), TeamClockLogic.flags(shift.copy(startSource = "added")))
+        assertEquals("3:02 pm – now", TeamClockLogic.shiftTimes(shift, ZoneOffset.UTC))
+        assertEquals("12 min break · 3 h 10 min paid", TeamClockLogic.shiftLine(shift))
+        assertEquals(
+            "Your company's rules: over 8 h a day is time-and-a-half; over 12 h is double time; over 40 regular hours a week is time-and-a-half.",
+            TeamClockLogic.rulesLine(MyHours.Rules(8.0, 12.0, 40.0)),
+        )
+        assertEquals("Your company's rules: over 7.5 h a day is time-and-a-half.", TeamClockLogic.rulesLine(MyHours.Rules(dailyOt = 7.5)))
+        assertNull(TeamClockLogic.rulesLine(MyHours.Rules()))
+        val labels = TeamClockLogic.totals(MyHours.Totals(paidMinutes = 600, regularMinutes = 480, overtimeMinutes = 120, daysWorked = 1)).map { it.first }
+        assertEquals(listOf("Paid hours", "Regular", "Overtime (1.5×)", "Days worked"), labels)
+        assertTrue(TeamClockLogic.totals(MyHours.Totals(doubleMinutes = 30)).any { it.first == "Double time" })
+        assertEquals("Mon, Nov 9 – Sun, Nov 22", TeamClockLogic.periodHeading(MyHours.Period("2026-11-09", "2026-11-22")))
+        assertEquals("incl. 2 h overtime", TeamClockLogic.dayOvertime(MyHours.Day("2026-11-12", overtimeMinutes = 120)))
     }
 }
