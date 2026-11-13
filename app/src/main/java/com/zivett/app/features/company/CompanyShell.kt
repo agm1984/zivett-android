@@ -44,6 +44,7 @@ import com.zivett.app.app.CompanyDashboardRoute
 import com.zivett.app.app.CompanyDashboardTab
 import com.zivett.app.app.CompanyMyDayTab
 import com.zivett.app.app.MyDayRoute
+import com.zivett.app.app.OwnJobRoute
 import com.zivett.app.core.auth.Access
 import com.zivett.app.app.CompanyInvoiceRoute
 import com.zivett.app.app.CompanyInvoicesRoute
@@ -159,6 +160,7 @@ fun CompanyShell(approved: Boolean) {
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
         composable<CompanyMyDayTab> { BellScreen("My day") { MyDayScreen() } }
         composable<MyDayRoute> { BellScreen("My day", onBack = { nav.popBackStack() }) { MyDayScreen() } }
+        composable<OwnJobRoute> { entry -> OwnJobScreen(entry.toRoute<OwnJobRoute>().jobId) { nav.popBackStack() } }
         composable<CompanyDashboardRoute> { BellScreen("Dashboard", onBack = { nav.popBackStack() }) { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
         composable<CompanyQuotesTab> { BellScreen("Quotes") { CompanyQuotesScreen() } }
@@ -193,7 +195,8 @@ fun CompanyShell(approved: Boolean) {
 
 /// A non-job notification's destination (web `lib/notificationRoute.js`):
 /// new job near you → the feed (composer open for that job), quote
-/// released → My quotes, payout sent / payouts set up → Payouts. Tabs are
+/// released → My quotes, payout sent / payouts set up → Payouts, put on
+/// an own job → that job's crew page. Tabs are
 /// switched the way the bar switches them.
 fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget) {
     fun tab(route: Any) = nav.navigate(route) {
@@ -205,6 +208,7 @@ fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTa
         is PushTarget.Opportunities -> { PendingOpportunity.code = target.jobCode; tab(CompanyOpportunitiesTab) }
         PushTarget.Quotes -> tab(CompanyQuotesTab)
         PushTarget.Payouts -> nav.navigate(PayoutsRoute)
+        is PushTarget.OwnJob -> nav.navigate(OwnJobRoute(target.id))
         is PushTarget.Job -> {}
     }
 }

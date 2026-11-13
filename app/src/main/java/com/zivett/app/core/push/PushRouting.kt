@@ -14,6 +14,9 @@ sealed interface PushTarget {
     data class Opportunities(val jobCode: String?) : PushTarget
     data object Quotes : PushTarget
     data object Payouts : PushTarget
+    /// One of the company's own (Business tools) jobs — "You're on a job"
+    /// (`company.own-jobs.show`, numeric `id`).
+    data class OwnJob(val id: Int) : PushTarget
 }
 
 /// Where a tapped push should land. The FCM data payload carries the same
@@ -35,6 +38,7 @@ object PushRouting {
             route == "company.opportunities" -> PushTarget.Opportunities(param("job"))
             route == "company.quotes" -> PushTarget.Quotes
             route == "company.payouts" -> PushTarget.Payouts
+            route == "company.own-jobs.show" -> param("id")?.toIntOrNull()?.let { PushTarget.OwnJob(it) }
             else -> null
         }
     }
@@ -53,6 +57,7 @@ object PushRouting {
     fun paramKey(target: PushTarget): String? = when (target) {
         is PushTarget.Job -> target.ref
         is PushTarget.Opportunities -> target.jobCode
+        is PushTarget.OwnJob -> target.id.toString()
         else -> null
     }
 

@@ -241,4 +241,39 @@ class MyDayTest {
         assertEquals("POST api/company/own-jobs/12/clock-in", client.sent.first())
         assertEquals("Clocked in on J-1042", model.toast)
     }
+
+    // The own job page
+
+    @Test fun ownJobNotificationsOpenTheOwnJobPage() {
+        val target = com.zivett.app.core.push.PushRouting.target(mapOf("route_name" to "company.own-jobs.show", "route_params" to """{"id":12}"""))
+        assertEquals(com.zivett.app.core.push.PushTarget.OwnJob(12), target)
+        assertEquals("12", com.zivett.app.core.push.PushRouting.paramKey(target!!))
+        // The intent round trip MainActivity does with the single param.
+        assertEquals(target, com.zivett.app.core.push.PushRouting.target("company.own-jobs.show") { key -> "12".takeIf { key == "id" } })
+        assertNull(com.zivett.app.core.push.PushRouting.target(mapOf("route_name" to "company.own-jobs.show")))
+    }
+
+    @Test fun theOwnJobPageOffersStartFinishAndTheClock() {
+        val base = com.zivett.app.core.models.OwnJob(id = 12, crew = listOf(CompanyCalendar.CrewTech(3, "Mike Ross")), scheduledDate = "2026-11-12", scheduledWindow = "afternoon", startTime = "13:00", estimatedHours = 2.5)
+        val scheduled = base.copy(next = listOf("in_progress"))
+        assertEquals("in_progress" to "Start job", com.zivett.app.features.company.OwnJobLogic.nextStatus(scheduled))
+        assertEquals("completed" to "Finish job", com.zivett.app.features.company.OwnJobLogic.nextStatus(base.copy(status = "in_progress", next = listOf("completed"))))
+        assertNull(com.zivett.app.features.company.OwnJobLogic.nextStatus(base.copy(status = "completed")))
+        assertTrue(com.zivett.app.features.company.OwnJobLogic.showsClock(scheduled, 3))
+        assertFalse(com.zivett.app.features.company.OwnJobLogic.showsClock(scheduled, 4))
+        assertFalse(com.zivett.app.features.company.OwnJobLogic.showsClock(base.copy(status = "completed"), 3))
+        assertEquals("Thu, Nov 12 · Afternoon · starts 1:00 pm · about 2.5 h", com.zivett.app.features.company.OwnJobLogic.whenLine(base))
+        assertEquals("1 h 05 min", com.zivett.app.features.company.OwnJobLogic.minutes(65))
+        assertEquals("2 h", com.zivett.app.features.company.OwnJobLogic.hours(2.0))
+    }
+
+    @Test fun theOwnJobModelTakesTheServersCopyAfterEachAction() = runTest {
+        val started = com.zivett.app.core.models.OwnJob(id = 12, status = "in_progress", next = listOf("completed"))
+        val client = PreviewApiClient(mapOf(MyDayEndpoints.ownJobStatus(12, "in_progress").path to OwnJobResponse(started)))
+        val model = com.zivett.app.features.company.OwnJobModel(12, client)
+        model.setStatus("in_progress")
+        assertEquals("in_progress", model.job?.status)
+        assertEquals("Job started — you're clocked in", model.toast)
+        assertEquals(listOf("POST api/company/own-jobs/12/status"), client.sent)
+    }
 }
