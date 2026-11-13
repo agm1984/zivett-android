@@ -189,13 +189,34 @@ live-location path runs; other `advance` steps and `own_status` post from
 My day; `start` opens the Start job picker (`openStart`); `waiting` is
 text. Every action re-reads the day; it also refetches on resume and on
 `NavBadgesModel.liveEvents`. `features/company/OwnJob.kt` is the crew view
-of an own job (`GET /api/company/own-jobs/{id}`, start/finish, clock
-in/out); `company.own-jobs.show` notifications route there
+of an own job (`GET /api/company/own-jobs/{id}`, start/finish, the job
+timer — `own-jobs/{id}/clock-in|out`, worded "Start/Stop job timer"); `company.own-jobs.show` notifications route there
 (`PushTarget.OwnJob`). Planned arrival: `PATCH .../jobs/{id}/arrival`
 (explicit null clears) from the company job page's crew card;
 `JobPresentation.arrivalPlanLine` on the booker's arrival banner. Crew
 picker members carry `busy` ("Busy then" + `CompanyPresentation.busyLine`).
 `MyDayTest`.
+
+## Team clock & My hours (2026-11-12)
+
+Two clocks, never blurred: the TEAM CLOCK is the person's working day
+(`api/company/clock` in/out/break, `TeamShifts` server-side) and the JOB
+TIMER is where that time went on an own job. Wording follows the web —
+"Start my day / Take a break / End my day" vs "Start / Stop job timer".
+Models in `core/models/ClockModels.kt`; Business tools companies only —
+`ApiClient.clockState()` reads a 404 as disabled, `MyDay.shift` carries
+the same state, `Organization.hasBusinessTools` gates the More row. All
+wording and maths is `TeamClockLogic` (`features/company/TeamClock.kt`,
+`ClockCard`, `EndDayDialog`); `MyDayModel` owns the clock actions
+(`clock`, `clockLoadedAt` anchors the ticking minutes). My hours is
+`features/company/MyHours.kt` (`MyHoursModel`, `ShiftForm`: an end at or
+before the start is the NEXT day, the note is required, `date` = the
+viewed period's start so the answer stays on it; a 422 shows inline —
+per field, or the message alone for an approved period). The server
+starts a forgotten day at the first work action and closes a forgotten
+one after 14 h; its "Still working?" / "We clocked you out" pushes route
+`company.my-day` → `PushTarget.MyDay` → My day on today
+(`MyDayRefresh`). `TeamClockTest`.
 
 ## My quotes (2026-10-25)
 
