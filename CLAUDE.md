@@ -161,6 +161,42 @@ the booker answers on the job page's `RescheduleCard`
 `[]` for empty objects: `load` uses `PhpRatesSerializer`, `openings`
 its own `OpeningsSerializer` (drops undecodable rows).
 
+**Dispatch additions (2026-11-12).** The calendar reads ONE list,
+`CompanyCalendar.entries` = ZiVETT `jobs` + `own_jobs` (Business tools,
+`OwnCalendarJobsSerializer` drops bad rows) mapped to `CalendarJob` with
+`kind = "own"`, `ownStatus`, `startTime`; a `busy: true` row (string id
+"busy-12", slot only) becomes a negative-id "Busy" chip that never opens.
+`status` is nullable for that reason — render through
+`CalendarStatusBadge`, open through the screen's `openEntry` (own →
+`OwnJobRoute`, ZiVETT → `CompanyJobRoute`). Jobs wear their LEAD's colour
+(`ZColors.techColors`, team order, cycling; a lead off the roster falls
+back to id mod 10; nobody = `noTech`) via `CalendarLogic.colorIndex` /
+`leadColor`. The filter is `TechFilter(hidden, hideUnassigned)` (a tick per
+person + "No tech yet", "Only"); the board's row is "No tech yet" and shows
+only when the range has unassigned work. Month | Week | List — List is
+`?start=&days=14` (`rangeCalendar`, `CalendarLogic.agenda`). Days sort by
+`CalendarLogic.visitOrder` (instant, then span start, then window).
+
+## My day & own jobs (2026-11-12)
+
+`features/company/MyDay.kt` (`MyDayModel` + `MyDayLogic`) reads
+`GET /api/company/my-day?date=` (`core/models/MyDayModels.kt`). Field techs
+(`Access.opensOnMyDay`: approved company, member, `takes_jobs`) get it as
+the FIRST tab with Dashboard moved into More; admins and office staff get
+a My day row in More. A card's `next`: `advance` to en_route opens
+`CompanyJobRoute(advanceOnOpen = true)` so the job page's own advance →
+live-location path runs; other `advance` steps and `own_status` post from
+My day; `start` opens the Start job picker (`openStart`); `waiting` is
+text. Every action re-reads the day; it also refetches on resume and on
+`NavBadgesModel.liveEvents`. `features/company/OwnJob.kt` is the crew view
+of an own job (`GET /api/company/own-jobs/{id}`, start/finish, clock
+in/out); `company.own-jobs.show` notifications route there
+(`PushTarget.OwnJob`). Planned arrival: `PATCH .../jobs/{id}/arrival`
+(explicit null clears) from the company job page's crew card;
+`JobPresentation.arrivalPlanLine` on the booker's arrival banner. Crew
+picker members carry `busy` ("Busy then" + `CompanyPresentation.busyLine`).
+`MyDayTest`.
+
 ## My quotes (2026-10-25)
 
 Contract: `docs/mobile-api.md` "My quotes". `CompanyQuotesScreen`
