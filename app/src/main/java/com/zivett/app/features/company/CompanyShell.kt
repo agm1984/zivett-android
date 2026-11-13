@@ -156,7 +156,7 @@ fun CompanyShell(approved: Boolean) {
         tabs, NotificationArea.COMPANY,
         onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) },
         onStripeReturn = onStripeReturn,
-        onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target) },
+        onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target, myDayIsTab = fieldTech) },
         navBadges = navBadges,
     ) { nav ->
         composable<CompanyDashboardTab> { BellScreen("Dashboard") { CompanyDashboardScreen() } }
@@ -199,9 +199,10 @@ fun CompanyShell(approved: Boolean) {
 /// A non-job notification's destination (web `lib/notificationRoute.js`):
 /// new job near you → the feed (composer open for that job), quote
 /// released → My quotes, payout sent / payouts set up → Payouts, put on
-/// an own job → that job's crew page. Tabs are
-/// switched the way the bar switches them.
-fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget) {
+/// an own job → that job's crew page, the team clock's nudges → My day
+/// (the tab for field techs, pushed for everyone else) re-read on today.
+/// Tabs are switched the way the bar switches them.
+fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTarget, myDayIsTab: Boolean = false) {
     fun tab(route: Any) = nav.navigate(route) {
         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
@@ -212,6 +213,10 @@ fun openCompanyTarget(nav: androidx.navigation.NavHostController, target: PushTa
         PushTarget.Quotes -> tab(CompanyQuotesTab)
         PushTarget.Payouts -> nav.navigate(PayoutsRoute)
         is PushTarget.OwnJob -> nav.navigate(OwnJobRoute(target.id))
+        PushTarget.MyDay -> {
+            MyDayRefresh.request()
+            if (myDayIsTab) tab(CompanyMyDayTab) else nav.navigate(MyDayRoute) { launchSingleTop = true }
+        }
         is PushTarget.Job -> {}
     }
 }

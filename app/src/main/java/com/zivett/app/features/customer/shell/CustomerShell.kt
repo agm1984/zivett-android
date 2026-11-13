@@ -143,9 +143,10 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     composable<NotificationsRoute> { entry ->
         val area = Areas.notificationArea(entry.toRoute<NotificationsRoute>().area)
         val model = rememberNotificationsModel(area)
+        val myDayIsTab = LocalAppEnvironment.current.session.user?.let { com.zivett.app.core.auth.Access.opensOnMyDay(it) } ?: false
         NotificationsScreen(model, onBack = { nav.popBackStack() }, openTarget = { target ->
             // Only company notifications point anywhere but a job.
-            if (area == NotificationArea.COMPANY) com.zivett.app.features.company.openCompanyTarget(nav, target)
+            if (area == NotificationArea.COMPANY) com.zivett.app.features.company.openCompanyTarget(nav, target, myDayIsTab)
         }) { id ->
             when (area) {
                 NotificationArea.COMPANY -> nav.navigate(com.zivett.app.app.CompanyJobRoute(id))

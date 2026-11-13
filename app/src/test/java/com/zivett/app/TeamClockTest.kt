@@ -246,4 +246,20 @@ class TeamClockTest {
         assertEquals("2026-11-09", model.hours?.period?.start)
         assertEquals("POST api/company/my-hours/shifts", client.sent.single())
     }
+
+    // The clock's pushes ("Still working?", "We clocked you out")
+
+    @Test fun clockPushesOpenMyDay() {
+        val target = com.zivett.app.core.push.PushRouting.target(mapOf("route_name" to "company.my-day", "route_params" to "[]"))
+        assertEquals(com.zivett.app.core.push.PushTarget.MyDay, target)
+        assertNull(com.zivett.app.core.push.PushRouting.paramKey(target!!))
+        // A bell row with no params resolves the same way.
+        assertEquals(com.zivett.app.core.push.PushTarget.MyDay, com.zivett.app.core.push.PushRouting.target("company.my-day") { null })
+    }
+
+    @Test fun aRefreshRequestCounts() {
+        val before = com.zivett.app.features.company.MyDayRefresh.requests
+        com.zivett.app.features.company.MyDayRefresh.request()
+        assertEquals(before + 1, com.zivett.app.features.company.MyDayRefresh.requests)
+    }
 }

@@ -14,7 +14,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -63,6 +65,7 @@ import com.zivett.app.features.shared.LocalNav
 import com.zivett.app.features.shared.LocalNavBadges
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.time.Duration
@@ -178,6 +181,16 @@ object MyDayLogic {
     /// "On my way" goes through the job page, which starts live location
     /// sharing; every other step posts from here.
     fun opensJobToAdvance(next: DayJob.Next): Boolean = next.action == "advance" && next.status == JobStatus.EN_ROUTE.wire
+}
+
+/// A push or bell tap that wants My day re-read on today (the team clock's
+/// "Still working?" / "We clocked you out"). A mounted My day reacts; a new
+/// one loads anyway.
+object MyDayRefresh {
+    var requests by mutableIntStateOf(0)
+        private set
+
+    fun request() { requests++ }
 }
 
 /// `GET /api/company/my-day` — one person's day, stepping a day at a time.
@@ -303,6 +316,8 @@ fun MyDayScreen() {
     }
     val liveEvents = LocalNavBadges.current?.liveEvents ?: 0
     LaunchedEffect(liveEvents) { if (liveEvents > 0) model.load() }
+    // A clock push tapped while My day is up: back to today, re-read.
+    LaunchedEffect(model) { snapshotFlow { MyDayRefresh.requests }.drop(1).collect { model.goToday() } }
 
     // The running clocks' minutes tick while they're on screen.
     var now by remember { mutableStateOf(Instant.now()) }
