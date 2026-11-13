@@ -63,6 +63,13 @@ object CompanyPresentation {
     fun arrivalLabel(job: Job): String = job.arrivalTime?.let { "Around ${MyDayLogic.formatClock(it)}" }
         ?: "Any time · ${job.scheduledWindow?.let { JobPresentation.windowLabel(it) } ?: "in the window"}"
 
+    /// "On J-1042 · 9:00 am – 11:00 am" — the jobs a teammate is already on
+    /// during this one's slot (web `CrewPickerModal.busyLine`).
+    fun busyLine(busy: List<com.zivett.app.core.models.BusyBooking>): String? = busy.takeIf { it.isNotEmpty() }?.joinToString("; ") { booking ->
+        val times = listOfNotNull(booking.start, booking.end).map { MyDayLogic.formatClock(it) }.joinToString(" – ")
+        listOfNotNull("On ${booking.code ?: booking.title ?: "another job"}", times.ifEmpty { null }).joinToString(" · ")
+    }
+
     fun onCrew(job: Job, user: User?): Boolean = user != null && job.isAssigned(user.id)
 
     /// The company-side primary action (`companyJobAction` in lib/jobs.js),

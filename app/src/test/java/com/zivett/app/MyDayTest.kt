@@ -7,6 +7,8 @@ import com.zivett.app.core.models.MyDay
 import com.zivett.app.core.models.OwnJobResponse
 import com.zivett.app.core.models.RosterMember
 import com.zivett.app.core.models.User
+import com.zivett.app.core.models.nextUp
+import com.zivett.app.core.models.noFieldTechs
 import com.zivett.app.core.auth.Access
 import com.zivett.app.core.models.CompanyEndpoints
 import com.zivett.app.core.models.MyDayEndpoints
@@ -379,5 +381,21 @@ class MyDayTest {
         assertEquals("api/company/jobs/4/arrival", request.path)
         assertEquals("""{"arrival_time":null}""", request.body?.decodeToString())
         assertEquals("""{"arrival_time":"09:30"}""", MyDayEndpoints.setArrival(4, "09:30").body?.decodeToString())
+    }
+
+    // Crew picker
+
+    @Test fun busyTeammatesSayWhereTheyAre() {
+        val member = JsonCoding.json.decodeFromString<RosterMember>(
+            """{"id": 3, "name": "Mike", "assignable": true, "takes_jobs": true, "auto_pickable": false,
+               "busy": [{"kind": "job", "code": "Z-AAA111", "title": "Leaky tap", "start": "09:00", "end": "11:00"},
+                        {"kind": "own", "code": "J-1042", "title": "Gutters", "start": "13:00", "end": "17:00"}]}""",
+        )
+        assertEquals("On Z-AAA111 · 9:00 am – 11:00 am; On J-1042 · 1:00 pm – 5:00 pm", com.zivett.app.features.company.CompanyPresentation.busyLine(member.busy))
+        assertNull(com.zivett.app.features.company.CompanyPresentation.busyLine(emptyList()))
+        // A team that's all busy still takes jobs — no "nobody takes jobs" warning.
+        val roster = com.zivett.app.core.models.AssignmentRoster(members = listOf(member))
+        assertFalse(roster.noFieldTechs)
+        assertNull(roster.nextUp())
     }
 }
