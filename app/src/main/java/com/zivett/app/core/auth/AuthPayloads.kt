@@ -39,7 +39,8 @@ data class InvitationForm(
 
 /// The signup form as the backend's `RegisterRequest` wants it. `terms`
 /// must be true (`accepted` rule); `phone` may carry the display mask —
-/// the server strips it to ten digits.
+/// the server strips it to ten digits. `passwordConfirmation` is the
+/// password typed again; the server checks the two match.
 @Serializable
 data class RegistrationForm(
     val role: UserRole = UserRole.CUSTOMER,
@@ -48,6 +49,7 @@ data class RegistrationForm(
     val email: String = "",
     val phone: String = "",
     val password: String = "",
+    val passwordConfirmation: String = "",
     val terms: Boolean = false,
     val referralCode: String? = null,
     val deviceName: String = "",
