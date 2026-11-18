@@ -84,7 +84,8 @@ class SignupFormModel(initialRole: UserRole? = null) {
 
     val canSubmit: Boolean
         get() = !submitting && form.firstName.isNotBlank() && form.lastName.isNotBlank() && form.email.isNotBlank()
-            && PhoneFormatter.isComplete(form.phone) && form.password.length >= 8 && form.terms
+            && PhoneFormatter.isComplete(form.phone) && form.password.length >= 8
+            && form.passwordConfirmation.isNotEmpty() && form.terms
 
     /// The fee banner shows for customers only, and only while a fee is
     /// configured — matches `Signup.vue`.
@@ -131,9 +132,15 @@ class SignupFormModel(initialRole: UserRole? = null) {
 
     suspend fun submit(session: AuthSession) {
         if (!canSubmit) return
-        submitting = true
         fieldErrors = emptyMap()
         bannerError = null
+        // Caught here so the mismatch shows under the field it's about;
+        // the server checks it too.
+        if (form.password != form.passwordConfirmation) {
+            fieldErrors = mapOf("password_confirmation" to "The two passwords don't match.")
+            return
+        }
+        submitting = true
         val payload = form.copy(email = form.email.trim().lowercase(), firstName = form.firstName.trim(), lastName = form.lastName.trim())
         try {
             session.register(payload)
@@ -199,8 +206,9 @@ fun SignupScreen(nav: NavHostController, initialRole: UserRole?) {
 
         ZTextField("Email", form.form.email, { form.form = form.form.copy(email = it) }, error = form.fieldErrors["email"], keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
         ZTextField("Phone", form.phone, { form.phone = it }, error = form.fieldErrors["phone"], keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
-        ZTextField("Password", form.form.password, { form.form = form.form.copy(password = it) }, error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Done)
+        ZTextField("Password", form.form.password, { form.form = form.form.copy(password = it) }, error = form.fieldErrors["password"], secure = true, imeAction = ImeAction.Next)
         if (form.fieldErrors["password"] == null) ZCaption("At least 8 characters")
+        ZTextField("Confirm password", form.form.passwordConfirmation, { form.form = form.form.copy(passwordConfirmation = it) }, error = form.fieldErrors["password_confirmation"], secure = true, imeAction = ImeAction.Done)
 
         ZCheckbox(form.form.terms, { form.form = form.form.copy(terms = it) }) { TermsConsent() }
         form.fieldErrors["terms"]?.let { ZCaption(it, color = colors.danger) }
