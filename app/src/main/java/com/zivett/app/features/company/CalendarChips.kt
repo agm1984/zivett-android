@@ -60,8 +60,8 @@ object CredentialFieldGuide {
             "JPG, PNG or PDF · up to 10 MB", "A clear phone photo of your driver’s licence or passport works fine.",
         ),
         CredentialGuide(
-            "license", "Trade license",
-            "Your current trade certification — the document that lets us call you a Verified Pro.",
+            "license", "Licence/Certification",
+            "Your trade licence or certification — required for licensed trades like plumbing and electrical, and optional otherwise. Once verified it adds a badge bookers see on your quotes.",
             listOf("Covers the trades you selected in Services & rates", "The licence number and expiry date, visible", "Your name or business name on it"),
             "JPG, PNG or PDF · up to 10 MB", "If your certification is digital, a full-page screenshot showing the number and expiry is fine.",
         ),

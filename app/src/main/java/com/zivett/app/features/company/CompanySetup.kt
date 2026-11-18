@@ -144,7 +144,7 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Services & rates", "Trades, hourly rates, radius, availability", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.Build) }
                                 ZDivider(Modifier.padding(start = 60.dp))
-                                ZNavRow("Credentials", "Photo ID, license, insurance, registration", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.UploadFile) }
+                                ZNavRow("Credentials", "Photo ID, insurance, registration, licence/certification", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.UploadFile) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("What each document needs", "What a good upload shows, per document", onClick = { nav.navigate(CredentialGuideRoute) }) { ZIconTile(Icons.Outlined.Checklist) }
                             }
