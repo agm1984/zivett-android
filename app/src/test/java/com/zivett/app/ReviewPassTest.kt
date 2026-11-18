@@ -32,12 +32,16 @@ import org.junit.Test
 
 /// The web's 2026-10-29 review pass (Damon's review), as the app mirrors it.
 class ReviewPassTest {
-    @Test fun onlyClosedJobsTakeAReview() {
-        assertEquals(setOf(JobStatus.WARRANTY_ACTIVE, JobStatus.WARRANTY_EXPIRED), JobStatus.reviewable)
+    // Rate, then pay (2026-11-17): an invoiced job takes its review in the
+    // pay sheet; the review card is for closed jobs only.
+    @Test fun invoicedJobsRateInThePaySheetAndClosedOnesOnTheCard() {
+        assertEquals(setOf(JobStatus.INVOICED, JobStatus.WARRANTY_ACTIVE, JobStatus.WARRANTY_EXPIRED), JobStatus.reviewable)
         val company = CompanySummary(id = 9, name = "Harbour Plumbing")
-        assertFalse(Fixtures.job(status = JobStatus.INVOICED, company = company).isReviewable)
+        val invoiced = Fixtures.job(status = JobStatus.INVOICED, company = company)
+        assertTrue(invoiced.isReviewable)
+        assertFalse(invoiced.showsReviewCard)
         assertFalse(Fixtures.job(status = JobStatus.COMPLETED, company = company).isReviewable)
-        assertTrue(Fixtures.job(status = JobStatus.WARRANTY_ACTIVE, company = company).isReviewable)
+        assertTrue(Fixtures.job(status = JobStatus.WARRANTY_ACTIVE, company = company).showsReviewCard)
     }
 
     @Test fun nonJobNotificationsRouteToCompanyTabs() {
