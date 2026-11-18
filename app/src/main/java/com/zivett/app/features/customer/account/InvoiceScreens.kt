@@ -1,5 +1,7 @@
 package com.zivett.app.features.customer.account
 
+import com.zivett.app.design.ZTextAction
+import com.zivett.app.app.JobDetailRoute
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -350,6 +352,7 @@ class PayInvoiceModel(
 
 @Composable
 fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
+    val nav = LocalNav.current
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -373,6 +376,13 @@ fun PayInvoiceScreen(invoiceId: Int, area: JobArea, onBack: () -> Unit) {
                 else Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Pay invoice", invoice.job?.title)
                     model.error?.let { ZBanner(it, tone = ZTone.DANGER) }
+                    // Rate, then pay: an unrated job sends the booker to its
+                    // page, whose Pay & close starts with the rating.
+                    invoice.job?.takeIf { it.reviewed == false }?.let { job ->
+                        ZTextAction("How did ${job.company ?: "your pro"} do? Rate them before you pay") {
+                            nav.navigate(JobDetailRoute(job.id, if (area.kind == JobArea.Kind.BUSINESS) Areas.BUSINESS else Areas.CUSTOMER))
+                        }
+                    }
                     InvoiceBreakdown(invoice)
                     if (Features.couponsEnabled) {
                         ZTextField("Coupon code", model.couponCode, { model.couponCode = it.uppercase() }, placeholder = "Optional", error = model.fieldErrors["coupon_code"], capitalization = KeyboardCapitalization.Characters)
