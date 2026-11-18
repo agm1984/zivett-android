@@ -45,10 +45,13 @@ enum class JobStatus(val wire: String, val label: String) {
         /// `JobStatus::customerCancellable()`.
         val customerCancellable: Set<JobStatus> = setOf(SUBMITTED, MATCHED, ACCEPTED, EN_ROUTE, ARRIVED, IN_PROGRESS)
 
-        /// `JobStatus::reviewable()` — closed jobs only: the review form
-        /// appears once the invoice is paid (Pay & close first, then rate),
-        /// and a review never closes or charges anything (2026-10-29).
-        val reviewable: Set<JobStatus> = setOf(WARRANTY_ACTIVE, WARRANTY_EXPIRED)
+        /// `JobStatus::reviewable()`. RATE, THEN PAY (2026-11-17): rating
+        /// is the first step of the Pay & close sheet on an invoiced job,
+        /// and the review card takes over once it's closed. A review never
+        /// pays — the server holds one written before payment until the
+        /// job closes.
+        val reviewable: Set<JobStatus> = setOf(INVOICED, WARRANTY_ACTIVE, WARRANTY_EXPIRED)
+        val closed: Set<JobStatus> = setOf(WARRANTY_ACTIVE, WARRANTY_EXPIRED)
     }
 }
 
@@ -299,6 +302,8 @@ data class Job(
     val acceptedQuote: Quote? get() = (quotes ?: emptyList()).firstOrNull { it.status == QuoteStatus.ACCEPTED }
     val isCancellable: Boolean get() = status in JobStatus.customerCancellable
     val isReviewable: Boolean get() = status in JobStatus.reviewable && company != null
+    /// The review CARD — closed jobs; an unpaid one rates in the pay sheet.
+    val showsReviewCard: Boolean get() = isReviewable && status in JobStatus.closed
     val headline: String get() = listOfNotNull(code, address).joinToString(" · ")
     /// `customer.name` — only serialized for company viewers.
     val customerName: String? get() = customer?.name
@@ -378,6 +383,8 @@ data class Invoice(
         val company: String? = null,
         /// Company viewers see the booker's name.
         val customer: String? = null,
+        /// Booker surfaces: has the job been rated? (rate, then pay)
+        val reviewed: Boolean? = null,
     )
 
     @Serializable

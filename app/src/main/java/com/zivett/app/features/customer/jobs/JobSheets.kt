@@ -1,5 +1,6 @@
 package com.zivett.app.features.customer.jobs
 
+import com.zivett.app.design.ZTextAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -325,11 +326,35 @@ fun ReviewSheet(model: JobDetailModel, onDismiss: () -> Unit) {
     }
 }
 
-/// Pay & close: one dollar tip input (no presets — "a tip isn't an
-/// expectation", the web's TipPicker rule), then settle.
+/// Pay & close. RATE, THEN PAY (2026-11-17, the web's invoice card): it
+/// opens on "How did they do?" — stars + an optional comment, Skip or
+/// Continue (saving the review never pays; the server holds it until the
+/// job closes), and a 1–2 star rating offers Report a problem instead,
+/// which pauses the payment. Then one dollar tip input (no presets — "a
+/// tip isn't an expectation", the web's TipPicker rule), then settle.
 @Composable
-fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> Unit) {
+fun PayAndCloseSheet(job: Job, invoice: Invoice, model: JobDetailModel, onReport: () -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val companyName = job.company?.name ?: "your pro"
+    var rating by remember { mutableStateOf(job.review?.rating ?: 0) }
+    var comment by remember { mutableStateOf(job.review?.comment ?: "") }
+    var rateStep by remember { mutableStateOf(job.isReviewable && job.review == null) }
+    if (rateStep) {
+        ZSheet(onDismiss = onDismiss, title = "How did $companyName do?", dismissable = !model.busy) {
+            ZBody("Rate the work before you pay. ${job.company?.name ?: "Your pro"} sees it once the job is closed.", tone = ZTextTone.SOFT)
+            ZStars(rating) { rating = it }
+            ZTextArea("Comment (optional)", comment, { comment = it }, placeholder = "How did the visit go?")
+            if (rating in 1..2) {
+                ZBanner("Something not right? Report a problem instead — your card isn't charged while support looks into it.", tone = ZTone.WARNING)
+                ZButton("Report a problem", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onReport(); onDismiss() }
+            }
+            ZButton("Continue", loading = model.busy, enabled = rating >= 1) {
+                scope.launch { if (model.submitReview(rating, comment, quiet = true)) rateStep = false }
+            }
+            ZButton("Skip", style = ZButtonStyle.OUTLINE) { rateStep = false }
+        }
+        return
+    }
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     var tip by remember { mutableStateOf("") }
@@ -349,6 +374,16 @@ fun PayAndCloseSheet(invoice: Invoice, model: JobDetailModel, onDismiss: () -> U
     // cancel the request and toast a failure the server never reported.
     ZSheet(onDismiss = onDismiss, title = "Pay & close", dismissable = !model.busy) {
         ZBody("Paying closes the job and starts your workmanship warranty — or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
+        val review = model.job?.review
+        if (review != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                ZCaption("You rated $companyName")
+                ZStars(review.rating)
+                ZTextAction("Change") { rating = review.rating; comment = review.comment ?: ""; rateStep = true }
+            }
+        } else if (job.isReviewable) {
+            ZTextAction("Rate $companyName first") { rateStep = true }
+        }
         InvoiceBreakdown(invoice)
         ZTextField("Tip your pro (optional)", tip, { tip = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal, corner = { ZCaption("100% goes to your pro") })
         PaymentCardSection(card, declined = declined) { declined = null }

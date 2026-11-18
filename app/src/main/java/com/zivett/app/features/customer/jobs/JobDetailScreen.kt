@@ -100,7 +100,7 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val model = remember(jobId) { JobDetailModel(jobId, environment.client, area, context) }
     var sheet by remember { mutableStateOf<JobSheet?>(null) }
-    var reviewNudged by remember { mutableStateOf(false) }
+    var reportAfterPay by remember { mutableStateOf(false) }
 
     LaunchedEffect(model) { model.load() }
     LiveJobEffect(jobId) { model.refresh() }
@@ -109,15 +109,13 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
         if (uris.isNotEmpty()) scope.launch { model.upload(PhotoImport.jpegData(context, uris)) }
     }
 
-    // Payment and rating are one flow, not two errands (the web scrolls
-    // into the review form after closing): when the pay sheet goes away
-    // after a successful close, carry the booker straight into the review — once.
+    // Rate, then pay: the pay sheet opens on the rating step. A low
+    // rating can switch to Report a problem once the pay sheet is gone.
     fun dismissSheet() {
-        val was = sheet
         sheet = null
-        if (was == JobSheet.Pay && model.justClosed && !reviewNudged && model.job?.review == null) {
-            reviewNudged = true
-            sheet = JobSheet.ReviewSheetKey
+        if (reportAfterPay) {
+            reportAfterPay = false
+            sheet = JobSheet.Report
         }
     }
 
@@ -139,7 +137,7 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
         JobSheet.Report -> ReportProblemSheet(model, onDismiss = ::dismissSheet)
         JobSheet.Claim -> WarrantyClaimSheet(model, onDismiss = ::dismissSheet)
         JobSheet.ReviewSheetKey -> ReviewSheet(model, onDismiss = ::dismissSheet)
-        JobSheet.Pay -> model.job?.invoice?.let { invoice -> PayAndCloseSheet(invoice, model, onDismiss = ::dismissSheet) }
+        JobSheet.Pay -> model.job?.let { job -> job.invoice?.let { invoice -> PayAndCloseSheet(job, invoice, model, onReport = { reportAfterPay = true }, onDismiss = ::dismissSheet) } }
         is JobSheet.Reviews -> CompanyReviewsSheet(current.id, current.name, onDismiss = ::dismissSheet)
         null -> Unit
     }
@@ -386,16 +384,13 @@ private fun InvoiceCard(job: Job, model: JobDetailModel, area: JobArea, onSheet:
         } else if (!invoice.isPaid && job.status != JobStatus.CANCELLED) {
             ZActionBand("Pay & close — ${Money.format(invoice.amountDueCents)}", loading = model.busy) { onSheet(JobSheet.Pay) }
             job.autoCloseAt?.let { ZCaption("Payment releases automatically on ${Dates.shortTime(it)} unless you report an issue first.") }
-            // Pay first, then rate — the review card appears only once
-            // the job is closed (JobStatus.reviewable).
-            ZCaption("Once it's paid, you can rate ${job.company?.name ?: "your pro"}.")
         }
     }
 }
 
 @Composable
 private fun ReviewCard(job: Job, onSheet: (JobSheet) -> Unit) {
-    if (!job.isReviewable) return
+    if (!job.showsReviewCard) return
     ZCard {
         ZHeadline("Your review")
         val review = job.review

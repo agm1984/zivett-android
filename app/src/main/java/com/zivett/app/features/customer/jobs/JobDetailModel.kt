@@ -261,7 +261,9 @@ class JobDetailModel(
         }
     }
 
-    suspend fun submitReview(rating: Int, comment: String): Boolean {
+    /// `quiet` = the pay sheet's rating step, which moves on to paying
+    /// rather than celebrating.
+    suspend fun submitReview(rating: Int, comment: String, quiet: Boolean = false): Boolean {
         busy = true
         try {
             val trimmed = comment.trim().ifEmpty { null }
@@ -269,7 +271,7 @@ class JobDetailModel(
             val review = if (existing != null) client.send(area.updateReview(existing.id, rating, trimmed)).review
             else client.send(area.review(jobId, rating, trimmed)).review
             job?.let { state = Loadable.Loaded(it.copy(review = review)) }
-            toast = "Thanks — your review helps keep pros accountable"
+            if (!quiet) toast = "Thanks — your review helps keep pros accountable"
             return true
         } catch (error: ApiError) {
             toast = error.first("rating") ?: error.first("comment") ?: error.userMessage

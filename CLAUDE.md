@@ -236,8 +236,9 @@ with defaults, so an older server reads as "not released, undated".
 
 ## Review pass (2026-10-29)
 
-Reviews only on closed jobs (`JobStatus.reviewable`; a review never
-closes or charges). Nav badges: `features/shared/NavBadges.kt`
+Rate, then pay (2026-11-17): `JobStatus.reviewable` = invoiced + closed;
+the Pay & close sheet opens on the rating step and the review card is for
+closed jobs (`Job.showsReviewCard`). A review never closes or charges. Nav badges: `features/shared/NavBadges.kt`
 (`NavBadgesModel` per shell via `RoleShell(navBadges =)` →
 `LocalNavBadges`; `ViewingNavBadge(key)` marks a "since you looked" badge
 seen while its screen shows). Notification taps resolve through

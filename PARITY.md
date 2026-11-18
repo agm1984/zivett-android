@@ -164,3 +164,6 @@ in `store/` (start at `store/README.md`).
 
 ## Fixed on iOS while porting
 - `PHPRates` property wrapper (2026-09-06): a brand-new company's `hourly_rates` / `category_rates` arrive as `[]` (PHP's empty associative array) and a rate can be `null`; plain `[String: Int]` refused both, which broke the company setup screen for `company-new@ratedpro.ca`. Same fix as Android's `PhpRatesSerializer`, with a decoding test.
+
+## Rate, then pay (2026-11-17, web PR #158)
+- [x] **Rating comes first in the pay sheet.** `JobStatus.reviewable` = invoiced + warranty_active + warranty_expired (`JobStatus.closed` = the last two; `Job.showsReviewCard` keeps the review card for closed jobs). `PayAndCloseSheet` opens on "How did X do?" (stars, optional comment, Continue / Skip) when the job isn't rated; Continue saves the review quietly (`submitReview(quiet = true)`) and moves to tip + Pay. 1–2 stars offer Report a problem, which closes the sheet and opens the report sheet. The pay step shows "You rated X ★ · Change" (or "Rate X first"). The review sheet that opened after paying is gone, and so is "Once it's paid, you can rate…". `PayInvoiceScreen` links "Rate them before you pay" to the job when `invoice.job.reviewed == false`. The server holds a pre-payment review from the pro until the job closes. `ReviewPassTest`. Not tried on a device.
