@@ -271,6 +271,10 @@ app/src/test/java/com/zivett/app/   JUnit 4; Fixtures + PreviewApiClient stand i
 
 ## Conventions
 
+- NO EM DASHES (—) in user-facing copy (removed everywhere 2026-11-21, web + both
+  apps): two sentences, a colon, a comma or parentheses by meaning; " · " between a
+  label and a value ("Accept · $120"); an empty value is a word ("None", "Not set",
+  "0 min"), never a dash. En dashes stay for ranges. Comments may keep them.
 - Every screen's logic lives in a plain model class holding
   `mutableStateOf` fields that takes `ApiClient`/`AuthSession` as
   parameters → unit-testable with `PreviewApiClient`. Composables are
