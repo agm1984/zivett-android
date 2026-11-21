@@ -497,7 +497,7 @@ fun QuoteRow(index: Int, quote: Quote, showReviews: (() -> Unit)?, accept: () ->
             Row(verticalAlignment = Alignment.CenterVertically) { ZMono("Option $index", modifier = Modifier.weight(1f)); ZMonoLarge(Money.format(quote.amountCents)) }
             ZBodyStrong(JobPresentation.quoteCompanyName(quote))
             // What ZiVETT checked about this pro (ID, insurance, licence,
-            // WorkSafeBC, background check…).
+            // WorkSafeBC…).
             VerificationBadges(quote.company?.verification)
             if (showReviews != null && quote.company?.rating != null) ZTextAction(JobPresentation.proLine(quote.company), onClick = showReviews) else ZCaption(JobPresentation.proLine(quote.company))
             com.zivett.app.features.shared.QuoteBreakdown(quote)

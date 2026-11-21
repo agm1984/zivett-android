@@ -57,10 +57,6 @@ fun VerificationBadges(badges: List<CompanySummary.Verification>?, modifier: Mod
     }
 }
 
-/// "Insurance verified" → "Insurance expired"; "Background checked" →
-/// "Background check expired".
-fun expiredLabel(label: String): String = when {
-    label.endsWith(" verified") -> label.removeSuffix(" verified")
-    label.endsWith(" checked") -> label.removeSuffix(" checked") + " check"
-    else -> label
-} + " expired"
+/// "Insurance verified" → "Insurance expired"; "WorkSafeBC clearance" →
+/// "WorkSafeBC clearance expired".
+fun expiredLabel(label: String): String = label.removeSuffix(" verified") + " expired"

@@ -12,7 +12,6 @@ import org.junit.Test
 class VerificationBadgesTest {
     @Test fun aLapsedItemReadsAsExpired() {
         assertEquals("Insurance expired", expiredLabel("Insurance verified"))
-        assertEquals("Background check expired", expiredLabel("Background checked"))
         assertEquals("WorkSafeBC clearance expired", expiredLabel("WorkSafeBC clearance"))
     }
 

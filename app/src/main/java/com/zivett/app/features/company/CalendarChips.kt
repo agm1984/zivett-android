@@ -83,11 +83,5 @@ object CredentialFieldGuide {
             listOf("Issued within the last 90 days", "Your account number, visible"),
             "JPG, PNG or PDF · up to 10 MB", null,
         ),
-        CredentialGuide(
-            "background_check", "Background check",
-            "A criminal record check, an extra trust signal shown as a badge on your passport. Entirely optional.",
-            listOf("Issued within the last 12 months", "Your name, matching this account"),
-            "JPG, PNG or PDF · up to 10 MB", null,
-        ),
     )
 }
