@@ -106,7 +106,7 @@ fun ReferralScreen(onBack: () -> Unit) {
                                 }
                             }
                             ZButton("Share your link") {
-                                shareText(context, "Book a verified pro on ZiVETT — use my code ${referral.code} for ${discountCopy(referral.discount)} off. ${referral.link}")
+                                shareText(context, "Book a verified pro on ZiVETT. Use my code ${referral.code} for ${discountCopy(referral.discount)} off. ${referral.link}")
                             }
                         }
                     }
@@ -154,7 +154,7 @@ fun WarrantiesScreen(area: JobArea, onBack: () -> Unit) {
                 val past = jobs.filter { !isActive(it) }
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Warranties", "Completed work is covered for a short window. Something not right? Open a claim from the job.")
-                    if (active.isEmpty()) ZEmptyState(Icons.Outlined.VerifiedUser, "No active warranties", "Every job comes with a workmanship warranty — it activates here once the invoice is paid.")
+                    if (active.isEmpty()) ZEmptyState(Icons.Outlined.VerifiedUser, "No active warranties", "Every job comes with a workmanship warranty. It activates here once the invoice is paid.")
                     for (job in active) {
                         ZCard(onClick = { nav.navigate(JobDetailRoute(job.id, areaKey)) }) {
                             Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.Top) {

@@ -93,7 +93,7 @@ class TeamClockTest {
     // Formatting (web lib/payroll.js formatDuration)
 
     @Test fun durationsReadTheWayTheWebWritesThem() {
-        assertEquals("—", TeamClockLogic.formatDuration(0))
+        assertEquals("0 min", TeamClockLogic.formatDuration(0))
         assertEquals("45 min", TeamClockLogic.formatDuration(45))
         assertEquals("7 h", TeamClockLogic.formatDuration(420))
         assertEquals("7 h 05 min", TeamClockLogic.formatDuration(425))
@@ -134,7 +134,7 @@ class TeamClockTest {
         client.sent.clear()
         model.startDay()
         assertEquals(listOf("POST api/company/clock/in", "GET api/company/my-day"), client.sent)
-        assertEquals("You're clocked in — have a good day", model.toast)
+        assertEquals("You're clocked in. Have a good day", model.toast)
         client.sent.clear()
         client.responses[ClockEndpoints.endBreak().path] = clock
         model.endBreak()
@@ -167,7 +167,7 @@ class TeamClockTest {
         val shift = JsonCoding.json.decodeFromString<ClockState>(state).shift!!
         assertEquals(listOf("Started at your first job step"), TeamClockLogic.flags(shift))
         assertEquals(
-            listOf("Started at your first job step", "Closed automatically — you forgot to clock out", "Times changed"),
+            listOf("Started at your first job step", "Closed automatically: you forgot to clock out", "Times changed"),
             TeamClockLogic.flags(shift.copy(endSource = "auto", edited = true)),
         )
         assertEquals(listOf("Added after the fact"), TeamClockLogic.flags(shift.copy(startSource = "added")))
@@ -197,7 +197,7 @@ class TeamClockTest {
         assertEquals("2026-11-13T10:30:00Z", body.endedAt)
         assertEquals(30, body.breakMinutes)
         assertEquals("Forgot", body.note)
-        assertEquals("Paid time: 8 h — ends the next day", form.paidLine(pacific))
+        assertEquals("Paid time: 8 h, ends the next day", form.paidLine(pacific))
         assertEquals("Paid time: 8 h", form.copy(start = LocalTime.of(8, 0), end = LocalTime.of(16, 30)).paidLine(pacific))
     }
 
@@ -242,7 +242,7 @@ class TeamClockTest {
         model.form = model.form!!.copy(note = "Forgot")
         assertTrue(model.save())
         assertNull(model.form)
-        assertEquals("Day added — the office will check it", model.toast)
+        assertEquals("Day added. The office will check it", model.toast)
         assertEquals("2026-11-09", model.hours?.period?.start)
         assertEquals("POST api/company/my-hours/shifts", client.sent.single())
     }

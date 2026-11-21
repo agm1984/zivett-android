@@ -105,7 +105,7 @@ class PlanPickerModel(val area: String, private val client: ApiClient, private v
     } catch (e: ApiError) {
         // Google has the money; our mirror failed. Restore re-sends it,
         // and Google's notification reaches the server anyway.
-        toast = "${e.userMessage} Your purchase is safe — tap Restore purchases to finish."
+        toast = "${e.userMessage} Your purchase is safe. Tap Restore purchases to finish."
         false
     }
 

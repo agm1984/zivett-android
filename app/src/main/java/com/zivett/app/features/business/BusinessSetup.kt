@@ -135,7 +135,7 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
                         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                             Icon(Icons.Filled.Verified, contentDescription = null, tint = ZTheme.colors.brandGold, modifier = Modifier.padding(top = ZSpacing.xl).size(40.dp))
                             ZMono("Setup complete")
-                            ZDisplay("You're all set — welcome to ZiVETT")
+                            ZDisplay("You're all set. Welcome to ZiVETT")
                             ZBody("Your team can now book vetted pros for any property, compare quotes, and keep every repair's paper trail in one place.", tone = ZTextTone.SOFT)
                             ZButton("Book your first request", onClick = onDismiss)
                             ZButton("Go to your overview", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
@@ -144,10 +144,10 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
                         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                             Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                                 ZDisplay("Every property covered, with ZiVETT")
-                                ZBody("Book verified pros across your whole portfolio — tenant requests, compared quotes, and every repair's paper trail in one place.", tone = ZTextTone.SOFT)
+                                ZBody("Book verified pros across your whole portfolio: tenant requests, compared quotes, and every repair's paper trail in one place.", tone = ZTextTone.SOFT)
                             }
                             Stepper(model, setup)
-                            BusinessSetupSteps.whatsLeft(model.step, setup)?.let { ZCaption("Needs attention — $it", color = ZTheme.colors.danger) }
+                            BusinessSetupSteps.whatsLeft(model.step, setup)?.let { ZCaption("Needs attention: $it", color = ZTheme.colors.danger) }
                             when (model.step) {
                                 BusinessSetupSteps.Step.PLAN -> PlanStep(model, plans, ::skip)
                                 BusinessSetupSteps.Step.PROFILE -> ProfileStep(model, ::skip)
@@ -209,10 +209,10 @@ private fun ProfileStep(model: BusinessSetupModel, skip: () -> Unit) {
     val missing = model.state.value?.let { BusinessSetupSteps.completeness(BusinessSetupSteps.Step.PROFILE, it).missing } ?: emptyList()
     ZCard {
         ZHeadline("Tell us about your organization")
-        ZCaption("Right now your account is named after you. This is the organization your team and the pros working your requests will see — you can change any of it later.")
+        ZCaption("Right now your account is named after you. This is the organization your team and the pros working your requests will see. You can change any of it later.")
         if (tried && missing.isNotEmpty()) ZBanner("Still needed before you can continue: ${missing.joinToString(", ")}.", tone = ZTone.DANGER)
         // After a blocked Continue the form opens with the gaps marked in place.
-        ZNavRow("Business profile", if (missing.isEmpty()) "Complete — edit anytime" else "Still needed: ${missing.joinToString(", ")}", onClick = { nav.navigate(OrgProfileRoute(Areas.BUSINESS, if (tried) missing.joinToString("|") else "")) }) { ZIconTile(Icons.Outlined.Business) }
+        ZNavRow("Business profile", if (missing.isEmpty()) "Complete, edit anytime" else "Still needed: ${missing.joinToString(", ")}", onClick = { nav.navigate(OrgProfileRoute(Areas.BUSINESS, if (tried) missing.joinToString("|") else "")) }) { ZIconTile(Icons.Outlined.Business) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         ZButton("Skip for now", style = ZButtonStyle.GHOST, loading = model.completing, fullWidth = false, onClick = skip)
@@ -246,7 +246,7 @@ private fun PropertiesStep(model: BusinessSetupModel, skip: () -> Unit) {
     LaunchedEffect(properties) { properties.load() }
     ZCard {
         ZHeadline("Add your properties")
-        ZCaption("Every repair request starts from a property. Add the ones you manage — one is enough to get going, and you can always add more later.")
+        ZCaption("Every repair request starts from a property. Add the ones you manage. One is enough to get going, and you can always add more later.")
         for (property in properties.state.value ?: emptyList()) {
             Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = colors.success, modifier = Modifier.size(18.dp))
@@ -279,7 +279,7 @@ private fun TeamStep(model: BusinessSetupModel, finish: () -> Unit) {
     LaunchedEffect(Unit) { loadInvitations() }
     ZCard {
         ZHeadline("Invite your team")
-        ZCaption("Teammates can raise and track repair requests across your whole portfolio. This step is optional — you can invite people from the Team page anytime.")
+        ZCaption("Teammates can raise and track repair requests across your whole portfolio. This step is optional. You can invite people from the Team page anytime.")
         ZTextField("Teammate's email", email, { email = it }, placeholder = "colleague@yourcompany.com", error = error, keyboardType = KeyboardType.Email)
         ZButton("Send invite", style = ZButtonStyle.SOFT, loading = inviting, fullWidth = false, enabled = email.isNotBlank()) {
             scope.launch {

@@ -106,7 +106,7 @@ fun AddressesScreen(onBack: () -> Unit) {
             ZScreen {
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { addresses ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                        ZPageTitle("Saved addresses", "Book in one tap — your default is preselected.")
+                        ZPageTitle("Saved addresses", "Book in one tap. Your default is preselected.")
                         if (addresses.isEmpty()) ZEmptyState(Icons.Outlined.Home, "No saved places yet", "Add your home so every booking starts filled in.")
                         for (address in addresses) {
                             ZCard {
@@ -176,7 +176,7 @@ fun AddressFormSheet(model: AddressesModel, existing: CustomerAddress?, onDismis
                         val result = runCatching { model.geocode(address) }.getOrNull()
                         geocoding = false
                         if (result?.lat != null && result.lng != null) { pin = result.lat to result.lng; pinAdjusted = false }
-                        else error = "Couldn't locate that address — check the spelling, or save without a pin."
+                        else error = "Couldn't locate that address. Check the spelling, or save without a pin."
                     }
                 }
             }

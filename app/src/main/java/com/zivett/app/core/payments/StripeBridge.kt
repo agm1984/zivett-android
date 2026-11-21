@@ -82,7 +82,7 @@ object StripeBridge {
         // `configure` has only just published the key; the launcher
         // arrives with the next composition.
         val launcher = withTimeoutOrNull(3_000) { launcher.filterNotNull().first() }
-            ?: return ChallengeOutcome.Failed("Bank confirmation isn't available right now — try again in a moment.")
+            ?: return ChallengeOutcome.Failed("Bank confirmation isn't available right now. Try again in a moment.")
         pendingPayment?.cancel()
         val deferred = CompletableDeferred<ChallengeOutcome>()
         pendingPayment = deferred

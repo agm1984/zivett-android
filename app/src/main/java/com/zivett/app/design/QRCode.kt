@@ -25,7 +25,7 @@ fun ZQRCode(url: String, size: Dp = 128.dp) {
     if (bitmap != null) {
         Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "Your referral QR code — scanning opens the signup page with your code",
+            contentDescription = "Your referral QR code. Scanning opens the signup page with your code",
             filterQuality = FilterQuality.None,
             modifier = Modifier.size(size).clip(RoundedCornerShape(ZRadius.tile)).border(1.dp, ZTheme.colors.border, RoundedCornerShape(ZRadius.tile)),
         )

@@ -151,10 +151,10 @@ private fun VerifyGate() {
         ZTitle("Verify your email to book")
         ZBody("We sent a code to ${environment.session.user?.email ?: "your inbox"}. Enter it from the account screen, then come back here.", tone = ZTextTone.SOFT)
         notice?.let { ZBanner(it, tone = ZTone.WARNING) }
-        ZButton("I've verified — continue") {
+        ZButton("I've verified, continue") {
             scope.launch {
                 runCatching { environment.session.refreshUser() }
-                if (environment.session.user?.isEmailVerified == false) notice = "Still unverified — enter the code from the email first."
+                if (environment.session.user?.isEmailVerified == false) notice = "Still unverified. Enter the code from the email first."
             }
         }
     }
@@ -186,7 +186,7 @@ private fun WizardBody(model: BookingWizardModel, options: BookingOptions) {
                 // A stored draft found on entry — Resume restores it (photos and
                 // all), Start over deletes it. Any fresh progress dismisses the offer.
                 ZCard {
-                    ZBody("You have an unfinished ${model.pendingDraftCategory ?: "booking"}${if (model.pendingDraftCategory != null) " booking" else ""} from earlier — pick up where you left off?")
+                    ZBody("You have an unfinished ${model.pendingDraftCategory ?: "booking"}${if (model.pendingDraftCategory != null) " booking" else ""} from earlier. Pick up where you left off?")
                     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                         ZButton("Resume", compact = true, fullWidth = false) { model.resumePending() }
                         ZButton("Start over", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { model.discardDraft() }
@@ -208,7 +208,7 @@ private fun WizardBody(model: BookingWizardModel, options: BookingOptions) {
                 BookingWizardEngine.Step.Photos -> PhotosStep(model) { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                 BookingWizardEngine.Step.Where -> if (model.area == BookingWizardEngine.Area.BUSINESS) PropertyStep(model, ::autoAdvance) { addingProperty = true } else WhereStep(model, options)
                 BookingWizardEngine.Step.Details -> {
-                    StepHeading("Unit, tenant & access", "Optional — helps the pro find the right door.")
+                    StepHeading("Unit, tenant & access", "Optional. Helps the pro find the right door.")
                     ZTextField("Unit / floor", model.form.unit, { model.form = model.form.copy(unit = it) }, placeholder = "Unit 4", error = model.fieldErrors["unit"])
                     ZTextField("Tenant / contact", model.form.tenant, { model.form = model.form.copy(tenant = it) }, placeholder = "A. Okafor", error = model.fieldErrors["tenant"], capitalization = KeyboardCapitalization.Words)
                     ZTextArea("Access notes", model.form.accessNotes, { model.form = model.form.copy(accessNotes = it) }, placeholder = "Gate code, parking, pets…", error = model.fieldErrors["access_notes"], minLines = 3)
@@ -278,7 +278,7 @@ private fun QuestionStep(model: BookingWizardModel, q: BookingOptions.Question, 
     fun set(values: List<String>) { model.form = model.form.copy(intakeAnswers = model.form.intakeAnswers + (q.id to values)) }
     when (q.type) {
         "single" -> {
-            StepHeading(q.prompt, "Pick the closest match — pros quote faster with specifics.")
+            StepHeading(q.prompt, "Pick the closest match. Pros quote faster with specifics.")
             for (option in q.options ?: emptyList()) ZSelectableRow(selected = answers == listOf(option), onClick = { set(listOf(option)); autoAdvance() }) { ZBodyStrong(option, modifier = Modifier.weight(1f)) }
         }
         "multi" -> {
@@ -299,8 +299,8 @@ private fun QuestionStep(model: BookingWizardModel, q: BookingOptions.Question, 
 @Composable
 private fun PhotosStep(model: BookingWizardModel, pick: () -> Unit) {
     val colors = ZTheme.colors
-    if (model.area == BookingWizardEngine.Area.BUSINESS) StepHeading("Add photos if you have them", "Pros quote faster when they can see the problem. Booking remotely? Continue without — you can add photos from the request page once you have them.")
-    else StepHeading("Add photos of the issue", "At least ${BookingWizardEngine.minPhotos} — pros quote faster and more accurately when they can see the problem. JPEG, PNG or WebP.")
+    if (model.area == BookingWizardEngine.Area.BUSINESS) StepHeading("Add photos if you have them", "Pros quote faster when they can see the problem. Booking remotely? Continue without them. You can add photos from the request page once you have them.")
+    else StepHeading("Add photos of the issue", "At least ${BookingWizardEngine.minPhotos}. Pros quote faster and more accurately when they can see the problem. JPEG, PNG or WebP.")
     model.photoNotice?.let { ZBanner(it, tone = ZTone.DANGER, onClick = { model.photoNotice = null }) }
     // Photos live on the server draft — uploaded when picked, so an interruption never costs a re-upload.
     val scope = rememberCoroutineScope()
@@ -332,7 +332,7 @@ private fun PropertyStep(model: BookingWizardModel, autoAdvance: () -> Unit, add
     val colors = ZTheme.colors
     StepHeading("Which property?", "Requests are booked against a property so history stays organized.")
     model.fieldErrors["property_id"]?.let { ZCaption(it, color = colors.danger) }
-    if (model.properties.isEmpty()) ZBanner("You haven't added any properties yet — add one now to book a request against it.", tone = ZTone.WARNING)
+    if (model.properties.isEmpty()) ZBanner("You haven't added any properties yet. Add one now to book a request against it.", tone = ZTone.WARNING)
     for (property in model.properties) {
         ZSelectableRow(selected = model.form.propertyId == property.id, onClick = { model.form = model.form.copy(propertyId = property.id); autoAdvance() }) {
             PropertyThumb(property, size = 40.dp)
@@ -438,7 +438,7 @@ private fun WindowsStep(model: BookingWizardModel, title: String) {
     val now = LocalDateTime.now()
     val days = (0 until 14).map { LocalDate.now().plusDays(it.toLong()) }
     LaunchedEffect(model.form.categoryId) { model.probeSupply(days = 14) }
-    StepHeading(title, "Pick every window that works — more options means a faster match.")
+    StepHeading(title, "Pick every window that works. More options means a faster match.")
     model.fieldErrors["availability_windows"]?.let { ZCaption(it, color = colors.danger) }
     for ((i, day) in days.withIndex()) {
         val key = BookingWizardEngine.dateKey(day)
@@ -471,12 +471,12 @@ private fun ReviewStep(model: BookingWizardModel, options: BookingOptions) {
     val windows = BookingWizardEngine.windows(form.selectedWindows)
     StepHeading("Review & confirm")
     ZCard {
-        ReviewRow(model, "Category", model.category?.name ?: "—", BookingWizardEngine.Step.Category)
+        ReviewRow(model, "Category", model.category?.name ?: "Not chosen", BookingWizardEngine.Step.Category)
         ReviewRow(model, "Timing", JobPresentation.modeMeta(form.mode).label, if (form.modePreset) BookingWizardEngine.Step.Review else BookingWizardEngine.Step.Mode)
         if (windows.isNotEmpty()) ZCaption(windows.joinToString("\n") { JobPresentation.windowSlot(it.date, it.window) })
         if (form.mode == "quote") {
-            ReviewRow(model, "Urgency", BookingWizardEngine.urgencies.firstOrNull { it.first == form.urgency }?.second ?: "—", BookingWizardEngine.Step.Urgency)
-            if (windows.isEmpty()) ZCaption("Timing flexible — arranged with your pro")
+            ReviewRow(model, "Urgency", BookingWizardEngine.urgencies.firstOrNull { it.first == form.urgency }?.second ?: "Not set", BookingWizardEngine.Step.Urgency)
+            if (windows.isEmpty()) ZCaption("Timing flexible, arranged with your pro")
         }
         if (model.area == BookingWizardEngine.Area.BUSINESS) {
             ReviewRow(model, "Property", listOfNotNull(model.properties.firstOrNull { it.id == form.propertyId }?.name, form.unit.ifEmpty { null }).joinToString(" · "), BookingWizardEngine.Step.Where)
@@ -493,7 +493,7 @@ private fun ReviewStep(model: BookingWizardModel, options: BookingOptions) {
     }
     ZCard {
         ZBodyStrong("Quotes set the price")
-        ZCaption("Verified pros send itemized quotes. Accepting one charges nothing — your card is saved, and the quote plus the trust & support fee and applicable taxes is charged only when the job's done and you close it.")
+        ZCaption("Verified pros send itemized quotes. Accepting one charges nothing. Your card is saved, and the quote plus the trust & support fee and applicable taxes is charged only when the job's done and you close it.")
         if (form.mode == "instant" && model.emergencyFeeCents > 0) ZCaption("Instant dispatch adds a flat ${Money.format(model.emergencyFeeCents)} emergency fee on top of the quote you accept.", tone = ZTextTone.INK)
         val phrase = JobPresentation.warrantyPhrase(options.warrantyDays)
         ZCaption("• ${phrase.replaceFirstChar { it.uppercase() }} on every paid job.\n• Cancel free any time before a pro is committed.\n• Any scope change is approved by you in-app before it bills.")
@@ -538,10 +538,10 @@ fun BookingSuccess(job: Job, photosUploaded: Boolean, mode: String, categoryName
     val message = when (mode) {
         "instant" -> "Nearby verified pros are quoting right now. Accept one and they're on their way."
         "scheduled" -> "Pros available on your chosen days are reviewing the job. You'll pick from their quotes."
-        else -> "Verified pros are reviewing your request. Quotes usually land within 24 hours — we'll notify you."
+        else -> "Verified pros are reviewing your request. Quotes usually land within 24 hours, and we'll notify you."
     }
     val steps = when (mode) {
-        "instant" -> listOf("Quotes arrive in minutes", "Accept the one you like", "Your pro heads out — track them live")
+        "instant" -> listOf("Quotes arrive in minutes", "Accept the one you like", "Your pro heads out. Track them live")
         "scheduled" -> listOf("Available pros send quotes", "Accept one to lock in your window", "Your pro arrives in the window you picked")
         else -> listOf("ZiVETT checks every quote before you see it", "Compare and accept the best fit", "Arrange timing with your pro in messages")
     }

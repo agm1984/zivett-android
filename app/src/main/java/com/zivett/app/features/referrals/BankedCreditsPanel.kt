@@ -43,7 +43,7 @@ fun BankedCreditsPanel(count: Int, totalCents: Int, nextCents: Int, applies: Str
         val line = buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(Money.format(nextCents)) }
             append(" $applies")
-            if (count > 1) append(" — credits spend one per $per, so the rest stay banked for your next ${per}s")
+            if (count > 1) append(". Credits spend one per $per, so the rest stay banked for your next ${per}s")
             append(".")
         }
         Text(line, style = ZType.caption, color = colors.inkMuted)

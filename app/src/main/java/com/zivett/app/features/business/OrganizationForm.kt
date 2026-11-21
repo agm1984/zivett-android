@@ -94,7 +94,7 @@ class OrganizationFormModel(private val client: ApiClient, val company: Boolean)
         /// The no-logo placeholder: the business's initials (first letter of
         /// the first two words) — the monogram the invoice letterhead uses.
         fun initials(name: String): String =
-            name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "—" }
+            name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
 
         val fieldKeys = listOf("name", "address_line1", "address_line2", "city", "region", "postal_code", "phone", "website", "social_x", "social_instagram", "social_facebook", "gst_number", "about", "industry")
     }
@@ -240,7 +240,7 @@ fun OrganizationFormScreen(area: String, missing: List<String> = emptyList(), on
             ZScreen {
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { org ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                        ZPageTitle("Business profile", "This is the business ${if (company) "customers see across ZiVETT — on quotes, jobs, and your Verified Pro Passport." else "pros see on each request."}")
+                        ZPageTitle("Business profile", "This is the business ${if (company) "customers see across ZiVETT: on quotes, jobs, and your Verified Pro Passport." else "pros see on each request."}")
                         if (flagged && model.fieldErrors.values.any { it == "Needed to continue." }) ZBanner("Fill in the marked fields to continue setup.", tone = ZTone.DANGER)
                         // Logo: rounded square (brand avatar convention).
                         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
@@ -249,7 +249,7 @@ fun OrganizationFormScreen(area: String, missing: List<String> = emptyList(), on
                             if (org.logoUrl != null) ZPhotoAvatar(org.logoUrl, initials, 56.dp, ZAvatarShape.COMPANY) else ZAvatar(initials, ZAvatarShape.COMPANY, 56.dp, onDark = true)
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 // Optional for companies too since 2026-10-12 (server no longer lists it missing).
-                                ZLabel(if (company) "Logo (optional — add it any time)" else "Logo (optional)")
+                                ZLabel(if (company) "Logo (optional, add it any time)" else "Logo (optional)")
                                 ZCaption(if (company) "Shown on your quotes and invoices." else "Shown to pros on your requests.")
                             }
                             if (canManage) {
@@ -275,7 +275,7 @@ fun OrganizationFormScreen(area: String, missing: List<String> = emptyList(), on
                         } else {
                             // Businesses declare their industry (required — the server refuses a save without one).
                             ZDropdown("Industry", model.field("industry"), model.industryOptions.map { it.value to it.label }, placeholder = "Pick your industry…", error = model.fieldErrors["industry"]) { model.set("industry", it) }
-                            ZCaption("What kind of business you run — it helps us route the right pros and support to you.")
+                            ZCaption("What kind of business you run. It helps us route the right pros and support to you.")
                         }
                         // Optional extras, folded away until asked for.
                         if (model.extrasOpen) {

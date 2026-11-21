@@ -29,7 +29,7 @@ class OrganizationFormTest {
     @Test fun theNoLogoMonogramIsTheFirstTwoInitials() {
         assertEquals("RP", OrganizationFormModel.initials("Ravensworth  plumbing & heating"))
         assertEquals("A", OrganizationFormModel.initials(" acme "))
-        assertEquals("—", OrganizationFormModel.initials(""))
+        assertEquals("?", OrganizationFormModel.initials(""))
     }
 
     @Test fun theOptionalExtrasStayFoldedUntilOneHasAValue() = runTest {

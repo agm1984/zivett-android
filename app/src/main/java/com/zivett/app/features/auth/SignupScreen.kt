@@ -98,7 +98,7 @@ class SignupFormModel(initialRole: UserRole? = null) {
             val fee = signupFee ?: return null
             if (!showsFeeBanner) return null
             val amount = Money.format(fee.cents)
-            return if (fee.waived) Banner("The $amount registration fee is waived", " — limited time, no code needed.", ZTone.SUCCESS)
+            return if (fee.waived) Banner("The $amount registration fee is waived", ". Limited time, no code needed.", ZTone.SUCCESS)
             else Banner("Customer accounts carry a one-time $amount registration fee", ".", ZTone.NEUTRAL)
         }
 
@@ -109,7 +109,7 @@ class SignupFormModel(initialRole: UserRole? = null) {
         get() {
             val invite = invite ?: return null
             if (invite.kind == "customer" && form.role == UserRole.CUSTOMER && invite.firstName != null) {
-                return Banner("${invite.firstName} invited you", " — sign up and get ${invite.discountLabel} your first booked job. The credit applies automatically.", ZTone.SUCCESS)
+                return Banner("${invite.firstName} invited you", ". Sign up and get ${invite.discountLabel} your first booked job. The credit applies automatically.", ZTone.SUCCESS)
             }
             if (invite.kind == "company" && form.role == UserRole.COMPANY && invite.name != null) {
                 return Banner(invite.name, " invited your business to ZiVETT.", ZTone.SUCCESS)

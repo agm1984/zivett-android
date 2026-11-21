@@ -148,7 +148,7 @@ class OpportunitiesModel(private val client: ApiClient) {
         try {
             client.send(CompanyEndpoints.quote(job.id, body))
             state.value?.let { state = Loadable.Loaded(it.copy(opportunities = it.opportunities.filter { o -> o.id != job.id })) }
-            toast = "Quote sent to ZiVETT for ${job.code ?: "the job"} — track it under My quotes"
+            toast = "Quote sent to ZiVETT for ${job.code ?: "the job"}. Track it under My quotes"
             // Refetch so the job reappears under "Quoted by your team".
             runCatching { load() }
             return null
@@ -210,13 +210,13 @@ fun OpportunitiesScreen() {
             ZLoadable(model.state, retry = { scope.launch { model.load() } }) { feed ->
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Opportunities")
-                    feed.cooldownUntil?.let { ZBanner("Your feed is paused after recent withdrawals. New opportunities reopen ${Dates.shortTime(it)}. Withdrawals also lower your ranking — completed jobs repair it.", tone = ZTone.DANGER) }
+                    feed.cooldownUntil?.let { ZBanner("Your feed is paused after recent withdrawals. New opportunities reopen ${Dates.shortTime(it)}. Withdrawals also lower your ranking. Completed jobs repair it.", tone = ZTone.DANGER) }
                     // Nothing ships capped today, so this never renders — and if a cap
                     // ever does, it states the fact only: the app never mentions
                     // memberships (see PARITY.md, App Store 3.1.1 / Play payments).
                     feed.leads.limit?.let { limit ->
                         val remaining = feed.leads.remaining ?: 0
-                        ZBanner(if (remaining == 0) "You've used all $limit of your leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month — each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
+                        ZBanner(if (remaining == 0) "You've used all $limit of your leads this month. New leads open at the start of next month." else "$remaining of $limit leads left this month. Each quote you send uses one.", tone = if (remaining == 0) ZTone.DANGER else ZTone.WARNING)
                     }
                     if (feed.opportunities.isEmpty() && feed.cooldownUntil == null) ZEmptyState(Icons.Outlined.AutoAwesome, if (feed.quoted.isNotEmpty()) "No new opportunities right now" else "No opportunities right now", "New jobs appear here the moment customers book. Check back soon.")
                     for (job in feed.opportunities) {
@@ -251,11 +251,11 @@ private fun QuotedByTeam(quotes: List<Quote>, userId: Int?, openQuotes: () -> Un
     val now = java.time.Instant.now()
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs), modifier = Modifier.padding(top = ZSpacing.sm)) {
         ZHeadline("Quoted by your team")
-        ZCaption("Your company has quoted these — one quote per job. Revise or withdraw it from My quotes.")
+        ZCaption("Your company has quoted these, one quote per job. Revise or withdraw it from My quotes.")
         for (quote in quotes) {
             ZCard(onClick = openQuotes) {
                 ZBodyStrong(quote.job?.title ?: "Job", maxLines = 2)
-                ZBody("Quoted by ${CompanyQuotesLogic.quotedBy(quote, userId)} — ${Money.format(quote.amountCents)}", tone = ZTextTone.SOFT)
+                ZBody("Quoted by ${CompanyQuotesLogic.quotedBy(quote, userId)}, ${Money.format(quote.amountCents)}", tone = ZTextTone.SOFT)
                 ZCaption(listOfNotNull(CompanyQuotesLogic.waitingState(quote), quote.createdAt?.let { CompanyQuotesLogic.sentAgo(it, now) }, quote.job?.code).joinToString(" · "), tone = ZTextTone.FAINT)
             }
         }
@@ -402,7 +402,7 @@ fun QuoteComposerSheet(
         if (!payoutsReady) {
             Column(modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card)).background(colors.warningSoft).padding(ZSpacing.sm), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 ZBodyStrong("One step before you can quote: set up payouts.")
-                ZCaption("Payouts are how you get paid — when a booker accepts your quote and the job is done, ZiVETT sends the money to your bank account. Banking details are entered securely with Stripe and take a few minutes; ZiVETT never sees them.")
+                ZCaption("Payouts are how you get paid. When a booker accepts your quote and the job is done, ZiVETT sends the money to your bank account. Banking details are entered securely with Stripe and take a few minutes; ZiVETT never sees them.")
             }
         }
 
@@ -416,7 +416,7 @@ fun QuoteComposerSheet(
                     ZCaption("/hr", tone = ZTextTone.SOFT)
                 }
                 rateError?.let { ZCaption(it, color = colors.danger) }
-                    ?: ZCaption("Applies to all your ${job.category.name.lowercase()} quotes from now on — quotes already sent keep their price.", tone = ZTextTone.FAINT)
+                    ?: ZCaption("Applies to all your ${job.category.name.lowercase()} quotes from now on. Quotes already sent keep their price.", tone = ZTextTone.FAINT)
                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                     Spacer(Modifier.weight(1f))
                     ZButton("Cancel", style = ZButtonStyle.GHOST, compact = true, fullWidth = false, enabled = !savingRate) { editingRate = false }
@@ -440,7 +440,7 @@ fun QuoteComposerSheet(
                 ZCaption("${job.category.name} rate ${Money.format(rateCents)}/hr")
                 if (saveRate != null && !editingRate) ZTextAction("Change") { startRateEdit() }
             }
-            Stepper("Estimated hours", if (hours == 0.0) "—" else hours.hoursLabel(), down = { hoursFollowLabour = false; hours = maxOf(0.0, ((hours - 0.5) * 2).roundToInt() / 2.0) }, up = { hoursFollowLabour = false; hours = minOf(100.0, maxOf(0.5, ((hours + 0.5) * 2).roundToInt() / 2.0)) })
+            Stepper("Estimated hours", if (hours == 0.0) "Not set" else hours.hoursLabel(), down = { hoursFollowLabour = false; hours = maxOf(0.0, ((hours - 0.5) * 2).roundToInt() / 2.0) }, up = { hoursFollowLabour = false; hours = minOf(100.0, maxOf(0.5, ((hours + 0.5) * 2).roundToInt() / 2.0)) })
             Stepper("Crew", crew.toString(), down = { crew = maxOf(1, crew - 1); syncHours() }, up = { crew = minOf(20, crew + 1); syncHours() })
             ZHeadline("Line items")
             lines.forEach { line ->
@@ -460,13 +460,13 @@ fun QuoteComposerSheet(
                 MoneyRow("You keep", totalCents - CompanyPresentation.commission(totalCents, commissionBps), strong = true, color = colors.success)
             }
         } else {
-            ZBanner("Set your ${job.category.name} hourly rate${if (saveRate != null) "" else " on your Passport"} first — quotes are priced from it.", tone = ZTone.WARNING)
+            ZBanner("Set your ${job.category.name} hourly rate${if (saveRate != null) "" else " on your Passport"} first. Quotes are priced from it.", tone = ZTone.WARNING)
             if (saveRate != null && !editingRate) ZTextAction("Set your ${job.category.name.lowercase()} rate") { startRateEdit() }
         }
 
         if (offeredWindows.isNotEmpty()) {
             ZHeadline("When would you arrive?${if (job.mode == "scheduled") "" else " (optional)"}")
-            ZCaption("The booker offered these windows — your quote proposes one.")
+            ZCaption("The booker offered these windows. Your quote proposes one.")
             ZFlowRow(spacing = 6.dp) {
                 for (window in offeredWindows) {
                     val key = "${window.date}|${window.window}"
@@ -479,7 +479,7 @@ fun QuoteComposerSheet(
                 }
                 if (job.mode != "scheduled") {
                     val flexible = proposedKey == "flexible"
-                    Text("Flexible — arrange after acceptance", style = ZType.label, color = if (flexible) colors.onBrand else colors.inkSoft,
+                    Text("Flexible, arrange after acceptance", style = ZType.label, color = if (flexible) colors.onBrand else colors.inkSoft,
                         modifier = Modifier.clip(CircleShape).background(if (flexible) colors.navy else colors.surface).border(1.dp, if (flexible) colors.navy else colors.borderStrong, CircleShape).clickable { proposedKey = if (flexible) null else "flexible" }.padding(horizontal = 10.dp, vertical = 7.dp))
                 }
             }
@@ -511,7 +511,7 @@ fun QuoteComposerSheet(
         }
         ZTextArea("What's not included (optional)", exclusions, { exclusions = it }, placeholder = "Drywall repair, painting, hauling the old unit away…", minLines = 3)
         ZTextArea("Note to the customer (optional)", message, { message = it }, placeholder = "Anything that helps them choose you", minLines = 3)
-        ZCaption("The booker compares quotes and accepts one — acceptance assigns you the job and unlocks the exact address and access notes.", tone = ZTextTone.FAINT)
+        ZCaption("The booker compares quotes and accepts one. Acceptance assigns you the job and unlocks the exact address and access notes.", tone = ZTextTone.FAINT)
 
         // Payouts unready: the primary action IS going to set them up.
         if (!payoutsReady && setupPayouts != null) {

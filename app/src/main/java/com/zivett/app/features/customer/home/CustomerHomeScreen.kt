@@ -332,7 +332,7 @@ private fun HeroFirstRun() {
     val environment = LocalAppEnvironment.current
     val nav = LocalNav.current
     val steps = listOf(
-        Triple("1", "Describe the job", "A few taps — what's wrong, where, and when."),
+        Triple("1", "Describe the job", "A few taps: what's wrong, where, and when."),
         Triple("2", "We match a verified pro", "Identity, licence and insurance checked."),
         Triple("3", "Track, pay, stay covered", "Live status, in-app payment, workmanship warranty."),
     )

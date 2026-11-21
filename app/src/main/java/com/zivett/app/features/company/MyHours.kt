@@ -95,7 +95,7 @@ data class ShiftForm(
 
     /// "Paid time: 8 h — ends the next day".
     fun paidLine(zone: ZoneId = ZoneId.systemDefault()): String? = paidMinutes(zone)?.let { minutes ->
-        "Paid time: ${TeamClockLogic.durationOrZero(minutes)}" + if (end != null && TeamClockLogic.endsNextDay(start, end)) " — ends the next day" else ""
+        "Paid time: ${TeamClockLogic.durationOrZero(minutes)}" + if (end != null && TeamClockLogic.endsNextDay(start, end)) ", ends the next day" else ""
     }
 
     fun body(periodDate: String?, zone: ZoneId = ZoneId.systemDefault()) = ShiftBody(
@@ -177,7 +177,7 @@ class MyHoursModel(private val client: ApiClient) {
         try {
             val body = current.body(hours?.period?.start ?: date, zone)
             state = Loadable.Loaded(current.shiftId?.let { client.send(ClockEndpoints.fixShift(it, body)) } ?: client.send(ClockEndpoints.addShift(body)))
-            toast = if (current.shiftId != null) "Hours fixed — the office will see the change" else "Day added — the office will check it"
+            toast = if (current.shiftId != null) "Hours fixed. The office will see the change" else "Day added. The office will check it"
             form = null
             return true
         } catch (e: CancellationException) {

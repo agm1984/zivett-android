@@ -78,7 +78,7 @@ private fun SignedInRouter(user: User) {
         is Access.Destination.Suspended -> BlockedAccountScreen("Account suspended", destination.reason)
         Access.Destination.Deactivated -> BlockedAccountScreen("Account deactivated", "Your account no longer has access to this organization.")
         Access.Destination.MissingOrganization -> BlockedAccountScreen("No organization", "Your account isn't attached to an organization. Contact support.")
-        is Access.Destination.Unsupported -> BlockedAccountScreen("Use the web app", "Admin tools live at zivett.com — the mobile app is for customers, businesses, and pros.")
+        is Access.Destination.Unsupported -> BlockedAccountScreen("Use the web app", "Admin tools live at zivett.com. The mobile app is for customers, businesses, and pros.")
     }
 }
 

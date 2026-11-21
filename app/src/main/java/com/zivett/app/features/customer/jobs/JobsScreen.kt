@@ -116,12 +116,12 @@ fun JobRow(job: Job, onClick: () -> Unit) {
                     else -> colors.success
                 }
                 Text(JobPresentation.liveLine(job), style = ZType.caption, color = color, modifier = Modifier.weight(1f))
-                ZMonoBody(JobPresentation.priceLabel(job) ?: "—", weight = FontWeight.SemiBold)
+                ZMonoBody(JobPresentation.priceLabel(job) ?: "No quotes", weight = FontWeight.SemiBold)
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ZCaption(listOfNotNull(job.createdAt?.let { Dates.monthDay(it) }, job.company?.name).joinToString(" · "), modifier = Modifier.weight(1f))
-                ZMonoBody(job.invoice?.let { Money.format(it.amountDueCents) } ?: "—", weight = FontWeight.SemiBold)
+                ZMonoBody(job.invoice?.let { Money.format(it.amountDueCents) } ?: "No invoice", weight = FontWeight.SemiBold)
             }
         }
     }

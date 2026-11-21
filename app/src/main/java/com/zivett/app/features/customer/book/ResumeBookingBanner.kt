@@ -88,7 +88,7 @@ fun ResumeBookingBanner(area: BookingWizardEngine.Area) {
                 append("You have an unfinished ")
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(label ?: "booking") }
                 if (label != null) append(" booking")
-                append(" — your answers and photos are saved.")
+                append(". Your answers and photos are saved.")
             },
             style = ZType.caption, color = Color.White, modifier = Modifier.weight(1f),
         )

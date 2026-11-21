@@ -62,5 +62,5 @@ object AddressLookup {
         return merged.takeIf { filled.isNotEmpty() }
     }
 
-    const val filledNotice = "We filled in what we could from the street — check it's right."
+    const val filledNotice = "We filled in what we could from the street. Check it's right."
 }

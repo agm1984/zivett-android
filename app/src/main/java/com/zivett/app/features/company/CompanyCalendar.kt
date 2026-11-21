@@ -177,7 +177,7 @@ class CompanyCalendarModel(private val client: ApiClient, today: LocalDate = Loc
 
     private fun label(date: String) = CalendarLogic.dayTitle(date)
 
-    suspend fun blockDay(date: String) = act("${label(date)} blocked — scheduled jobs that day leave your feed") { client.send(CompanyEndpoints.blockDate(date)) }
+    suspend fun blockDay(date: String) = act("${label(date)} blocked. Scheduled jobs that day leave your feed") { client.send(CompanyEndpoints.blockDate(date)) }
     suspend fun blockWindow(date: String, window: String) = act("${CalendarLogic.windowTag(window)} blocked on ${label(date)}") { client.send(CompanyEndpoints.blockDate(date, window)) }
     suspend fun unblock(row: AvailabilityResponse.BlockedDate) = act(if (row.window == null) "${label(row.date)} reopened" else "${CalendarLogic.windowTag(row.window)} reopened on ${label(row.date)}") { client.send(CompanyEndpoints.unblockDate(row.id)) }
 
@@ -479,7 +479,7 @@ private fun JobChip(job: CalendarJob, wide: Boolean, color: Color) {
         Text(
             when {
                 job.busy -> "Busy"
-                wide -> "${job.clockTime?.let { MyDayLogic.formatClock(it).replace(" ", "") } ?: CalendarLogic.windowTag(job.window).take(1)} · ${job.code ?: "—"}"
+                wide -> "${job.clockTime?.let { MyDayLogic.formatClock(it).replace(" ", "") } ?: CalendarLogic.windowTag(job.window).take(1)} · ${job.code ?: "Job"}"
                 else -> CalendarChips.chipLabel(job.window, job.code)
             },
             style = ZType.mono.copy(fontSize = if (wide) 10.sp else 8.sp, letterSpacing = 0.sp),

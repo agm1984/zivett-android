@@ -15,7 +15,7 @@ object CalendarChips {
     /// truncated variant of the web's "Morning · Z-93U4H3".
     fun chipLabel(window: String?, code: String?, tentative: Boolean = false): String {
         val initial = tag(window).take(1)
-        return "$initial·${code ?: "—"}${if (tentative) "?" else ""}"
+        return "$initial·${code ?: "Job"}${if (tentative) "?" else ""}"
     }
 }
 
@@ -55,37 +55,37 @@ object CredentialFieldGuide {
     val entries: List<CredentialGuide> = listOf(
         CredentialGuide(
             "photo_id", "Photo ID",
-            "Government-issued photo ID of the owner — it confirms a real person stands behind the account. Seen only by our review team, never by bookers.",
-            listOf("Your name, matching this account", "The photo and dates, readable", "The whole document — all four corners, no glare"),
+            "Government-issued photo ID of the owner. It confirms a real person stands behind the account. Seen only by our review team, never by bookers.",
+            listOf("Your name, matching this account", "The photo and dates, readable", "The whole document: all four corners, no glare"),
             "JPG, PNG or PDF · up to 10 MB", "A clear phone photo of your driver’s licence or passport works fine.",
         ),
         CredentialGuide(
             "license", "Licence/Certification",
-            "Your trade licence or certification — required for licensed trades like plumbing and electrical, and optional otherwise. Once verified it adds a badge bookers see on your quotes.",
+            "Your trade licence or certification, required for licensed trades like plumbing and electrical, and optional otherwise. Once verified it adds a badge bookers see on your quotes.",
             listOf("Covers the trades you selected in Services & rates", "The licence number and expiry date, visible", "Your name or business name on it"),
             "JPG, PNG or PDF · up to 10 MB", "If your certification is digital, a full-page screenshot showing the number and expiry is fine.",
         ),
         CredentialGuide(
             "insurance", "Insurance",
-            "Your certificate of liability insurance — the document your insurer or broker issues that proves your coverage. It’s what lets us tell bookers you’re insured.",
+            "Your certificate of liability insurance: the document your insurer or broker issues that proves your coverage. It’s what lets us tell bookers you’re insured.",
             listOf("Your business name, matching your profile", "The coverage amount (most trades carry $2M liability)", "The effective and expiry dates, readable"),
-            "JPG, PNG or PDF · up to 10 MB", "Don’t have it handy? Your broker can email it to you in minutes — ask for a “certificate of insurance”.",
+            "JPG, PNG or PDF · up to 10 MB", "Don’t have it handy? Your broker can email it to you in minutes. Ask for a “certificate of insurance”.",
         ),
         CredentialGuide(
             "registration", "Business registration",
-            "Your BC registration or incorporation certificate — it proves the business legally exists.",
+            "Your BC registration or incorporation certificate. It proves the business legally exists.",
             listOf("The legal name (matching, or naming, your operating name)", "The registration or incorporation number, visible"),
-            "JPG, PNG or PDF · up to 10 MB", "Registered a while ago? Search “BC Registries” — you can download a copy of your registration there.",
+            "JPG, PNG or PDF · up to 10 MB", "Registered a while ago? Search “BC Registries” and you can download a copy of your registration there.",
         ),
         CredentialGuide(
             "worksafebc", "WorkSafeBC clearance",
-            "Your WorkSafeBC clearance letter — shows your coverage is in good standing. Optional, but it earns a trust badge on your passport.",
+            "Your WorkSafeBC clearance letter. It shows your coverage is in good standing. Optional, but it earns a trust badge on your passport.",
             listOf("Issued within the last 90 days", "Your account number, visible"),
             "JPG, PNG or PDF · up to 10 MB", null,
         ),
         CredentialGuide(
             "background_check", "Background check",
-            "A criminal record check — an extra trust signal shown as a badge on your passport. Entirely optional.",
+            "A criminal record check, an extra trust signal shown as a badge on your passport. Entirely optional.",
             listOf("Issued within the last 12 months", "Your name, matching this account"),
             "JPG, PNG or PDF · up to 10 MB", null,
         ),

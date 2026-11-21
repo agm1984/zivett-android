@@ -51,7 +51,7 @@ class JobPresentationTest {
     @Test fun windowFormatting() {
         assertEquals("Sun, Aug 9 · Morning", JobPresentation.windowSlot("2026-08-09", "morning"))
         assertEquals("Sun, Aug 9", JobPresentation.windowSlot("2026-08-09", null))
-        assertEquals("Sunday, August 9 — Afternoon (12pm–5pm)", JobPresentation.arrivalLabel("2026-08-09", "afternoon"))
+        assertEquals("Sunday, August 9 · Afternoon (12pm–5pm)", JobPresentation.arrivalLabel("2026-08-09", "afternoon"))
     }
 
     @Test fun warrantyCopyNeverHardcodesANumber() {
@@ -72,7 +72,7 @@ class JobPresentationTest {
     @Test fun cancelCopyFollowsTheFee() {
         var job = Fixtures.job(status = JobStatus.SUBMITTED, quotes = listOf(pending, Quote(id = 2, amountCents = 1, status = QuoteStatus.PENDING)))
         assertTrue(JobPresentation.cancelManageCopy(job).startsWith("Free to cancel"))
-        assertTrue(JobPresentation.cancelConfirmCopy(job).contains("the 2 pending quotes"))
+        assertTrue(JobPresentation.cancelConfirmCopy(job).contains("The 2 pending quotes"))
         assertEquals("Cancel it", JobPresentation.cancelButtonTitle(job))
         job = Fixtures.job(status = JobStatus.ARRIVED, company = Fixtures.ravensworth).copy(cancellationFeeCents = 12_500)
         assertTrue(JobPresentation.cancelManageCopy(job).contains("$125.00 cancellation fee"))
@@ -111,7 +111,7 @@ class JobPresentationTest {
         assertEquals("Now", CalendarChips.tag(null))
         assertEquals("M·Z-93U4H3", CalendarChips.chipLabel("morning", "Z-93U4H3"))
         assertEquals("A·Z-1?", CalendarChips.chipLabel("afternoon", "Z-1", tentative = true))
-        assertEquals("N·—", CalendarChips.chipLabel("", null))
+        assertEquals("N·Job", CalendarChips.chipLabel("", null))
     }
 
     @Test fun credentialFileTypes() {

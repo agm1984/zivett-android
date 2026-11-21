@@ -226,7 +226,7 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         busy = true
         try {
             state = Loadable.Loaded(client.send(com.zivett.app.core.models.MyDayEndpoints.setArrival(jobId, time)).job)
-            toast = time?.let { "Arrival planned for ${MyDayLogic.formatClock(it)} — the customer is told" } ?: "Arrival back to any time in the window"
+            toast = time?.let { "Arrival planned for ${MyDayLogic.formatClock(it)}. The customer is told" } ?: "Arrival back to any time in the window"
         } catch (e: ApiError) { toast = e.first("arrival_time") ?: e.userMessage } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
     }
 
@@ -235,7 +235,7 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         busy = true
         try {
             state = Loadable.Loaded(client.send(CompanyEndpoints.withdrawReschedule(jobId)).job)
-            toast = "Move request withdrawn — the visit stays as agreed"
+            toast = "Move request withdrawn. The visit stays as agreed"
         } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
     }
 
@@ -262,14 +262,14 @@ class LiveLocationSharer(private val context: Context) {
 
     fun start(send: suspend (Double, Double) -> Boolean) {
         this.send = send
-        if (!hasPermission) { notice = "Location permission denied — sharing stopped."; return }
+        if (!hasPermission) { notice = "Location permission denied. Sharing stopped."; return }
         val provider = if (Build.VERSION.SDK_INT >= 31 && manager.allProviders.contains(LocationManager.FUSED_PROVIDER)) LocationManager.FUSED_PROVIDER else LocationManager.GPS_PROVIDER
         try {
             manager.requestLocationUpdates(provider, 4000L, 5f, listener)
             sharing = true
             notice = null
         } catch (_: SecurityException) {
-            notice = "Location permission denied — sharing stopped."
+            notice = "Location permission denied. Sharing stopped."
         }
     }
 
@@ -335,7 +335,7 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
     LaunchedEffect(status) { if (status != null && status != JobStatus.EN_ROUTE && sharer.sharing) sharer.stop() }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) sharer.start { lat, lng -> model.reportLocation(lat, lng) } else sharer.notice = "Location permission denied — sharing stopped."
+        if (granted) sharer.start { lat, lng -> model.reportLocation(lat, lng) } else sharer.notice = "Location permission denied. Sharing stopped."
     }
     fun startSharing() {
         if (sharer.hasPermission) sharer.start { lat, lng -> model.reportLocation(lat, lng) } else locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -472,8 +472,8 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                         if (job.status == JobStatus.EN_ROUTE) {
                             ZCard {
                                 ZBodyStrong("Live location")
-                                ZCaption("Share your position so the customer can watch you arrive — keep the app open while driving.")
-                                ZButton(if (sharer.sharing) "Sharing — tap to stop" else "Share live location", style = if (sharer.sharing) ZButtonStyle.SUCCESS else ZButtonStyle.OUTLINE, compact = true, fullWidth = false) {
+                                ZCaption("Share your position so the customer can watch you arrive. Keep the app open while driving.")
+                                ZButton(if (sharer.sharing) "Sharing, tap to stop" else "Share live location", style = if (sharer.sharing) ZButtonStyle.SUCCESS else ZButtonStyle.OUTLINE, compact = true, fullWidth = false) {
                                     if (sharer.sharing) sharer.stop() else startSharing()
                                 }
                             }
@@ -533,7 +533,7 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                             ZCard {
                                 ZMono("Agreed price")
                                 ZMonoLarge(Money.format(accepted.amountCents))
-                                ZCaption("Your accepted quote — scope or price changes go through a change order.")
+                                ZCaption("Your accepted quote. Scope or price changes go through a change order.")
                                 // Legacy escape hatch: pre-auto-invoice jobs can sit Completed-but-uninvoiced.
                                 if (job.status == JobStatus.COMPLETED) ZButton("Send invoice", compact = true, loading = model.busy, fullWidth = false) { scope.launch { model.sendInvoice() } }
                             }
@@ -635,7 +635,7 @@ private fun CompanyReportSheet(model: CompanyJobDetailModel, onDismiss: () -> Un
         val done = opened
         if (done != null) {
             ZMono("Case opened")
-            ZTitle("${done.code ?: "Case"} — support will follow up")
+            ZTitle("${done.code ?: "Case"}: support will follow up")
             ZBody("Our team can see the job and your report. We'll follow up by notification.", tone = ZTextTone.SOFT)
             ZButton("Done", onClick = onDismiss)
         } else {

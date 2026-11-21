@@ -114,7 +114,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
             try {
                 val fresh = environment.client.send(CustomerEndpoints.cardSetupIntent())
                 val key = fresh.publishableKey; val secret = fresh.clientSecret
-                if (key == null || secret == null) { cardError = "Card setup isn't available right now — try again in a moment."; return@launch }
+                if (key == null || secret == null) { cardError = "Card setup isn't available right now. Try again in a moment."; return@launch }
                 StripeBridge.configure(context, key)
                 setupIntentId = StripeBridge.collectCard(secret)
             } catch (error: Exception) { cardError = error.userMessage } finally { collectingCard = false }
@@ -128,10 +128,10 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                 Icon(Icons.Filled.Verified, contentDescription = null, tint = colors.brandGold, modifier = Modifier.padding(0.dp))
                 ZMono("Quote accepted")
                 ZDisplay("Your ZiVETT Pro is on the way")
-                ZBody(if (stripe) "Your card is saved for the ${Money.format(current.holdCents)} total — it's only charged once the work is done and you close the $noun." else "Nothing is charged now — the ${Money.format(current.holdCents)} total is paid only when the work is done and you close the $noun.", tone = ZTextTone.SOFT)
+                ZBody(if (stripe) "Your card is saved for the ${Money.format(current.holdCents)} total. It's only charged once the work is done and you close the $noun." else "Nothing is charged now. The ${Money.format(current.holdCents)} total is paid only when the work is done and you close the $noun.", tone = ZTextTone.SOFT)
                 val date = current.date
                 if (date != null) ZBanner("Arriving ${JobPresentation.arrivalLabel(date, current.window)}", tone = ZTone.INFO)
-                else ZCaption("No fixed arrival time — arrange timing in the message thread right on this page.")
+                else ZCaption("No fixed arrival time. Arrange timing in the message thread right on this page.")
                 ZButton("Done", onClick = onDismiss)
             }
             is JobDetailModel.AcceptOutcome.ScheduleConflictOutcome -> {
@@ -140,7 +140,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                     ZBody("None of your offered windows work for them any more. Message them to arrange a time, or accept a different quote.", tone = ZTextTone.SOFT)
                     ZButton("Not now", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
                 } else {
-                    ZBody("${JobPresentation.quoteCompanyName(quote)} can no longer make the time they proposed. These windows from your original offer still work for them — pick one to accept the quote:", tone = ZTextTone.SOFT)
+                    ZBody("${JobPresentation.quoteCompanyName(quote)} can no longer make the time they proposed. These windows from your original offer still work for them. Pick one to accept the quote:", tone = ZTextTone.SOFT)
                     model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
                     for (w in current.validWindows) {
                         ZButton(JobPresentation.windowSlot(w.date, w.window), style = ZButtonStyle.OUTLINE, loading = model.busy) {
@@ -166,9 +166,9 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                     val date = quote.proposedDate
                     if (date != null) {
                         ZBodyStrong(JobPresentation.arrivalLabel(date, quote.proposedWindow))
-                        ZCaption("Confirmed the moment you accept — you'll see it on the job page.")
+                        ZCaption("Confirmed the moment you accept. You'll see it on the job page.")
                     } else {
-                        ZBody("No fixed arrival time — you'll arrange timing with ${JobPresentation.quoteCompanyName(quote)} in messages after accepting.", tone = ZTextTone.SOFT)
+                        ZBody("No fixed arrival time. You'll arrange timing with ${JobPresentation.quoteCompanyName(quote)} in messages after accepting.", tone = ZTextTone.SOFT)
                     }
                 }
 
@@ -181,7 +181,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                         preview.referralCreditCents?.takeIf { it > 0 }?.let { MoneyRow("Referral credit", -it, color = colors.success) }
                         ZDivider()
                         MoneyRow("Total when you close the $noun", preview.totalCents ?: quote.amountCents, strong = true)
-                        ZCaption(if (stripe) "Nothing is charged now — your card is saved and only charged when the job is done and you close it." else "Nothing is charged now — you pay only when the job is done and you close it.")
+                        ZCaption(if (stripe) "Nothing is charged now. Your card is saved and only charged when the job is done and you close it." else "Nothing is charged now. You pay only when the job is done and you close it.")
                     }
                 }
 
@@ -198,7 +198,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                             when {
                                 state.loaded.driver != "stripe" -> CardLine("Test payments (simulated)")
                                 setupIntentId != null -> {
-                                    CardLine("Card added — it's saved when you confirm")
+                                    CardLine("Card added. It's saved when you confirm")
                                     // The way out when the server couldn't save that card:
                                     // a fresh SetupIntent (each secret is single-use).
                                     if (model.acceptError != null) ZButton("Use a different card", style = ZButtonStyle.GHOST, compact = true, enabled = !model.busy, fullWidth = false) {
@@ -211,15 +211,15 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                                     // An expired card will most likely be refused at
                                     // closure — offer the swap now (the accept pins it).
                                     if (card.isExpired()) {
-                                        ZCaption("This card has expired — add a different one so closing the job goes through.", color = colors.danger)
+                                        ZCaption("This card has expired. Add a different one so closing the job goes through.", color = colors.danger)
                                         cardError?.let { ZCaption(it, color = colors.danger) }
                                         ZButton("Use a different card", style = ZButtonStyle.OUTLINE, compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
                                     }
                                 }
                                 else -> {
                                     ZBodyStrong("Add a payment card to accept this quote")
-                                    ZCaption("Nothing is charged now — the card is only billed when the job is done and you close it.")
-                                    if (state.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode — use card 4242 4242 4242 4242 with any future expiry and CVC.", tone = ZTextTone.FAINT)
+                                    ZCaption("Nothing is charged now. The card is only billed when the job is done and you close it.")
+                                    if (state.loaded.publishableKey?.startsWith("pk_test_") == true) ZCaption("Test mode: use card 4242 4242 4242 4242 with any future expiry and CVC.", tone = ZTextTone.FAINT)
                                     cardError?.let { ZCaption(it, color = colors.danger) }
                                     ZButton("Add a card", compact = true, loading = collectingCard, fullWidth = false) { collectCard() }
                                 }
@@ -231,7 +231,7 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
                 // Beside the button that caused it — never a toast, which
                 // renders under this sheet.
                 model.acceptError?.let { ZBanner(it, tone = ZTone.DANGER) }
-                ZButton("Confirm — ${Money.format(quote.amountCents)}", style = ZButtonStyle.SUCCESS, loading = model.busy, enabled = canConfirm) {
+                ZButton("Confirm · ${Money.format(quote.amountCents)}", style = ZButtonStyle.SUCCESS, loading = model.busy, enabled = canConfirm) {
                     scope.launch { outcome = model.acceptQuote(quote, setupIntentId = setupIntentId) }
                 }
             }
@@ -254,7 +254,7 @@ fun CancelJobSheet(job: Job, model: JobDetailModel, onDismiss: () -> Unit) {
     ZSheet(onDismiss = onDismiss, title = "Cancel ${job.code ?: "this job"}?", dismissable = !model.busy) {
         val fee = job.cancellationFeeCents
         if (fee != null && fee > 0) {
-            ZCard { ZMono("Cancellation fee — charged now"); ZMonoLarge(Money.format(fee), color = colors.danger) }
+            ZCard { ZMono("Cancellation fee, charged now"); ZMonoLarge(Money.format(fee), color = colors.danger) }
         }
         ZBody(JobPresentation.cancelConfirmCopy(job), tone = ZTextTone.SOFT)
         ZButton(JobPresentation.cancelButtonTitle(job), style = ZButtonStyle.DANGER, loading = model.busy) { scope.launch { model.cancel(); onDismiss() } }
@@ -272,7 +272,7 @@ fun ReportProblemSheet(model: JobDetailModel, onDismiss: () -> Unit) {
         val done = opened
         if (done != null) {
             ZMono("Case opened")
-            ZTitle("${done.code ?: "Case"} — our support team is on it")
+            ZTitle("${done.code ?: "Case"}: our support team is on it")
             ZBody("We'll follow up by notification. Payment for this job stays paused until the case is resolved.", tone = ZTextTone.SOFT)
             ZButton("Done", onClick = onDismiss)
         } else {
@@ -299,7 +299,7 @@ fun WarrantyClaimSheet(model: JobDetailModel, onDismiss: () -> Unit) {
         val done = opened
         if (done != null) {
             ZMono("Claim opened")
-            ZTitle("${done.code ?: "Claim"} — our support team is on it")
+            ZTitle("${done.code ?: "Claim"}: our support team is on it")
             ZBody("Your pro and our support team can both see the claim. We'll follow up by notification.", tone = ZTextTone.SOFT)
             ZButton("Done", onClick = onDismiss)
         } else {
@@ -345,7 +345,7 @@ fun PayAndCloseSheet(job: Job, invoice: Invoice, model: JobDetailModel, onReport
             ZStars(rating) { rating = it }
             ZTextArea("Comment (optional)", comment, { comment = it }, placeholder = "How did the visit go?")
             if (rating in 1..2) {
-                ZBanner("Something not right? Report a problem instead — your card isn't charged while support looks into it.", tone = ZTone.WARNING)
+                ZBanner("Something not right? Report a problem instead. Your card isn't charged while support looks into it.", tone = ZTone.WARNING)
                 ZButton("Report a problem", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onReport(); onDismiss() }
             }
             ZButton("Continue", loading = model.busy, enabled = rating >= 1) {
@@ -373,7 +373,7 @@ fun PayAndCloseSheet(job: Job, invoice: Invoice, model: JobDetailModel, onReport
     // Pinned open while the charge is in flight: swiping it away used to
     // cancel the request and toast a failure the server never reported.
     ZSheet(onDismiss = onDismiss, title = "Pay & close", dismissable = !model.busy) {
-        ZBody("Paying closes the job and starts your workmanship warranty — or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
+        ZBody("Paying closes the job and starts your workmanship warranty, or it settles automatically 48 hours after invoicing.", tone = ZTextTone.SOFT)
         val review = model.job?.review
         if (review != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {

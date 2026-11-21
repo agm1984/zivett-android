@@ -245,8 +245,8 @@ class MyDayModel(private val client: ApiClient) {
         load()
     }
 
-    suspend fun startDay() = dayClock("You're clocked in — have a good day") { client.send(ClockEndpoints.clockIn()) }
-    suspend fun endDay() = dayClock("Clocked out — your hours are saved") { client.send(ClockEndpoints.clockOut()) }
+    suspend fun startDay() = dayClock("You're clocked in. Have a good day") { client.send(ClockEndpoints.clockIn()) }
+    suspend fun endDay() = dayClock("Clocked out. Your hours are saved") { client.send(ClockEndpoints.clockOut()) }
     suspend fun startBreak() = dayClock("On a break") { client.send(ClockEndpoints.startBreak()) }
     suspend fun endBreak() = dayClock("Back on the clock") { client.send(ClockEndpoints.endBreak()) }
 
@@ -289,13 +289,13 @@ class MyDayModel(private val client: ApiClient) {
     suspend fun advance(job: DayJob) = act(job, null) { client.send(CompanyEndpoints.advance(job.id)) }
 
     /// An own job's Start (starts your job timer) or Finish (stops every one).
-    suspend fun ownStatus(job: DayJob, status: String) = act(job, if (status == OwnJobStatus.COMPLETED) "${job.code ?: job.title} finished" else "${job.code ?: job.title} started — the job timer is running") {
+    suspend fun ownStatus(job: DayJob, status: String) = act(job, if (status == OwnJobStatus.COMPLETED) "${job.code ?: job.title} finished" else "${job.code ?: job.title} started. The job timer is running") {
         client.send(MyDayEndpoints.ownJobStatus(job.id, status))
     }
 
     /// The job timer (own jobs) — where the day's time went.
     suspend fun clockIn(job: DayJob) = act(job, "Job timer started on ${job.code ?: job.title}") { client.send(MyDayEndpoints.clockIn(job.id)) }
-    suspend fun clockOut(jobId: Int) = act(null, "Job timer stopped — your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)) }
+    suspend fun clockOut(jobId: Int) = act(null, "Job timer stopped. Your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)) }
 }
 
 @Composable

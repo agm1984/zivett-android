@@ -28,7 +28,7 @@ class CompanyQuotingTest {
             ApiError.Transport("offline"),
             ApiError.Server(500, null),
             ApiError.RateLimited(30),
-            ApiError.Validation(ValidationErrors("Set up payouts before quoting — an accepted job must always have somewhere for the money to go.")),
+            ApiError.Validation(ValidationErrors("Set up payouts before quoting. An accepted job must always have somewhere for the money to go.")),
         )
         for (failure in failures) {
             val client = client()

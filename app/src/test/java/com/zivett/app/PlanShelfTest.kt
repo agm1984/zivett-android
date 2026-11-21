@@ -165,7 +165,7 @@ class PlanPickerModelTest {
 
         assertFalse(model.buy(model.cards.first { it.plan.key == "pro" }, StoreBillingPlan.YEARLY))
         assertTrue(store.acknowledged.isEmpty())
-        assertTrue(model.toast!!.endsWith("Your purchase is safe — tap Restore purchases to finish."))
+        assertTrue(model.toast!!.endsWith("Your purchase is safe. Tap Restore purchases to finish."))
     }
 
     @Test fun membersCantBuyAndPendingPaymentsSaySo() = runTest {

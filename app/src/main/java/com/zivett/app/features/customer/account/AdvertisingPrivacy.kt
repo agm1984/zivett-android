@@ -88,7 +88,7 @@ fun AdvertisingPrivacySection() {
                     enabled = !model.saving,
                 )
                 model.loadFailed -> ZCaption(
-                    "Couldn't load your privacy settings — tap to retry",
+                    "Couldn't load your privacy settings. Tap to retry",
                     tone = ZTextTone.LINK,
                     modifier = Modifier.clickable { scope.launch { model.load() } },
                 )

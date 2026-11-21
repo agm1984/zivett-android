@@ -88,7 +88,7 @@ class CompanyDashboardModel(private val client: ApiClient) {
 
     suspend fun refreshStripeStatus() {
         val ready = runCatching { client.send(CompanyEndpoints.refreshStripeStatus()) }.getOrNull()?.payoutsReady
-        toast = if (ready == true) "Payouts are set up — you're ready to quote" else "Stripe is still reviewing your details — this usually clears in a minute or two."
+        toast = if (ready == true) "Payouts are set up. You're ready to quote" else "Stripe is still reviewing your details. This usually clears in a minute or two."
         load()
     }
 }
@@ -175,7 +175,7 @@ private fun ApprovedContent(dashboard: CompanyDashboard, model: CompanyDashboard
     }
     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         // The rating tile opens the org's own reviews — the same sheet bookers see.
-        ZStatTile(dashboard.stats.rating?.let { "${it.oneDecimal()}★" } ?: "—", "Customer rating", Modifier.weight(1f), onClick = onReviews)
+        ZStatTile(dashboard.stats.rating?.let { "${it.oneDecimal()}★" } ?: "None yet", "Customer rating", Modifier.weight(1f), onClick = onReviews)
         ZStatTile(Money.format(dashboard.stats.payoutPending), "Payout pending", Modifier.weight(1f))
     }
 
@@ -193,7 +193,7 @@ private fun ApprovedContent(dashboard: CompanyDashboard, model: CompanyDashboard
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 ZBodyStrong("Verified Pro Passport")
-                ZCaption("${environment.session.user?.organization?.name ?: "Your company"} — credentials verified and visible to customers.")
+                ZCaption("${environment.session.user?.organization?.name ?: "Your company"}: credentials verified and visible to customers.")
             }
             ZBadge("Verified", ZTone.SUCCESS)
             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.inkFaint)
@@ -238,7 +238,7 @@ private fun SubmittedContent(setup: CompanySetup) {
                 ZBadge(badge.label, badge.tone)
             }
         }
-        ZCaption("Need to update something? Upload a new version on your Passport page any time — our team reviews the latest copy.")
+        ZCaption("Need to update something? Upload a new version on your Passport page any time. Our team reviews the latest copy.")
     }
 }
 
@@ -313,7 +313,7 @@ fun CompanyReferralCard() {
                     ZCaption("${current.stats.companiesJoined} ${if (current.stats.companiesJoined == 1) "company has" else "companies have"} joined${if (current.stats.rewardsEarnedCents > 0) " · ${Money.format(current.stats.rewardsEarnedCents)} earned all time" else ""}")
                 }
             }
-            ZButton("Share your link") { shareText(context, "Join ZiVETT as a verified pro — use my code ${current.code}. ${current.link}") }
+            ZButton("Share your link") { shareText(context, "Join ZiVETT as a verified pro. Use my code ${current.code}. ${current.link}") }
             // The wallet: credits ride out one invoice at a time, so the bank and the next credit differ.
             BankedCreditsPanel(current.stats.bankedCount, current.stats.pendingCents, current.stats.nextCreditCents, "tops up your next invoice's payout", "invoice")
         }

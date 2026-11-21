@@ -44,7 +44,7 @@ import java.util.Locale
 object TeamClockLogic {
     /// "7 h 30 min" / "7 h 05 min" / "7 h" / "45 min" / "—" (nothing).
     fun formatDuration(minutes: Int): String {
-        if (minutes <= 0) return "—"
+        if (minutes <= 0) return "0 min"
         val hours = minutes / 60
         val rest = minutes % 60
         return when {
@@ -111,7 +111,7 @@ object TeamClockLogic {
     /// Why a shift needs a look, in the person's own words.
     fun flags(shift: TeamShift): List<String> = listOfNotNull(
         "Started at your first job step".takeIf { shift.startSource == TeamShift.SOURCE_WORK },
-        "Closed automatically — you forgot to clock out".takeIf { shift.endSource == TeamShift.SOURCE_AUTO },
+        "Closed automatically: you forgot to clock out".takeIf { shift.endSource == TeamShift.SOURCE_AUTO },
         "Added after the fact".takeIf { shift.startSource == TeamShift.SOURCE_ADDED },
         "Times changed".takeIf { shift.edited },
     )

@@ -169,7 +169,7 @@ fun BusinessRequestRow(job: Job, onClick: () -> Unit) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             ZCaption(listOfNotNull(job.code, job.property?.name ?: job.address, job.unit).joinToString(" · "), maxLines = 1, modifier = Modifier.weight(1f))
-            ZMonoBody(JobPresentation.priceLabel(job) ?: "—", weight = FontWeight.SemiBold)
+            ZMonoBody(JobPresentation.priceLabel(job) ?: "No quotes", weight = FontWeight.SemiBold)
         }
         job.tenant?.let { ZCaption("Tenant: $it", tone = ZTextTone.FAINT) }
     }
@@ -200,7 +200,7 @@ fun BusinessRequestsScreen() {
                     ZTextAction("+ New") { nav.navigate(BookRoute(Areas.BUSINESS)) }
                 }
                 ZCard(padding = 0.dp) {
-                    ZNavRow("Messages", if (unreadMessages > 0) "$unreadMessages unread — threads with your pros, by property" else "Threads with your pros, by property", onClick = { nav.navigate(BusinessMessagesRoute) }) {
+                    ZNavRow("Messages", if (unreadMessages > 0) "$unreadMessages unread · threads with your pros, by property" else "Threads with your pros, by property", onClick = { nav.navigate(BusinessMessagesRoute) }) {
                         ZIconTile(Icons.AutoMirrored.Outlined.Chat)
                     }
                 }
