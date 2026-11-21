@@ -44,6 +44,7 @@ import com.zivett.app.core.models.CompanyDashboard
 import com.zivett.app.core.models.CompanyEndpoints
 import com.zivett.app.core.models.CompanyReferral
 import com.zivett.app.core.models.CompanySetup
+import com.zivett.app.core.models.OrganizationRole
 import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.reloaded
@@ -88,7 +89,10 @@ class CompanyDashboardModel(private val client: ApiClient) {
 
     suspend fun refreshStripeStatus() {
         val ready = runCatching { client.send(CompanyEndpoints.refreshStripeStatus()) }.getOrNull()?.payoutsReady
-        toast = if (ready == true) "Payouts are set up. You're ready to quote" else "Stripe is still reviewing your details. This usually clears in a minute or two."
+        // Set up while the passport is still under review: nothing to
+        // quote on until approval.
+        val approved = state.value?.approved ?: true
+        toast = if (ready == true) (if (approved) "Payouts are set up. You're ready to quote" else "Payouts are set up. You can quote as soon as you're approved") else "Stripe is still reviewing your details. This usually clears in a minute or two."
         load()
     }
 }
@@ -140,7 +144,7 @@ fun CompanyDashboardScreen() {
                             SetupChecklist(dashboard.setup)
                             ZButton("Continue setup") { nav.navigate(CompanySetupRoute) }
                         }
-                        else -> SubmittedContent(dashboard.setup)
+                        else -> SubmittedContent(dashboard, model, onStripe = { url -> sentToStripe = openUrl(context, url) })
                     }
                     Spacer(Modifier.padding(ZSpacing.lg))
                 }
@@ -151,23 +155,51 @@ fun CompanyDashboardScreen() {
     if (showingReviews) environment.session.user?.organization?.let { org -> CompanyReviewsSheet(org.id, org.name) { showingReviews = false } }
 }
 
+/// Stripe payout setup. Offered from SUBMISSION (the server marks it
+/// required then): under review it's the optional "while you wait" step,
+/// so approval lets them quote at once; once approved it's the one thing
+/// between them and quoting. Org admins only (the endpoints 403 members).
+/// Web: PayoutSetupCard.
+@Composable
+private fun PayoutSetupCard(dashboard: CompanyDashboard, model: CompanyDashboardModel, onStripe: (String) -> Unit) {
+    val environment = LocalAppEnvironment.current
+    val scope = rememberCoroutineScope()
+    val isOrgAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
+    if (!dashboard.stripePayouts.required || dashboard.stripePayouts.ready || !isOrgAdmin) return
+    ZCard {
+        if (dashboard.approved) {
+            ZBodyStrong("Set up payouts to start quoting")
+            ZCaption("Connect your bank through Stripe so accepted jobs can pay out to you. It takes a few minutes, and your details go to Stripe, never to ZiVETT.")
+        } else {
+            ZBodyStrong("Set up payouts while you wait")
+            ZCaption("Connect your bank through Stripe now, and you can quote the moment your passport is approved. It takes a few minutes, and your details go to Stripe, never to ZiVETT.")
+        }
+        ZButton("Set up payouts", compact = true, loading = model.startingPayoutSetup, fullWidth = false) {
+            scope.launch { model.payoutOnboardingUrl()?.let(onStripe) }
+        }
+    }
+}
+
+/// The post-submission stepper. The Payouts row is Stripe-only: payouts
+/// can be set up during review, and quoting waits on it after approval.
+internal fun applicationTimeline(uploaded: Int, total: Int, approvedDocs: Int, payouts: CompanyDashboard.StripePayouts): List<TimelineRow> = buildList {
+    add(TimelineRow("Application submitted", "Your business profile is with our team.", TimelineRowState.DONE))
+    add(TimelineRow("Credentials uploaded", "$uploaded of $total documents in (manage on your Passport page)", if (uploaded == total) TimelineRowState.DONE else TimelineRowState.CURRENT))
+    add(TimelineRow("Passport review", if (approvedDocs > 0) "$approvedDocs of $total documents verified by our team." else "Identity, license & insurance verification by our team.", if (uploaded == total) TimelineRowState.CURRENT else TimelineRowState.TODO))
+    if (payouts.required) {
+        add(TimelineRow("Payouts", if (payouts.ready) "Stripe has verified your payout account." else "Needed before your first quote. You can set it up now.", if (payouts.ready) TimelineRowState.DONE else TimelineRowState.TODO))
+    }
+    add(TimelineRow("Approved & live", "Job opportunities unlock in your area.", TimelineRowState.TODO))
+}
+
 @Composable
 private fun ApprovedContent(dashboard: CompanyDashboard, model: CompanyDashboardModel, onStripe: (String) -> Unit, onReviews: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val nav = LocalNav.current
-    val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
     ZPageTitle("Dashboard", environment.session.user?.organization?.name)
 
-    if (dashboard.stripePayouts.required && !dashboard.stripePayouts.ready) {
-        ZCard {
-            ZBodyStrong("Set up payouts to start quoting")
-            ZCaption("ZiVETT pays you through Stripe. A few minutes of business details and you're ready to quote.")
-            ZButton("Set up payouts", compact = true, loading = model.startingPayoutSetup, fullWidth = false) {
-                scope.launch { model.payoutOnboardingUrl()?.let(onStripe) }
-            }
-        }
-    }
+    PayoutSetupCard(dashboard, model, onStripe)
 
     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
         ZStatTile(dashboard.stats.opportunities.toString(), "New opportunities", Modifier.weight(1f))
@@ -204,7 +236,8 @@ private fun ApprovedContent(dashboard: CompanyDashboard, model: CompanyDashboard
 }
 
 @Composable
-private fun SubmittedContent(setup: CompanySetup) {
+private fun SubmittedContent(dashboard: CompanyDashboard, model: CompanyDashboardModel, onStripe: (String) -> Unit) {
+    val setup = dashboard.setup
     val nav = LocalNav.current
     val colors = ZTheme.colors
     ZPageTitle("Your application")
@@ -217,17 +250,13 @@ private fun SubmittedContent(setup: CompanySetup) {
             ZTextAction("Re-upload on your Passport") { nav.navigate(PassportRoute) }
         }
     }
+    PayoutSetupCard(dashboard, model, onStripe)
     val uploaded = setup.steps.credentials.uploaded ?: 0
     val total = setup.steps.credentials.total ?: 4
     val approvedDocs = docs.count { it.status == "approved" }
     ZCard {
         Row(verticalAlignment = Alignment.CenterVertically) { ZHeadline("Under review", modifier = Modifier.weight(1f)); ZBadge("Pending review", ZTone.WARNING) }
-        TimelineList(listOf(
-            TimelineRow("Application submitted", "Your business profile is with our team.", TimelineRowState.DONE),
-            TimelineRow("Credentials uploaded", "$uploaded of $total documents in (manage on your Passport page)", if (uploaded == total) TimelineRowState.DONE else TimelineRowState.CURRENT),
-            TimelineRow("Passport review", if (approvedDocs > 0) "$approvedDocs of $total documents verified by our team." else "Identity, license & insurance verification by our team.", if (uploaded == total) TimelineRowState.CURRENT else TimelineRowState.TODO),
-            TimelineRow("Approved & live", "Job opportunities unlock in your area.", TimelineRowState.TODO),
-        ))
+        TimelineList(applicationTimeline(uploaded, total, approvedDocs, dashboard.stripePayouts))
     }
     ZCard {
         ZHeadline("Your documents")
