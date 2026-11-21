@@ -9,7 +9,11 @@ import androidx.compose.runtime.setValue
 /// code; the rest open a company tab (2026-10-29: "New … job near you",
 /// "Your quote went to the booker", "Payout sent", "Payouts are set up").
 sealed interface PushTarget {
-    data class Job(val ref: String) : PushTarget
+    /// `review` = the one-time "How did X do?" reminder
+    /// (`Notify::reviewRequested`, `route_params.review = 1`): open the job
+    /// and offer the quick rating sheet when it's closed and unrated.
+    /// Older servers never send it, so absent = a plain job open.
+    data class Job(val ref: String, val review: Boolean = false) : PushTarget
     /// The feed; `jobCode` opens that job's quote composer when it's quotable.
     data class Opportunities(val jobCode: String?) : PushTarget
     data object Quotes : PushTarget
@@ -29,6 +33,7 @@ object PushRouting {
     const val LOG_TAG = "ZivettPush"
     const val EXTRA_ROUTE_NAME = "route_name"
     const val EXTRA_ROUTE_ID = "route_id"
+    const val EXTRA_REVIEW = "review"
 
     private fun isJobRoute(route: String) = route.startsWith("customer.jobs") || route.startsWith("business.requests") || route.startsWith("company.jobs")
 
@@ -37,7 +42,7 @@ object PushRouting {
     fun target(routeName: String?, param: (String) -> String?): PushTarget? {
         val route = routeName ?: return null
         return when {
-            isJobRoute(route) -> param("id")?.let { PushTarget.Job(it) }
+            isJobRoute(route) -> param("id")?.let { PushTarget.Job(it, review = flag(param("review"))) }
             route == "company.opportunities" -> PushTarget.Opportunities(param("job"))
             route == "company.quotes" -> PushTarget.Quotes
             route == "company.payouts" -> PushTarget.Payouts
@@ -56,6 +61,25 @@ object PushRouting {
     /// numeric id) inside a push data map — null when the push points at
     /// something other than a job.
     fun jobRef(data: Map<String, String>): String? = (target(data) as? PushTarget.Job)?.ref
+
+    /// The target a tapped notification's intent extras describe (what
+    /// `ZivettMessagingService` packed: route name, `paramKey`, the review
+    /// flag). A job ref with no route name is a tap from an older build's
+    /// notification — still a job.
+    fun intentTarget(routeName: String?, routeId: String?, review: Boolean): PushTarget? {
+        if (routeName == null) return routeId?.let { PushTarget.Job(it, review) }
+        return target(routeName) { key ->
+            when (key) {
+                "id", "job" -> routeId
+                "review" -> if (review) "1" else null
+                else -> null
+            }
+        }
+    }
+
+    /// A truthy route param: PHP sends `1` (or `true`); FCM data and the
+    /// bell's `RouteParam` hand it over as a string.
+    fun flag(value: String?): Boolean = value?.trim()?.lowercase() in setOf("1", "true")
 
     /// The single param a tapped notification's intent carries.
     fun paramKey(target: PushTarget): String? = when (target) {

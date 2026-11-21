@@ -98,7 +98,7 @@ fun BusinessShell() {
         shellTab(BusinessAccountTab, "Account", Icons.Outlined.Person),
     )
 
-    RoleShell(tabs, NotificationArea.BUSINESS, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS)) }, navBadges = navBadges) { nav ->
+    RoleShell(tabs, NotificationArea.BUSINESS, onPushJob = { nav, id, review -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS, review)) }, navBadges = navBadges) { nav ->
         composable<BusinessOverviewTab> {
             val user = environment.session.user
             var gated by remember { mutableStateOf(false) }

@@ -19,7 +19,6 @@ import com.zivett.app.app.LocalAppEnvironment
 import com.zivett.app.app.RootScreen
 import com.zivett.app.core.PendingReferral
 import com.zivett.app.core.push.PendingPushOpen
-import com.zivett.app.core.push.PushTarget
 import com.zivett.app.core.push.PushRegistration
 import com.zivett.app.core.push.PushRouting
 import com.zivett.app.design.ZivettTheme
@@ -85,14 +84,13 @@ class MainActivity : ComponentActivity() {
         android.util.Log.d(PushRouting.LOG_TAG, "handleIntent extras=${intent.extras?.keySet()} route_id=${intent.getStringExtra(PushRouting.EXTRA_ROUTE_ID)}")
         val routeName = intent.getStringExtra(PushRouting.EXTRA_ROUTE_NAME)
         val routeId = intent.getStringExtra(PushRouting.EXTRA_ROUTE_ID)
+        val review = intent.getBooleanExtra(PushRouting.EXTRA_REVIEW, false)
         if (routeName != null || routeId != null) {
-            // A job ref with no route name is a tap from an older build's
-            // notification — still a job.
-            val target = if (routeName == null) routeId?.let { PushTarget.Job(it) }
-            else PushRouting.target(routeName) { key -> routeId.takeIf { key == "id" || key == "job" } }
+            val target = PushRouting.intentTarget(routeName, routeId, review)
             target?.let { PendingPushOpen.store(it) }
             intent.removeExtra(PushRouting.EXTRA_ROUTE_NAME)
             intent.removeExtra(PushRouting.EXTRA_ROUTE_ID)
+            intent.removeExtra(PushRouting.EXTRA_REVIEW)
         }
 
         val uri: Uri = intent.data ?: return

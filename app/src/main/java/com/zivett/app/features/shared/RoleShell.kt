@@ -57,7 +57,9 @@ val LocalNav = staticCompositionLocalOf<NavHostController> { error("No NavHostCo
 fun RoleShell(
     tabs: List<ShellTab>,
     pushArea: NotificationArea?,
-    onPushJob: (NavHostController, Int) -> Unit,
+    /// A job push: the job's id, and whether it's the review reminder
+    /// (`PushTarget.Job.review` — booker shells offer the quick rating sheet).
+    onPushJob: (NavHostController, Int, Boolean) -> Unit,
     /// Back from Stripe's Connect onboarding (`AppEvents.stripeReturned`).
     /// Only the approved-company shell has somewhere to take it.
     onStripeReturn: ((NavHostController) -> Unit)? = null,
@@ -93,7 +95,8 @@ fun RoleShell(
         val target = pending ?: return@LaunchedEffect
         if (pushArea == null) return@LaunchedEffect
         PendingPushOpen.take()
-        val ref = (target as? PushTarget.Job)?.ref
+        val job = target as? PushTarget.Job
+        val ref = job?.ref
         if (ref == null) { onPushTarget(nav, target); return@LaunchedEffect }
         // Consuming the ref re-keys this effect to null, which cancels it —
         // so the lookup runs on the shell's own scope, not the effect's.
@@ -103,7 +106,7 @@ fun RoleShell(
                 .onFailure { android.util.Log.w(com.zivett.app.core.push.PushRouting.LOG_TAG, "lookup failed for $ref: $it") }
                 .getOrNull() ?: return@launch
             android.util.Log.d(com.zivett.app.core.push.PushRouting.LOG_TAG, "opening job id=$id")
-            onPushJob(nav, id)
+            onPushJob(nav, id, job.review)
         }
     }
 

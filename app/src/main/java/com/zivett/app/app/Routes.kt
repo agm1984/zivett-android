@@ -37,7 +37,9 @@ import kotlinx.serialization.Serializable
 @Serializable object CompanyMyDayTab
 
 // Shared booker screens (`area` is "customer" or "business").
-@Serializable data class JobDetailRoute(val jobId: Int, val area: String)
+/// `review` = opened from the review reminder: offer the quick rating
+/// sheet if the job is closed and still unrated.
+@Serializable data class JobDetailRoute(val jobId: Int, val area: String, val review: Boolean = false)
 @Serializable data class ConversationRoute(val jobId: Int, val area: String, val title: String, val subtitle: String? = null, val readOnly: Boolean = false, val showJobLink: Boolean = false)
 @Serializable data class InvoiceDetailRoute(val invoiceId: Int, val area: String)
 @Serializable data class PayInvoiceRoute(val invoiceId: Int, val area: String)

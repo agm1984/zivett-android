@@ -84,7 +84,7 @@ fun CustomerShell() {
         shellTab(CustomerAccountTab, "Account", Icons.Outlined.Person),
     )
 
-    RoleShell(tabs, NotificationArea.CUSTOMER, onPushJob = { nav, id -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER)) }, navBadges = navBadges) { nav ->
+    RoleShell(tabs, NotificationArea.CUSTOMER, onPushJob = { nav, id, review -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER, review)) }, navBadges = navBadges) { nav ->
         composable<CustomerHomeTab> { CustomerHomeScreen(homeModel) }
         composable<CustomerJobsTab> { JobsScreen() }
         composable<CustomerBookTab> { BookJobScreen() }
@@ -107,7 +107,7 @@ fun CustomerShell() {
 fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
     composable<JobDetailRoute> { entry ->
         val route = entry.toRoute<JobDetailRoute>()
-        JobDetailScreen(route.jobId, Areas.jobArea(route.area)) { nav.popBackStack() }
+        JobDetailScreen(route.jobId, Areas.jobArea(route.area), promptReview = route.review) { nav.popBackStack() }
     }
     composable<ConversationRoute> { entry ->
         val route = entry.toRoute<ConversationRoute>()
@@ -147,11 +147,11 @@ fun NavGraphBuilder.bookerDestinations(nav: NavHostController) {
         NotificationsScreen(model, onBack = { nav.popBackStack() }, openTarget = { target ->
             // Only company notifications point anywhere but a job.
             if (area == NotificationArea.COMPANY) com.zivett.app.features.company.openCompanyTarget(nav, target, myDayIsTab)
-        }) { id ->
+        }) { id, review ->
             when (area) {
                 NotificationArea.COMPANY -> nav.navigate(com.zivett.app.app.CompanyJobRoute(id))
-                NotificationArea.BUSINESS -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS))
-                NotificationArea.CUSTOMER -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER))
+                NotificationArea.BUSINESS -> nav.navigate(JobDetailRoute(id, Areas.BUSINESS, review))
+                NotificationArea.CUSTOMER -> nav.navigate(JobDetailRoute(id, Areas.CUSTOMER, review))
             }
         }
     }

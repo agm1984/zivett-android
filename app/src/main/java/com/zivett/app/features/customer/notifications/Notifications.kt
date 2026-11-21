@@ -152,7 +152,7 @@ fun NotificationBell(unread: Int, dark: Boolean = false, onClick: () -> Unit) {
 
 /// The inbox screen: rows, mark-all-read, tap → the area's job.
 @Composable
-fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openTarget: (PushTarget) -> Unit = {}, openJob: (Int) -> Unit) {
+fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openTarget: (PushTarget) -> Unit = {}, openJob: (id: Int, review: Boolean) -> Unit) {
     val scope = rememberCoroutineScope()
     val colors = ZTheme.colors
 
@@ -174,7 +174,7 @@ fun NotificationsScreen(model: NotificationsModel, onBack: () -> Unit, openTarge
                                 if (target !is PushTarget.Job) { openTarget(target); return@launch }
                                 val ref = target.ref
                                 val id = model.resolveJobId(ref) ?: return@launch
-                                openJob(id)
+                                openJob(id, target.review)
                             }
                         }) {
                             Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.Top) {

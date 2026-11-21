@@ -246,6 +246,10 @@ seen while its screen shows). Notification taps resolve through
 routes open the job, `company.opportunities|quotes|payouts` open
 `openCompanyTarget`; add a case there for any new non-job route. Details
 in PARITY.md "Review pass port".
+A job target's `review` flag (the review reminder's `route_params.review
+= 1`, `PushRouting.flag`) rides to `JobDetailRoute(review = true)`, which
+offers `QuickReviewSheet` when `QuickReview.qualifies` (closed, unrated);
+PARITY.md "Review reminder".
 
 ## Layout
 
