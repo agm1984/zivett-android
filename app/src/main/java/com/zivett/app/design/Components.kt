@@ -616,19 +616,26 @@ fun ZAvatar(initials: String, shape: ZAvatarShape = ZAvatarShape.PERSON, size: D
     }
 }
 
-/// A photo avatar with initials fallback (team members, assigned techs).
+/// A photo avatar with initials fallback (team members, assigned techs,
+/// company logos). The initials show until the image has loaded, and stay
+/// when it fails or there's no URL.
 @Composable
-fun ZPhotoAvatar(url: String?, initials: String, size: Dp = 40.dp, shape: ZAvatarShape = ZAvatarShape.PERSON) {
+fun ZPhotoAvatar(url: String?, initials: String, size: Dp = 40.dp, shape: ZAvatarShape = ZAvatarShape.PERSON, onDark: Boolean = false) {
     val clipShape: Shape = if (shape == ZAvatarShape.PERSON) CircleShape else RoundedCornerShape(ZRadius.tile)
     if (url == null) {
-        ZAvatar(initials, shape, size)
+        ZAvatar(initials, shape, size, onDark)
     } else {
-        coil3.compose.AsyncImage(
-            model = url,
-            contentDescription = null,
-            modifier = Modifier.size(size).clip(clipShape),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        )
+        var loaded by remember(url) { mutableStateOf(false) }
+        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+            if (!loaded) ZAvatar(initials, shape, size, onDark)
+            coil3.compose.AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier.size(size).clip(clipShape),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                onState = { loaded = it is coil3.compose.AsyncImagePainter.State.Success },
+            )
+        }
     }
 }
 
