@@ -118,6 +118,7 @@ import com.zivett.app.design.ZTopBar
 import com.zivett.app.design.ZType
 import com.zivett.app.features.customer.book.BookingWizardEngine
 import com.zivett.app.features.shared.LocalNav
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,7 +132,39 @@ class PassportModel(private val client: ApiClient) {
     var toast by mutableStateOf<String?>(null)
     var uploadingKind by mutableStateOf<String?>(null)
 
-    suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.passport()) } }
+    /// The server's list of uploaded required documents still missing
+    /// their expiry date, by label (`setup.steps.credentials.missing_expiry`).
+    var missingExpiry by mutableStateOf<List<String>>(emptyList())
+    /// The document whose date is being saved right now.
+    var savingExpiryKind by mutableStateOf<String?>(null)
+    /// A refused or unusable date, shown under its row, by kind.
+    var expiryErrors by mutableStateOf<Map<String, String>>(emptyMap())
+
+    suspend fun load() {
+        state = state.reloaded { client.send(CompanyEndpoints.passport()) }
+        // The passport payload doesn't say which dates submitting needs; the
+        // setup payload does. Best-effort: a failure keeps the last answer.
+        try { missingExpiry = client.send(CompanyEndpoints.organization()).setup.steps.credentials.missingExpiry.orEmpty() }
+        catch (e: CancellationException) { throw e } catch (_: Exception) {}
+    }
+
+    /// Dates a document that's already on file. Without one, the picked date
+    /// rides the upload instead (the screen keeps it until then).
+    suspend fun setExpiry(kind: String, documentId: Int, date: LocalDate, today: LocalDate = LocalDate.now()): Boolean {
+        CredentialExpiry.dateProblem(date, today)?.let { expiryErrors = expiryErrors + (kind to it); return false }
+        savingExpiryKind = kind
+        expiryErrors = expiryErrors - kind
+        try {
+            client.send(CompanyEndpoints.setCredentialExpiry(documentId, BookingWizardEngine.dateKey(date)))
+            toast = "Expiry date saved"
+            load()
+            return true
+        } catch (e: CancellationException) { throw e }
+        catch (e: ApiError) { expiryErrors = expiryErrors + (kind to (e.first("expires_at") ?: e.userMessage)) }
+        catch (e: Exception) { expiryErrors = expiryErrors + (kind to e.userMessage) }
+        finally { savingExpiryKind = null }
+        return false
+    }
 
     /// The shared upload core — the file picker sends bytes from a
     /// content Uri, the photo-library path sends re-encoded JPEG bytes.
@@ -151,8 +184,6 @@ class PassportModel(private val client: ApiClient) {
         return false
     }
 }
-
-private val expiringKinds = setOf("license", "insurance", "worksafebc")
 
 /// The Verified Pro Passport: credential rows with uploads, plus the
 /// editable service details (trades & rates, radius, availability).
@@ -226,8 +257,11 @@ fun PassportScreen(onBack: (() -> Unit)?) {
                         if (!response.passport.approved && response.passport.documents.uploaded < response.passport.documents.total) {
                             ZBanner("${response.passport.documents.uploaded} of ${response.passport.documents.total} documents uploaded. Completing your passport speeds up review.", tone = ZTone.WARNING)
                         }
+                        // The credentials step's blocker, in the web's words.
+                        CredentialExpiry.stillNeededLine(model.missingExpiry)?.let { ZBanner(it, tone = ZTone.WARNING) }
                         val canManage = response.editable?.canManage ?: false
                         for (credential in response.passport.credentials) {
+                            val needsDate = credential.kind != null && CredentialExpiry.needsDate(credential.field, model.missingExpiry)
                             ZCard(padding = ZSpacing.sm) {
                                 Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -236,8 +270,11 @@ fun PassportScreen(onBack: (() -> Unit)?) {
                                         credential.rejectionReason?.let { ZCaption(it, color = colors.danger) }
                                         credential.expiresAt?.let { ZCaption("Expires $it", tone = ZTextTone.FAINT) }
                                     }
-                                    val badge = CompanyPresentation.credentialBadge(credential.status)
-                                    ZBadge(badge.label, badge.tone)
+                                    if (needsDate) ZBadge("Needs date", ZTone.WARNING)
+                                    else {
+                                        val badge = CompanyPresentation.credentialBadge(credential.status)
+                                        ZBadge(badge.label, badge.tone)
+                                    }
                                 }
                                 val kind = credential.kind
                                 if (kind != null) {
@@ -258,11 +295,21 @@ fun PassportScreen(onBack: (() -> Unit)?) {
                                             }
                                         }
                                     }
-                                    if (kind in expiringKinds) {
+                                    if (kind in CredentialExpiry.expiringKinds) {
+                                        val hasDocument = credential.documentId != null
+                                        val label = CredentialExpiry.controlLabel(hasDocument, credential.expiresAt, expiryDates[kind])
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                                            ZCaption("Document expiry", modifier = Modifier.weight(1f))
-                                            ZTextAction(expiryDates[kind]?.toString() ?: "Set expiry date") { pickingExpiryFor = kind }
+                                            ZCaption("Document expiry", modifier = Modifier.weight(1f), color = if (needsDate) colors.warning else null)
+                                            when {
+                                                model.savingExpiryKind == kind -> ZSpinner()
+                                                // Verified with a date: renewing it is a re-upload.
+                                                hasDocument && CredentialExpiry.dateLocked(credential.status, credential.expiresAt) -> ZCaption(label)
+                                                canManage || !hasDocument -> ZTextAction(label) { pickingExpiryFor = kind }
+                                                else -> ZCaption(label)
+                                            }
                                         }
+                                        model.expiryErrors[kind]?.let { ZCaption(it, color = colors.danger) }
+                                        if (needsDate && model.expiryErrors[kind] == null) ZCaption("Add the expiry date shown on the document. Your application can't be submitted without it.", color = colors.warning)
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                                         if (model.uploadingKind == kind) {
@@ -296,11 +343,23 @@ fun PassportScreen(onBack: (() -> Unit)?) {
     }
 
     pickingExpiryFor?.let { kind ->
-        val state = rememberDatePickerState(initialSelectedDateMillis = (expiryDates[kind] ?: LocalDate.now().plusYears(1)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        val credential = model.state.value?.passport?.credentials?.firstOrNull { it.kind == kind }
+        val initial = CredentialExpiry.initialDate(credential?.expiresAt, expiryDates[kind], LocalDate.now())
+        val state = rememberDatePickerState(initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
         DatePickerDialog(
             onDismissRequest = { pickingExpiryFor = null },
             confirmButton = { TextButton(onClick = {
-                state.selectedDateMillis?.let { millis -> expiryDates = expiryDates + (kind to Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()) }
+                state.selectedDateMillis?.let { millis ->
+                    val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                    val documentId = credential?.documentId
+                    // On file: save it now. Not yet uploaded: it rides the upload.
+                    if (documentId != null) scope.launch { model.setExpiry(kind, documentId, date) }
+                    else {
+                        val problem = CredentialExpiry.dateProblem(date, LocalDate.now())
+                        model.expiryErrors = if (problem != null) model.expiryErrors + (kind to problem) else model.expiryErrors - kind
+                        if (problem == null) expiryDates = expiryDates + (kind to date)
+                    }
+                }
                 pickingExpiryFor = null
             }) { Text("OK") } },
             dismissButton = { TextButton(onClick = { pickingExpiryFor = null }) { Text("Cancel") } },

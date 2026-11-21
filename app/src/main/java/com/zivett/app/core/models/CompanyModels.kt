@@ -33,14 +33,16 @@ data class CompanySetup(
         val rejectionReason: String? = null,
         val documentId: Int? = null,
         val originalName: String? = null,
+        /// `YYYY-MM-DD`, or null when no date was given.
+        val expiresAt: String? = null,
     )
 
     @Serializable
     // The server's `plan` step is deliberately NOT modelled: the app
     // never sells or nudges a plan (store policy — see PARITY.md).
     data class Steps(val profile: Step, val details: Step, val credentials: Step, val plan: Plan? = null) {
-        /// The membership pick — first in the flow, like the web wizard.
-        /// Absent on servers older than the plan step.
+        /// The membership pick — LAST in the flow since 2026-11-18, like the
+        /// web wizard. Absent on servers older than the plan step.
         @Serializable data class Plan(val complete: Boolean = false, val planName: String? = null)
 
         @Serializable
@@ -50,6 +52,12 @@ data class CompanySetup(
             val uploaded: Int? = null,
             val total: Int? = null,
             val documents: List<Document>? = null,
+            val optionalDocuments: List<Document>? = null,
+            /// Credentials only: labels of uploaded REQUIRED documents that
+            /// run out but carry no expiry date yet (["Insurance"]). While
+            /// it's non-empty the step isn't complete and submitting 422s.
+            /// Absent on an older server.
+            val missingExpiry: List<String>? = null,
         )
     }
 }
@@ -172,6 +180,8 @@ data class PassportResponse(val passport: Passport, val editable: CompanyDetails
             val documentId: Int? = null,
             /// The uploaded file's mime, for the in-app viewer.
             val documentMime: String? = null,
+            /// Document rows: whether approval needs it (absent on an older server).
+            val required: Boolean? = null,
         ) {
             val rowId: String get() = key ?: kind ?: this.field
         }
@@ -197,6 +207,11 @@ data class CompanyDetails(
     /// (since 2026-10-12; absent on an older server → plain tile).
     @Serializable data class CategoryOption(val id: Int, val name: String, val code: String? = null, val icon: String? = null, val bgColor: String? = null, val fgColor: String? = null)
     @Serializable data class ModeOption(val value: String, val label: String)
+}
+
+@Serializable data class CredentialExpiryBody(val expiresAt: String)
+@Serializable data class CredentialExpiryResponse(val document: Document) {
+    @Serializable data class Document(val id: Int, val expiresAt: String? = null)
 }
 
 @Serializable
@@ -432,6 +447,12 @@ object CompanyEndpoints {
         form.addFile("file", fileName, mimeType, data)
         return ApiRequest.empty(Method.POST, "api/company/credentials", form.body(), form.contentType)
     }
+
+    /// Dates an already-uploaded document (`YYYY-MM-DD`, after today). An
+    /// APPROVED document that already has a date 422s: renewing it is a
+    /// re-upload.
+    fun setCredentialExpiry(documentId: Int, expiresAt: String) =
+        ApiRequest.patch<CredentialExpiryResponse, CredentialExpiryBody>("api/company/credentials/$documentId/expiry", CredentialExpiryBody(expiresAt))
 
     /// The uploaded document's bytes (`Storage::download` stream) — the
     /// pro checking what they submitted.
