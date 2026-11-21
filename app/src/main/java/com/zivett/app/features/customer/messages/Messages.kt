@@ -134,7 +134,7 @@ fun MessagesScreen(area: String = Areas.CUSTOMER, onBack: (() -> Unit)? = null) 
                     }
                     if (shown.isEmpty()) {
                         if (showingPast) ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No past conversations", "Threads move here once their job settles.")
-                        else if (business) ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No active conversations", "Threads live here while a request is under way — messaging opens once a pro is assigned.")
+                        else if (business) ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No active conversations", "Threads live here while a request is under way. Messaging opens once a pro is assigned.")
                         else ZEmptyState(Icons.AutoMirrored.Outlined.Chat, "No messages yet", "Once a pro takes your job, you can message them here.")
                     }
                     for ((property, group) in if (business) MessagesInbox.groupByProperty(shown) else listOf("" to shown)) {

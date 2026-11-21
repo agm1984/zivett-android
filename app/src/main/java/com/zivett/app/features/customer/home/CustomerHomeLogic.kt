@@ -72,7 +72,7 @@ object CustomerHomeLogic {
         val subject = hero.subject
         return when (hero.key) {
             HeroKey.FIRSTRUN -> Greeting("Welcome", "Let's get you set up, $userFirstName")
-            HeroKey.PENDING -> Greeting("Request sent", "Sit tight — finding your pro")
+            HeroKey.PENDING -> Greeting("Request sent", "Sit tight, finding your pro")
             HeroKey.QUOTES -> {
                 val count = (subject as? Subject.JobSubject)?.job?.pendingQuotes?.size ?: 0
                 Greeting("$count new ${if (count == 1) "quote" else "quotes"}", "Time to choose")

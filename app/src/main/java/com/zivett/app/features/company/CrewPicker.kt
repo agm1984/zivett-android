@@ -93,8 +93,8 @@ fun CrewPickerSheet(
         when {
             starting && job.crewMembers.isNotEmpty() -> ZBanner(CompanyPresentation.startPickerIntro(job, crewSize), tone = ZTone.SUCCESS)
             starting -> ZBody(CompanyPresentation.startPickerIntro(job, crewSize), tone = ZTextTone.SOFT)
-            isCrew -> ZBody("Pick $technicians — the quote's crew. The first person you pick leads, and the customer sees their photo first.", tone = ZTextTone.SOFT)
-            else -> ZBody("Suggested order — fewest open jobs first, then longest since their last one. The booker sees the assigned tech's name and photo.", tone = ZTextTone.SOFT)
+            isCrew -> ZBody("Pick $technicians, the quote's crew. The first person you pick leads, and the customer sees their photo first.", tone = ZTextTone.SOFT)
+            else -> ZBody("Suggested order: fewest open jobs first, then longest since their last one. The booker sees the assigned tech's name and photo.", tone = ZTextTone.SOFT)
         }
         ZLoadable(roster, retry = { scope.launch { loadRoster() } }) { loaded ->
             val picked = selection ?: job.crewMembers.map { it.id }.ifEmpty { loaded.crewUserIds }
@@ -103,7 +103,7 @@ fun CrewPickerSheet(
                     if (loaded.canAutoPick(picked, crewSize)) {
                         ZButton("Auto-pick ${if (picked.isNotEmpty()) "the rest" else if (isCrew) "the crew" else "next"}", style = ZButtonStyle.OUTLINE) { selection = loaded.autoPick(picked, crewSize) }
                     }
-                } else loaded.nextUp()?.let { next -> ZButton("Auto-assign next — ${next.name}", loading = saving == next.id) { submit(listOf(next.id)) } }
+                } else loaded.nextUp()?.let { next -> ZButton("Auto-assign next: ${next.name}", loading = saving == next.id) { submit(listOf(next.id)) } }
                 // Nobody pickable is almost always "nobody has a photo yet"
                 // — usually a solo owner who signed up without one.
                 if (loaded.nobodyAssignable) {

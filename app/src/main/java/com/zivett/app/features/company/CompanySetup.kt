@@ -132,15 +132,15 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                             Icon(Icons.Filled.Verified, contentDescription = null, tint = colors.brandGold, modifier = Modifier.padding(top = ZSpacing.xl).size(40.dp))
                             ZMono("Application submitted")
                             ZDisplay("Your application is in review")
-                            ZBody("Our team checks every company before it goes live — that review is what the ZiVETT badge means to bookers. You'll hear back by notification; approval opens the job feed.", tone = ZTextTone.SOFT)
+                            ZBody("Our team checks every company before it goes live. That review is what the ZiVETT badge means to bookers. You'll hear back by notification; approval opens the job feed.", tone = ZTextTone.SOFT)
                         } else {
-                            ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the steps and submit — our team takes it from there.")
+                            ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the steps and submit, and our team takes it from there.")
                             SetupChecklist(response.setup)
                             ZCard(padding = 0.dp) {
                                 val plan = response.setup.steps.plan
-                                ZNavRow("Plan", plan?.let { if (it.complete) "${it.planName ?: "Chosen"} — view or change" else "Choose your membership" } ?: "Your membership", onClick = { nav.navigate(PlanRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.StarOutline) }
+                                ZNavRow("Plan", plan?.let { if (it.complete) "${it.planName ?: "Chosen"} · view or change" else "Choose your membership" } ?: "Your membership", onClick = { nav.navigate(PlanRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.StarOutline) }
                                 ZDivider(Modifier.padding(start = 60.dp))
-                                ZNavRow("Business profile", "Name, address, phone — what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY, model.profileMissingRoute())); model.profileVisited = true }) { ZIconTile(Icons.Outlined.Business) }
+                                ZNavRow("Business profile", "Name, address, phone: what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY, model.profileMissingRoute())); model.profileVisited = true }) { ZIconTile(Icons.Outlined.Business) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Services & rates", "Trades, hourly rates, radius, availability", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.Build) }
                                 ZDivider(Modifier.padding(start = 60.dp))
@@ -150,7 +150,7 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                             }
                             // Submit is gated on completeness, like the web review step.
                             val missing = CompanySetupModel.missingSummary(response.setup.steps)
-                            if (missing.isNotEmpty()) ZBanner("Needs attention — ${missing.joinToString(", ")}.", tone = ZTone.WARNING)
+                            if (missing.isNotEmpty()) ZBanner("Needs attention: ${missing.joinToString(", ")}.", tone = ZTone.WARNING)
                             if (environment.session.user?.organizationRole == OrganizationRole.ADMIN) {
                                 ZButton("Submit application", style = ZButtonStyle.SUCCESS, loading = model.submitting, enabled = missing.isEmpty()) { scope.launch { model.submit(environment.session) } }
                             } else ZCaption("Only organization admins can submit the application.")
@@ -169,7 +169,7 @@ fun CredentialGuideScreen(onBack: () -> Unit) {
     Column {
         ZTopBar("Document guide", onBack = onBack)
         ZScreen {
-            ZPageTitle("Document guide", "What our review team looks for in each upload — get these right and approval is fast.")
+            ZPageTitle("Document guide", "What our review team looks for in each upload. Get these right and approval is fast.")
             for (guide in CredentialFieldGuide.entries) {
                 ZCard {
                     ZBodyStrong(guide.title)

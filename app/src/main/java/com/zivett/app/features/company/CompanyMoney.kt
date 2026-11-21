@@ -147,12 +147,12 @@ fun CompanyInvoiceDetailScreen(invoiceId: Int, onBack: () -> Unit) {
                             MoneyRow("Platform commission (${CompanyPresentation.percent(commissionBps)})", -(invoice.commissionCents ?: 0))
                             val trustBps = invoice.trustFeeBps; val trust = invoice.trustFeeCents
                             if (trustBps != null && trust != null && trust > 0) MoneyRow("Trust & support (${CompanyPresentation.percent(trustBps)})", -trust)
-                            invoice.tipCents?.takeIf { it > 0 }?.let { MoneyRow("Tip — 100% yours", it, color = colors.success) }
+                            invoice.tipCents?.takeIf { it > 0 }?.let { MoneyRow("Tip, 100% yours", it, color = colors.success) }
                             invoice.companyReferralCreditCents?.takeIf { it > 0 }?.let { MoneyRow("Referral credit", it, color = colors.success) }
                             if (invoice.connectFeeCents > 0) MoneyRow("Account fees", -invoice.connectFeeCents)
                             ZDivider()
                             MoneyRow("You receive", (invoice.netCents ?: 0) - invoice.connectFeeCents, strong = true, color = colors.success)
-                            ZCaption(if (invoice.isPaid) "Settled — track it on your Payouts page." else "Queued as a payout once the booker pays or the invoice auto-settles.")
+                            ZCaption(if (invoice.isPaid) "Settled. Track it on your Payouts page." else "Queued as a payout once the booker pays or the invoice auto-settles.")
                         }
                     }
                     Spacer(Modifier.padding(ZSpacing.lg))

@@ -133,12 +133,12 @@ class PaymentChallengeTest {
 
     @Test fun aNonPaymentConflictKeepsTheServersMessage() = runTest {
         val client = jobClient()
-        client.errors["api/customer/jobs/5/close"] = HttpApiClient.errorFor(409, null, """{"message":"This job has an open dispute — support will be in touch."}""".toByteArray())
+        client.errors["api/customer/jobs/5/close"] = HttpApiClient.errorFor(409, null, """{"message":"This job has an open dispute. Support will be in touch."}""".toByteArray())
         val model = JobDetailModel(5, client, JobArea.customer)
         model.load()
 
         assertEquals(JobDetailModel.CloseOutcome.Failed, model.close(0))
-        assertEquals("This job has an open dispute — support will be in touch.", model.toast)
+        assertEquals("This job has an open dispute. Support will be in touch.", model.toast)
     }
 
     @Test fun theInvoiceScreenLooksBeforeReportingATimeout() = runTest {

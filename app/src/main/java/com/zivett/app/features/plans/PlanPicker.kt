@@ -232,7 +232,7 @@ private fun Legal() {
     val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs), modifier = Modifier.padding(top = ZSpacing.sm)) {
         ZCaption(
-            "Plans are subscriptions that renew automatically until cancelled — yearly plans each year, monthly plans each month. Payment is charged to your Google Play account when you confirm the purchase. Cancel any time in Google Play › Payments & subscriptions › Subscriptions; your plan stays active until the end of the period you've paid for.",
+            "Plans are subscriptions that renew automatically until cancelled: yearly plans each year, monthly plans each month. Payment is charged to your Google Play account when you confirm the purchase. Cancel any time in Google Play › Payments & subscriptions › Subscriptions; your plan stays active until the end of the period you've paid for.",
             tone = ZTextTone.FAINT,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.md)) {

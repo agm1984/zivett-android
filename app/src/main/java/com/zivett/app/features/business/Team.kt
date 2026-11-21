@@ -100,7 +100,7 @@ class TeamModel(private val client: ApiClient, val area: TeamArea) {
         val upload = area.uploadMemberPhoto ?: return
         if (jpeg == null) { toast = "Could not read that image. Try a different photo."; return }
         busy = true
-        try { client.send(upload(member.id, jpeg)); toast = "Photo saved — ${member.name} can now be assigned jobs."; load() }
+        try { client.send(upload(member.id, jpeg)); toast = "Photo saved. ${member.name} can now be assigned jobs."; load() }
         catch (e: ApiError) { toast = e.first("photo") ?: e.userMessage } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
     }
 
@@ -241,7 +241,7 @@ fun TeamScreen(area: TeamArea, onBack: (() -> Unit)?) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                     Text("$first will be signed out and can no longer log in to ${model.state.value?.organization?.name ?: "your account"}. They'll disappear from your team list.")
-                    Text("Jobs, quotes and messages they worked on stay on record. If you only need to pause their access, set them to Deactivated instead — you can reactivate them later.")
+                    Text("Jobs, quotes and messages they worked on stay on record. If you only need to pause their access, set them to Deactivated instead. You can reactivate them later.")
                     if (area.kind == JobArea.Kind.COMPANY) Text("Anyone still on an open job's crew has to be swapped off in that job's crew picker first.")
                     removeError?.let { Text(it, color = colors.danger) }
                 }
@@ -273,7 +273,7 @@ private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: 
         }
         if (editingSelf) {
             // The server refuses a self role/status change; role and status are sent back unchanged.
-            ZCaption("This is your own account — you can change your name${if (isCompany) " and whether you take jobs" else ""} here, but not your role or status.")
+            ZCaption("This is your own account. You can change your name${if (isCompany) " and whether you take jobs" else ""} here, but not your role or status.")
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                 ZLabel("Role")
@@ -287,7 +287,7 @@ private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: 
         // Field tech vs office staff: steers who won jobs get auto-assigned
         // to. Not a permission, so it's editable on your own row too.
         if (isCompany) {
-            ZToggleRow("Takes jobs", "Won jobs are auto-assigned to teammates who go out on site. Turn this off for office staff — auto-assign skips them, but you can still put them on a job yourself from the job's page (the Assigned tech card's Reassign link, or Start job).", takesJobs, { takesJobs = it })
+            ZToggleRow("Takes jobs", "Won jobs are auto-assigned to teammates who go out on site. Turn this off for office staff. Auto-assign skips them, but you can still put them on a job yourself from the job's page (the Assigned tech card's Reassign link, or Start job).", takesJobs, { takesJobs = it })
         }
         ZButton("Save", loading = model.busy) {
             scope.launch {

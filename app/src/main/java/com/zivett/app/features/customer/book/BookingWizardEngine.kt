@@ -67,8 +67,8 @@ object BookingWizardEngine {
     const val maxPhotos = 8
     val longHorizonUrgencies = setOf("next_few_weeks", "planning")
     val urgencies: List<Pair<String, String>> = listOf(
-        "asap" to "Urgent — as soon as possible", "today" to "Today", "this_week" to "This week",
-        "next_few_weeks" to "In the next few weeks", "planning" to "Not sure — still planning or budgeting",
+        "asap" to "Urgent, as soon as possible", "today" to "Today", "this_week" to "This week",
+        "next_few_weeks" to "In the next few weeks", "planning" to "Not sure, still planning or budgeting",
     )
 
     fun steps(form: Form, questions: List<BookingOptions.Question>): List<Step> {

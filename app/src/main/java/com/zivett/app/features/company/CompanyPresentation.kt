@@ -111,13 +111,13 @@ object CompanyPresentation {
     /// (auto-assigned at acceptance) it says who — shown success-tinted.
     fun startPickerIntro(job: Job, crewSize: Int): String {
         val crew = job.crewMembers
-        if (crew.isNotEmpty()) return "${nameList(crew.map { it.name })} ${if (crew.size > 1) "are" else "is"} doing this job. Confirm to start it — they can then mark it en route — or change who's going."
+        if (crew.isNotEmpty()) return "${nameList(crew.map { it.name })} ${if (crew.size > 1) "are" else "is"} doing this job. Confirm to start it (they can then mark it en route), or change who's going."
         return "Pick ${if (crewSize > 1) technicians(crewSize) else "who's doing this job"}. Starting it lets them mark it en route."
     }
 
     /// The snackbar after a start.
     fun startedToast(code: String?, crewCount: Int): String =
-        "${code ?: "Job"} started — ${if (crewCount > 1) "the crew has" else "they've"} been told to head out"
+        "${code ?: "Job"} started. ${if (crewCount > 1) "The crew has" else "They've"} been told to head out"
 
     /// The job page's Start-job notice under the status header — accepted
     /// jobs only, for a tech on the crew or an admin who can start it.
@@ -127,8 +127,8 @@ object CompanyPresentation {
         val starts = jobAction(job, user) == JobAction.Start
         return when {
             mine && starts -> "You're doing this job. Start job to confirm who's going, then mark it en route when you set off."
-            mine && job.dispatchedAt == null -> "You're doing this job. Your team will start it when it's time — you'll get a notification, then you can mark it en route."
-            mine -> "Started — you're on the crew. Mark it en route when you set off."
+            mine && job.dispatchedAt == null -> "You're doing this job. Your team will start it when it's time. You'll get a notification, then you can mark it en route."
+            mine -> "Started. You're on the crew. Mark it en route when you set off."
             !starts -> null
             !job.crew.isNullOrEmpty() -> "${job.crew.joinToString(", ") { it.name }} ${if (job.crew.size > 1) "are" else "is"} lined up for this job. Start job to confirm who's going."
             else -> "Start job to pick who's going."

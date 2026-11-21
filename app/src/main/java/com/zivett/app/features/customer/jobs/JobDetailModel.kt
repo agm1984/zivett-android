@@ -69,7 +69,7 @@ class JobDetailModel(
     /// the grace window charges its fee on the spot.
     suspend fun cancel() {
         withContext(NonCancellable) {
-            mutate("Could not cancel this job — work may have already started.") {
+            mutate("Could not cancel this job. Work may have already started.") {
                 val job = client.send(area.cancel(jobId)).job
                 toast = "${job.code ?: "Job"} cancelled"
                 job
@@ -195,7 +195,7 @@ class JobDetailModel(
             val body = AcceptQuoteBody(couponCode = null, scheduledDate = scheduledDate, scheduledWindow = window, stripeSetupIntentId = setupIntentId)
             val job = client.send(area.acceptQuote(jobId, quote.id, body)).job
             state = Loadable.Loaded(job)
-            toast = "Your ZiVETT Pro is on the way — quote accepted"
+            toast = "Your ZiVETT Pro is on the way. Quote accepted"
             val hold = quote.authorizationPreview?.totalCents ?: quote.amountCents
             return AcceptOutcome.Accepted(hold, job.company?.name ?: "Your pro", job.scheduledDate, job.scheduledWindow)
         } catch (error: ApiError.Conflict) {
@@ -271,7 +271,7 @@ class JobDetailModel(
             val review = if (existing != null) client.send(area.updateReview(existing.id, rating, trimmed)).review
             else client.send(area.review(jobId, rating, trimmed)).review
             job?.let { state = Loadable.Loaded(it.copy(review = review)) }
-            if (!quiet) toast = "Thanks — your review helps keep pros accountable"
+            if (!quiet) toast = "Thanks, your review helps keep pros accountable"
             return true
         } catch (error: ApiError) {
             toast = error.first("rating") ?: error.first("comment") ?: error.userMessage
@@ -321,7 +321,7 @@ class JobDetailModel(
         try {
             val added = client.send(area.uploadPhotos(jobId, photos)).photos
             job?.let { state = Loadable.Loaded(it.copy(photos = (it.photos ?: emptyList()) + added)) }
-            toast = "Photos added — pros can now see the problem"
+            toast = "Photos added. Pros can now see the problem"
         } catch (error: ApiError) {
             toast = error.first("photos") ?: error.first("photos.0") ?: error.userMessage
         } catch (error: Exception) {

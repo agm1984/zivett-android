@@ -125,13 +125,13 @@ class OwnJobModel(val jobId: Int, private val client: ApiClient) {
     }
 
     /// Starting runs your job timer; finishing stops every one on the job.
-    suspend fun setStatus(status: String) = act(if (status == OwnJobStatus.COMPLETED) "Job finished — your time is on the job" else "Job started — the job timer is running") {
+    suspend fun setStatus(status: String) = act(if (status == OwnJobStatus.COMPLETED) "Job finished. Your time is on the job" else "Job started. The job timer is running") {
         client.send(MyDayEndpoints.ownJobStatus(jobId, status)).job
     }
 
     /// The job timer — not the working day (that's My day's clock card).
     suspend fun clockIn() = act("Job timer started on ${job?.code ?: "this job"}") { client.send(MyDayEndpoints.clockIn(jobId)).job }
-    suspend fun clockOut() = act("Job timer stopped — your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)).job }
+    suspend fun clockOut() = act("Job timer stopped. Your time is on the job") { client.send(MyDayEndpoints.clockOut(jobId)).job }
 }
 
 /// One of the company's own jobs as its crew sees it

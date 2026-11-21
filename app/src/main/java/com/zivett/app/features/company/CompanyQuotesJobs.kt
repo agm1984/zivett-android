@@ -111,7 +111,7 @@ class CompanyQuotesModel(private val client: ApiClient) {
         try {
             client.send(CompanyEndpoints.withdrawQuote(quote.id))
             state.value?.let { state = Loadable.Loaded(it.copy(quotes = it.quotes.filter { q -> q.id != quote.id })) }
-            toast = "Quote for ${quote.job?.code ?: "the job"} withdrawn — the job is back in your feed"
+            toast = "Quote for ${quote.job?.code ?: "the job"} withdrawn. The job is back in your feed"
         } catch (error: Exception) { toast = error.userMessage }
     }
 }
@@ -148,7 +148,7 @@ fun CompanyQuotesScreen() {
 
                         ZHeadline("Past quotes", modifier = Modifier.padding(top = ZSpacing.sm))
                         if (settled.isEmpty()) {
-                            ZCaption("Quotes land here once the booker decides — accepted ones open their job.")
+                            ZCaption("Quotes land here once the booker decides. Accepted ones open their job.")
                         } else {
                             val filters = CompanyQuotesLogic.Filter.entries
                             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -184,7 +184,7 @@ fun CompanyQuotesScreen() {
         AlertDialog(
             onDismissRequest = { withdrawing = null },
             title = { Text("Withdraw this quote?") },
-            text = { Text("Your ${Money.format(quote.amountCents)} quote on ${quote.job?.title ?: "this job"} (${quote.job?.code ?: ""}) comes off the table — the booker will no longer see or be able to accept it.") },
+            text = { Text("Your ${Money.format(quote.amountCents)} quote on ${quote.job?.title ?: "this job"} (${quote.job?.code ?: ""}) comes off the table. The booker will no longer see or be able to accept it.") },
             confirmButton = { TextButton(onClick = { withdrawing = null; scope.launch { model.withdraw(quote) } }) { Text("Withdraw quote", color = colors.danger) } },
             dismissButton = { TextButton(onClick = { withdrawing = null }) { Text("Keep the quote") } },
         )
@@ -293,7 +293,7 @@ class CompanyJobsModel(private val client: ApiClient) {
             state.value?.let { jobs ->
                 if (updated.status == JobStatus.INVOICED) {
                     state = Loadable.Loaded(jobs.filter { it.id != job.id })
-                    toast = "${updated.code ?: "Job"} complete — invoice sent to the booker automatically"
+                    toast = "${updated.code ?: "Job"} complete. Invoice sent to the booker automatically"
                     invoices = Loadable.Loading
                 } else state = Loadable.Loaded(jobs.map { if (it.id == job.id) updated else it })
             }
@@ -341,7 +341,7 @@ fun CompanyActiveJobsScreen() {
             if (completed) {
                 ZLoadable(model.invoices, retry = { scope.launch { model.loadInvoices() } }) { invoices ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
-                        if (invoices.isEmpty()) ZEmptyState(Icons.Outlined.Verified, "No completed jobs yet", "Finished jobs land here with their invoices — completing a job bills the booker automatically.")
+                        if (invoices.isEmpty()) ZEmptyState(Icons.Outlined.Verified, "No completed jobs yet", "Finished jobs land here with their invoices. Completing a job bills the booker automatically.")
                         for (invoice in invoices) CompanyInvoiceRow(invoice) { nav.navigate(CompanyInvoiceRoute(invoice.id)) }
                     }
                 }

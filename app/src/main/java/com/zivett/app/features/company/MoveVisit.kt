@@ -112,9 +112,9 @@ fun MoveVisitSheet(jobId: Int, jobCode: String?, client: ApiClient, onDismiss: (
                 loaded.rescheduleRequest?.let { pending ->
                     ZBanner("Waiting for the booker to accept ${CalendarLogic.slotLine(pending.date, pending.window)}.", tone = ZTone.INFO)
                     ZButton("Withdraw the request", style = ZButtonStyle.OUTLINE, loading = model.busy) {
-                        scope.launch { model.withdraw()?.let { onChanged(it, "Move request withdrawn — the visit stays as agreed") } }
+                        scope.launch { model.withdraw()?.let { onChanged(it, "Move request withdrawn. The visit stays as agreed") } }
                     }
-                    ZCaption("Or pick a different time below — a new request replaces this one.")
+                    ZCaption("Or pick a different time below. A new request replaces this one.")
                 }
                 ZCaption("Pick the new time. The booker is asked to accept it; until they do, the visit stays where it is.", tone = ZTextTone.SOFT)
                 for ((date, slots) in CalendarLogic.slotsByDate(loaded.slots)) {
@@ -125,7 +125,7 @@ fun MoveVisitSheet(jobId: Int, jobCode: String?, client: ApiClient, onDismiss: (
                         }
                     }
                 }
-                ZTextArea("Reason (optional)", model.reason, { if (it.length <= 500) model.reason = it }, placeholder = "Our crew is held up on another job — could we come the next morning?", minLines = 3)
+                ZTextArea("Reason (optional)", model.reason, { if (it.length <= 500) model.reason = it }, placeholder = "Our crew is held up on another job. Could we come the next morning?", minLines = 3)
                 ZCaption("${model.reason.length} / 500")
                 model.error?.let { ZBanner(it, tone = ZTone.DANGER) }
                 ZButton(
@@ -195,7 +195,7 @@ fun VisitTimeCard(job: Job, isAdmin: Boolean, busy: Boolean, onMove: () -> Unit,
                 }
             }
         } else if (isAdmin && CompanyMoves.movable(job)) {
-            ZCaption("Need a different time? Ask the booker — the visit only moves if they accept.")
+            ZCaption("Need a different time? Ask the booker. The visit only moves if they accept.")
             ZButton("Move visit", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, onClick = onMove)
         }
     }

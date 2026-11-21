@@ -405,7 +405,7 @@ private fun PaymentReceived(invoice: Invoice, onDone: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
         Icon(Icons.Filled.Verified, contentDescription = null, tint = ZTheme.colors.brandGold)
         ZMono("Payment received")
-        ZPageTitle("Thanks — you're all paid up", invoice.job?.title)
+        ZPageTitle("Thanks, you're all paid up", invoice.job?.title)
         ZBanner("${invoice.number ?: "Your invoice"} is paid. We've emailed your receipt, and you can share a PDF copy from the invoice any time.", tone = ZTone.SUCCESS)
         ZButton("Done", onClick = onDone)
     }

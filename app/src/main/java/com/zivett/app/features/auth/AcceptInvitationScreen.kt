@@ -144,7 +144,7 @@ fun AcceptInvitationScreen(nav: NavHostController, token: String) {
                 if (model.requiresPhoto) {
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                         ZLabel("Your photo")
-                        ZCaption("Customers see the tech showing up at their door — a clear face photo is required to take jobs.")
+                        ZCaption("Customers see the tech showing up at their door. A clear face photo is required to take jobs.")
                         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                             model.photoUri?.let { uri ->
                                 AsyncImage(model = uri, contentDescription = null, modifier = Modifier.size(56.dp).clip(CircleShape), contentScale = ContentScale.Crop)

@@ -45,8 +45,8 @@ sealed class ApiError : RuntimeException() {
             is Forbidden -> detail ?: "You don't have access to that."
             NotFound -> "We couldn't find that."
             is Validation -> errors.message
-            is Conflict -> detail ?: "That changed while you were looking — please refresh and try again."
-            is RateLimited -> "Too many attempts — please wait a moment and try again."
+            is Conflict -> detail ?: "That changed while you were looking. Please refresh and try again."
+            is RateLimited -> "Too many attempts. Please wait a moment and try again."
             is Server -> detail ?: "Something went wrong on our end. Please try again."
             is Transport -> "We couldn't reach ZiVETT. Check your connection and try again."
             is Decoding -> "We got an unexpected response. Please try again."
@@ -88,7 +88,7 @@ sealed class ApiError : RuntimeException() {
     fun first(field: String): String? = (this as? Validation)?.errors?.first(field)
 
     companion object {
-        const val UNCONFIRMED_PAYMENT = "We couldn't confirm that payment. If it went through it will show here shortly — otherwise it's safe to try again."
+        const val UNCONFIRMED_PAYMENT = "We couldn't confirm that payment. If it went through it will show here shortly. Otherwise it's safe to try again."
     }
 }
 

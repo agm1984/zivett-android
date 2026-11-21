@@ -23,10 +23,10 @@ sealed interface ChallengeOutcome {
     data object Unknown : ChallengeOutcome
 
     companion object {
-        const val CANCELED_COPY = "The bank confirmation wasn't completed — nothing was charged. Try again when you're ready."
+        const val CANCELED_COPY = "The bank confirmation wasn't completed, so nothing was charged. Try again when you're ready."
         const val FAILED_COPY = "Your bank couldn't confirm this payment. Try again or use a different card."
-        const val UNKNOWN_COPY = "We couldn't confirm that payment with your bank. If it went through it will show here shortly — otherwise it's safe to try again."
-        const val SETTLING_COPY = "Payment confirmed — it can take a few seconds to settle. Check back in a moment."
+        const val UNKNOWN_COPY = "We couldn't confirm that payment with your bank. If it went through it will show here shortly. Otherwise it's safe to try again."
+        const val SETTLING_COPY = "Payment confirmed. It can take a few seconds to settle. Check back in a moment."
         const val UNAVAILABLE_COPY = "Your bank needs an extra confirmation for this payment. Please complete it from zivett.com for now."
     }
 }

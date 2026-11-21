@@ -342,7 +342,7 @@ class BookingWizardModel(
 
     fun modeConsequence(key: String): String = when (key) {
         "instant" -> if (emergencyFeeCents > 0) "Adds the ${category?.name ?: ""} emergency fee of ${Money.format(emergencyFeeCents)}." else "No emergency fee for this category."
-        "scheduled" -> "Pick a day and arrival window — only pros available that day see your job."
+        "scheduled" -> "Pick a day and arrival window. Only pros available that day see your job."
         else -> "Verified pros send itemized quotes, typically within 24 hours. You compare and choose."
     }
 

@@ -100,7 +100,7 @@ class VerifyEmailModel {
         if (rechecking) return
         rechecking = true
         runCatching { session.refreshUser() }
-        if (session.user?.emailVerifiedAt == null) error = "Still unverified — enter the code from the email, or resend one."
+        if (session.user?.emailVerifiedAt == null) error = "Still unverified. Enter the code from the email, or resend one."
         rechecking = false
     }
 }
@@ -135,7 +135,7 @@ fun VerifyEmailScreen() {
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            ZLinkButton(if (model.rechecking) "Checking…" else "I verified on the web — check again", weight = FontWeight.Medium) { scope.launch { model.recheck(environment.session) } }
+            ZLinkButton(if (model.rechecking) "Checking…" else "I verified on the web, check again", weight = FontWeight.Medium) { scope.launch { model.recheck(environment.session) } }
         }
 
         ZButton("Log out", style = ZButtonStyle.GHOST, modifier = Modifier.padding(top = ZSpacing.lg)) { scope.launch { environment.session.logout() } }

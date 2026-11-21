@@ -115,7 +115,7 @@ fun HeroQuotesCard(job: Job) {
         // One trust statement for the whole set — curation is ZiVETT's promise.
         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.card)).background(colors.infoSoft).padding(ZSpacing.sm), horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.Top) {
             Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = colors.info, modifier = Modifier.size(16.dp))
-            Text("Every option below is from a pro ZiVETT has verified — identity, licence and insurance checked. Contact details are shared as soon as you accept.", style = ZType.caption.copy(fontSize = 12.5.sp), color = colors.ink)
+            Text("Every option below is from a pro ZiVETT has verified: identity, licence and insurance checked. Contact details are shared as soon as you accept.", style = ZType.caption.copy(fontSize = 12.5.sp), color = colors.ink)
         }
         quotes.forEachIndexed { index, quote -> QuoteOptionCard(job, quote, index, quote.id == bestId) }
     }
@@ -140,7 +140,7 @@ private fun QuoteOptionCard(job: Job, quote: Quote, index: Int, best: Boolean) {
             Box(
                 modifier = Modifier.padding(top = ZSpacing.sm).fillMaxWidth().clip(RoundedCornerShape(ZRadius.button)).background(if (best) colors.navy else colors.brandGold.copy(alpha = 0.15f)).clickable { nav.navigate(JobDetailRoute(job.id, Areas.CUSTOMER)) }.padding(vertical = 13.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Review & accept — ${Money.format(quote.amountCents)}", style = ZType.bodyStrong, color = if (best) colors.onBrand else colors.navyDeep.takeIf { !colors.isDark } ?: colors.ink) }
+            ) { Text("Review & accept · ${Money.format(quote.amountCents)}", style = ZType.bodyStrong, color = if (best) colors.onBrand else colors.navyDeep.takeIf { !colors.isDark } ?: colors.ink) }
         }
         if (best) {
             Text("ZIVETT RECOMMENDS", style = ZType.mono.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.4.sp), color = ZColors.fixedNavyDeep, modifier = Modifier.offset(x = ZSpacing.md, y = (-10).dp).clip(RoundedCornerShape(6.dp)).background(colors.star).padding(horizontal = 8.dp, vertical = 2.dp))
@@ -177,7 +177,7 @@ fun HeroInvoiceCard(invoice: Invoice, onPaid: suspend () -> Unit) {
 
         Column(modifier = Modifier.padding(ZSpacing.md)) {
             if (cancellation) {
-                Text("This covers the pro's time after they'd committed to your job — no work is included.", style = ZType.caption.copy(fontSize = 12.5.sp), color = colors.danger, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.card)).background(colors.dangerSoft).padding(ZSpacing.sm))
+                Text("This covers the pro's time after they'd committed to your job. No work is included.", style = ZType.caption.copy(fontSize = 12.5.sp), color = colors.danger, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.card)).background(colors.dangerSoft).padding(ZSpacing.sm))
             }
             for (item in invoice.lineItems ?: emptyList()) HeroMoneyRow(item.label, item.amount)
             // Fee + GST ride above the total; pre-fee invoices skip the block entirely.
@@ -207,7 +207,7 @@ fun HeroInvoiceCard(invoice: Invoice, onPaid: suspend () -> Unit) {
             // only offered a card when NONE was on file, so a declined
             // saved card had no way out.)
             PaymentCardSection(model.card, declined = model.declined, modifier = Modifier.padding(top = ZSpacing.sm)) { model.declined = null }
-            if (!cancellation) Text("Paying closes the job — or it settles automatically 48 hours after invoicing.", style = ZType.caption.copy(fontSize = 12.sp), color = colors.inkMuted, modifier = Modifier.padding(top = ZSpacing.sm))
+            if (!cancellation) Text("Paying closes the job, or it settles automatically 48 hours after invoicing.", style = ZType.caption.copy(fontSize = 12.sp), color = colors.inkMuted, modifier = Modifier.padding(top = ZSpacing.sm))
         }
 
         ZActionBand("Pay ${Money.format(model.totalCents)}", loading = model.paying, enabled = model.canPay, flushBottom = true, radius = ZRadius.panel) {

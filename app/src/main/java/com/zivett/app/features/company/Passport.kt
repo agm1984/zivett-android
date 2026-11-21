@@ -139,7 +139,7 @@ class PassportModel(private val client: ApiClient) {
         uploadingKind = kind
         try {
             client.send(CompanyEndpoints.uploadCredential(kind, fileName, mimeType, data, expiresAt))
-            toast = "Document uploaded — our team reviews it as part of your passport"
+            toast = "Document uploaded. Our team reviews it as part of your passport"
             load()
         } catch (e: ApiError) { toast = e.first("file") ?: e.first("expires_at") ?: "Could not upload that document. PDF, JPEG, PNG or WebP up to 10 MB." }
         catch (e: Exception) { toast = e.userMessage } finally { uploadingKind = null }
@@ -224,7 +224,7 @@ fun PassportScreen(onBack: (() -> Unit)?) {
                             }
                         }
                         if (!response.passport.approved && response.passport.documents.uploaded < response.passport.documents.total) {
-                            ZBanner("${response.passport.documents.uploaded} of ${response.passport.documents.total} documents uploaded — completing your passport speeds up review.", tone = ZTone.WARNING)
+                            ZBanner("${response.passport.documents.uploaded} of ${response.passport.documents.total} documents uploaded. Completing your passport speeds up review.", tone = ZTone.WARNING)
                         }
                         val canManage = response.editable?.canManage ?: false
                         for (credential in response.passport.credentials) {
@@ -464,7 +464,7 @@ fun DetailsEditorSheet(section: DetailsSection, details: CompanyDetails, onDismi
     ZSheet(onDismiss = onDismiss, title = section.title) {
         when (section) {
             DetailsSection.TRADES -> {
-                ZCaption("The trades you work in, each with your hourly rate — quotes are priced from it.")
+                ZCaption("The trades you work in, each with your hourly rate. Quotes are priced from it.")
                 for (option in details.categoryOptions) {
                     TradeTile(option, option.id in selected, rates[option.id] ?: "",
                         onToggle = { selected = if (option.id in selected) selected - option.id else selected + option.id },
@@ -489,10 +489,10 @@ fun DetailsEditorSheet(section: DetailsSection, details: CompanyDetails, onDismi
                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (on) colors.navy else colors.surface).border(1.dp, if (on) colors.navy else colors.borderStrong, RoundedCornerShape(10.dp)).clickable { workingDays = if (on) workingDays - day else workingDays + day }.padding(vertical = 10.dp))
                     }
                 }
-                if (workingDays.isEmpty()) ZCaption("Pick at least one working day — with none, no scheduled job can reach you.", color = colors.danger)
+                if (workingDays.isEmpty()) ZCaption("Pick at least one working day. With none, no scheduled job can reach you.", color = colors.danger)
             }
             DetailsSection.ALERT_EMAILS -> {
-                ZCaption("Where to email new-job alerts when a booking matches your trades and service area — one address per line. Leave empty to alert every active team member instead.")
+                ZCaption("Where to email new-job alerts when a booking matches your trades and service area, one address per line. Leave empty to alert every active team member instead.")
                 ZTextArea("", alertEmails, { alertEmails = it }, minLines = 4)
                 @Suppress("unused") val mono = FontFamily.Monospace
             }

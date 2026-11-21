@@ -164,7 +164,7 @@ fun CalendarDaySheet(
                     ZButton("Block the whole day", style = ZButtonStyle.GHOST, compact = true, fullWidth = false) {
                         confirm = PendingConfirm(
                             "Block ${CalendarLogic.dayTitle(date)}?",
-                            if (jobs.isNotEmpty()) "You have ${jobs.size} confirmed ${if (jobs.size == 1) "job" else "jobs"} this day — blocking does NOT cancel or move them. Scheduled jobs that day leave your feed, and quotes proposing it can't be accepted at it."
+                            if (jobs.isNotEmpty()) "You have ${jobs.size} confirmed ${if (jobs.size == 1) "job" else "jobs"} this day. Blocking does NOT cancel or move them. Scheduled jobs that day leave your feed, and quotes proposing it can't be accepted at it."
                             else "Scheduled jobs that day leave your feed, and quotes proposing it can no longer be accepted at it.",
                             "Block day", danger = true,
                         ) { model.blockDay(date) }
@@ -323,7 +323,7 @@ private fun TimeOffSection(date: String, calendar: CompanyCalendar, model: Compa
             FilterChip(selected = window == null, onClick = { window = null }, label = { Text("All day") })
             for (option in CalendarLogic.windows) FilterChip(selected = window == option, onClick = { window = option }, label = { Text(CalendarLogic.windowTag(option)) })
         }
-        ZCaption("Time off steers auto-assignment away from them — it never closes your calendar.")
+        ZCaption("Time off steers auto-assignment away from them. It never closes your calendar.")
         Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
             ZButton("Cancel", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { adding = false }
             val member = choosable.firstOrNull { it.id == who }
@@ -355,7 +355,7 @@ fun CalendarSettingsSheet(calendar: CompanyCalendar, model: CompanyCalendarModel
         if (days.isEmpty()) ZBanner("Pick at least one working day.", tone = ZTone.WARNING)
 
         ZHeadline("Weekly blocks")
-        ZCaption("Close a window every week — say, no evenings on Fridays. Tap to block or open.")
+        ZCaption("Close a window every week (say, no evenings on Fridays). Tap to block or open.")
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.width(44.dp))
@@ -385,7 +385,7 @@ fun CalendarSettingsSheet(calendar: CompanyCalendar, model: CompanyCalendarModel
         ZHeadline("Jobs per window")
         ZTextField("Most jobs in one window", capacity, { capacity = it.filter(Char::isDigit).take(2) }, placeholder = "No limit", keyboardType = KeyboardType.Number,
             error = if (parsed is CalendarLogic.Capacity.Invalid) "Enter 1 to 50, or leave it blank for no limit." else null)
-        ZCaption("A full window stops taking new work across your team — the feed, quotes, acceptances and moves. Leave blank for no limit.")
+        ZCaption("A full window stops taking new work across your team: the feed, quotes, acceptances and moves. Leave blank for no limit.")
 
         ZButton("Save", loading = model.busy, enabled = days.isNotEmpty() && parsed is CalendarLogic.Capacity.Valid) {
             val cap = (parsed as? CalendarLogic.Capacity.Valid)?.value
@@ -433,7 +433,7 @@ fun QuoteFromCalendar(jobId: Int, client: ApiClient, isAdmin: Boolean, onDismiss
             when (val state = model.state) {
                 Loadable.Loading -> ZSpinner()
                 is Loadable.Failed -> { ZBody(state.message, tone = ZTextTone.SOFT); ZButton("Try again") { scope.launch { model.load() } } }
-                is Loadable.Loaded -> { ZBody("This job is no longer open to quotes — it may have been quoted, released or booked.", tone = ZTextTone.SOFT); ZButton("Back to the day", style = ZButtonStyle.OUTLINE, onClick = onDismiss) }
+                is Loadable.Loaded -> { ZBody("This job is no longer open to quotes. It may have been quoted, released or booked.", tone = ZTextTone.SOFT); ZButton("Back to the day", style = ZButtonStyle.OUTLINE, onClick = onDismiss) }
             }
         }
         return

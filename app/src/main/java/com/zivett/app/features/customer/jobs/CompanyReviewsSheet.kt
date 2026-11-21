@@ -53,7 +53,7 @@ fun CompanyReviewsSheet(organizationId: Int, companyName: String, onDismiss: () 
                         ZBodyStrong("${rating.oneDecimal()} · ${response.summary.count} ${if (response.summary.count == 1) "review" else "reviews"}")
                     }
                 }
-                if (response.reviews.isEmpty()) ZBody("No reviews yet — this pro is new to ZiVETT.", tone = ZTextTone.SOFT)
+                if (response.reviews.isEmpty()) ZBody("No reviews yet. This pro is new to ZiVETT.", tone = ZTextTone.SOFT)
                 for (review in response.reviews) {
                     ZCard(padding = ZSpacing.sm) {
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

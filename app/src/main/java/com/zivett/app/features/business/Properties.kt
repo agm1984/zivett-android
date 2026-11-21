@@ -177,7 +177,7 @@ fun PropertyFormSheet(model: PropertiesModel, existing: Property?, onDismiss: ()
             preparingPhoto = true
             val jpeg = PhotoImport.jpegData(context, listOf(uri), 1024).firstOrNull()
             preparingPhoto = false
-            if (jpeg != null) photoJpeg = jpeg else error = "Couldn't read that photo — try another."
+            if (jpeg != null) photoJpeg = jpeg else error = "Couldn't read that photo. Try another."
         }
     }
 
@@ -208,7 +208,7 @@ fun PropertyFormSheet(model: PropertiesModel, existing: Property?, onDismiss: ()
                         val result = runCatching { model.geocode(address) }.getOrNull()
                         geocoding = false
                         if (result?.lat != null && result.lng != null) { pin = result.lat to result.lng; pinAdjusted = false }
-                        else error = "Couldn't locate that address — check the spelling, or save without a pin."
+                        else error = "Couldn't locate that address. Check the spelling, or save without a pin."
                     }
                 }
             }

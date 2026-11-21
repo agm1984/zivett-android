@@ -49,7 +49,7 @@ object JobPresentation {
         "instant" -> Meta("Instant Dispatch", ZTone.DANGER)
         "scheduled" -> Meta("Scheduled Booking", ZTone.SUCCESS)
         "quote" -> Meta("Quote / Project", ZTone.INFO)
-        else -> Meta(mode ?: "—", ZTone.NEUTRAL)
+        else -> Meta(mode ?: "Not set", ZTone.NEUTRAL)
     }
 
     /// The mono chip on mode tiles (IN / SC / QT).
@@ -100,7 +100,7 @@ object JobPresentation {
     /// "Support case DSP-Y82AAK" — codes are nullable on old rows.
     private fun caseName(dispute: Dispute): String = "Support case${dispute.code?.let { " $it" } ?: ""}"
 
-    fun caseTitle(dispute: Dispute): String = "${caseName(dispute)} — ${disputeKindLabel(dispute.kind)}"
+    fun caseTitle(dispute: Dispute): String = "${caseName(dispute)}: ${disputeKindLabel(dispute.kind)}"
 
     private val caseDay = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
 
@@ -129,7 +129,7 @@ object JobPresentation {
     /// hold exists.
     fun caseNextStep(dispute: Dispute, side: CaseSide): String {
         if (dispute.status == "awaiting_evidence") {
-            return if (dispute.mine) "Support needs more from you — check your notifications and reply with photos or details."
+            return if (dispute.mine) "Support needs more from you. Check your notifications and reply with photos or details."
             else "Support has asked for more details and may reach out to you."
         }
         val next = if (dispute.mine) "We'll notify you when support starts reviewing it and when it's resolved." else "Support may reach out to you while they look into it."
@@ -140,7 +140,7 @@ object JobPresentation {
     /// Replaces Pay & close while a case is open — the server won't close
     /// or charge (JobClosure::held), so the button would do nothing.
     fun paymentPausedCopy(dispute: Dispute): String =
-        "Payment is paused while support case${dispute.code?.let { " $it" } ?: ""} is open — your card isn't charged until it's resolved."
+        "Payment is paused while support case${dispute.code?.let { " $it" } ?: ""} is open. Your card isn't charged until it's resolved."
 
     val reportKinds: List<Pair<String, String>> = listOf("quality" to "Work quality", "conduct" to "Conduct or behaviour", "safety" to "Safety concern")
 
@@ -207,7 +207,7 @@ object JobPresentation {
     fun arrivalLabel(date: String, window: String?): String {
         val day = JsonCoding.parseDate(date)?.let { longDay.format(it) } ?: date
         if (window == null) return day
-        return "$day — ${windowLabel(window)}"
+        return "$day · ${windowLabel(window)}"
     }
 
     /// "Mike R. plans to arrive around 9:30 am" — under the arrival banner
@@ -244,7 +244,7 @@ object JobPresentation {
             JobStatus.EN_ROUTE -> "$company is on the way"
             JobStatus.ARRIVED -> "Your pro has arrived"
             JobStatus.IN_PROGRESS -> "Repair under way"
-            JobStatus.COMPLETED -> "Done — invoice on its way"
+            JobStatus.COMPLETED -> "Done, invoice on its way"
             JobStatus.INVOICED -> "Invoice ready to pay"
             else -> meta(job.status).label
         }
@@ -259,12 +259,12 @@ object JobPresentation {
 
     fun cancelManageCopy(job: Job): String {
         if (!job.isCancellable) {
-            openCases(job).firstOrNull()?.let { return "${caseName(it)} is ${disputeStatusMeta(it.status).label.lowercase()} — payment and closing are paused until it's resolved." }
+            openCases(job).firstOrNull()?.let { return "${caseName(it)} is ${disputeStatusMeta(it.status).label.lowercase()}. Payment and closing are paused until it's resolved." }
             return "Something wrong? Reporting a problem brings support in, and any pending payment is paused until it's resolved."
         }
         val fee = job.cancellationFeeCents
-        if (fee != null && fee > 0) return "Cancelling now has a ${Money.format(fee)} cancellation fee — your pro has already committed to this job."
-        return "Free to cancel right now — once a pro is committed, a cancellation fee applies."
+        if (fee != null && fee > 0) return "Cancelling now has a ${Money.format(fee)} cancellation fee. Your pro has already committed to this job."
+        return "Free to cancel right now. Once a pro is committed, a cancellation fee applies."
     }
 
     /// The "Your pro" card's line under each crew member, lead first.
@@ -281,7 +281,7 @@ object JobPresentation {
             return "$why The fee is charged to your saved card when you confirm."
         }
         val n = job.pendingQuotes.size
-        return "Cancelling is free right now, but it can't be undone — the $n pending ${if (n == 1) "quote" else "quotes"} on this job will be declined."
+        return "Cancelling is free right now, but it can't be undone. The $n pending ${if (n == 1) "quote" else "quotes"} on this job will be declined."
     }
 
     fun cancelButtonTitle(job: Job): String {

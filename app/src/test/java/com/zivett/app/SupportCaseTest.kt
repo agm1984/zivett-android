@@ -50,7 +50,7 @@ class SupportCaseTest {
     }
 
     @Test fun labelsMatchTheWeb() {
-        assertEquals("Support case DSP-Y82AAK — Work quality", JobPresentation.caseTitle(case()))
+        assertEquals("Support case DSP-Y82AAK: Work quality", JobPresentation.caseTitle(case()))
         assertEquals("Rework requested", JobPresentation.disputeKindLabel("rework"))
         assertEquals("Billing query", JobPresentation.disputeKindLabel("billing"))
         assertEquals("Conduct or behaviour", JobPresentation.disputeKindLabel("conduct"))
@@ -78,14 +78,14 @@ class SupportCaseTest {
     }
 
     @Test fun nextStepCopySaysPausedNeverHeld() {
-        assertEquals("Support needs more from you — check your notifications and reply with photos or details.", JobPresentation.caseNextStep(case("awaiting_evidence", mine = true), CaseSide.BOOKER))
+        assertEquals("Support needs more from you. Check your notifications and reply with photos or details.", JobPresentation.caseNextStep(case("awaiting_evidence", mine = true), CaseSide.BOOKER))
         assertEquals("Support has asked for more details and may reach out to you.", JobPresentation.caseNextStep(case("awaiting_evidence"), CaseSide.COMPANY))
         assertEquals("We'll notify you when support starts reviewing it and when it's resolved. Payment and closing the job are paused while the case is open.", JobPresentation.caseNextStep(case(mine = true), CaseSide.BOOKER))
         assertEquals("Support may reach out to you while they look into it. Your payout and closing the job are paused while the case is open.", JobPresentation.caseNextStep(case("under_review"), CaseSide.COMPANY))
-        assertEquals("Payment is paused while support case DSP-Y82AAK is open — your card isn't charged until it's resolved.", JobPresentation.paymentPausedCopy(case()))
+        assertEquals("Payment is paused while support case DSP-Y82AAK is open. Your card isn't charged until it's resolved.", JobPresentation.paymentPausedCopy(case()))
 
         val manage = JobPresentation.cancelManageCopy(Fixtures.job(status = JobStatus.INVOICED).copy(disputes = listOf(case("under_review"))))
-        assertEquals("Support case DSP-Y82AAK is under review — payment and closing are paused until it's resolved.", manage)
+        assertEquals("Support case DSP-Y82AAK is under review. Payment and closing are paused until it's resolved.", manage)
         assertFalse(JobPresentation.cancelManageCopy(Fixtures.job(status = JobStatus.INVOICED)).contains("held"))
     }
 

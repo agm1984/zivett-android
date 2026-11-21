@@ -279,7 +279,7 @@ class MyDayTest {
         val model = com.zivett.app.features.company.OwnJobModel(12, client)
         model.setStatus("in_progress")
         assertEquals("in_progress", model.job?.status)
-        assertEquals("Job started — the job timer is running", model.toast)
+        assertEquals("Job started. The job timer is running", model.toast)
         assertEquals(listOf("POST api/company/own-jobs/12/status"), client.sent)
     }
 

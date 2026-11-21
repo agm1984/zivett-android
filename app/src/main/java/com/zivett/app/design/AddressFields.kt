@@ -76,7 +76,7 @@ fun ZAddressFields(address: String, onAddressChange: (String) -> Unit, error: St
 fun ZRegionPicker(value: String, onChange: (String) -> Unit) {
     val colors = ZTheme.colors
     var expanded by remember { mutableStateOf(false) }
-    val display = AddressParts.regionGroups.flatMap { it.options }.firstOrNull { it.code == value }?.name ?: value.ifEmpty { "—" }
+    val display = AddressParts.regionGroups.flatMap { it.options }.firstOrNull { it.code == value }?.name ?: value.ifEmpty { "Choose…" }
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -95,7 +95,7 @@ fun ZRegionPicker(value: String, onChange: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = colors.surface) {
-            DropdownMenuItem(text = { Text("—", style = ZType.body) }, onClick = { onChange(""); expanded = false })
+            DropdownMenuItem(text = { Text("None", style = ZType.body) }, onClick = { onChange(""); expanded = false })
             if (value.isNotEmpty() && !AddressParts.isRegionCode(value)) {
                 DropdownMenuItem(text = { Text(value, style = ZType.body) }, onClick = { onChange(value); expanded = false })
             }

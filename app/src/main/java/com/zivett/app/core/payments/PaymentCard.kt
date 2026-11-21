@@ -89,7 +89,7 @@ class PaymentCardModel(private val client: ApiClient, private val context: Conte
             val key = fresh.publishableKey
             val androidContext = context
             if (secret == null || key == null || androidContext == null) {
-                error = "Card setup isn't available right now — try again in a moment."
+                error = "Card setup isn't available right now. Try again in a moment."
                 return false
             }
             StripeBridge.configure(androidContext, key)
@@ -134,7 +134,7 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
             Loadable.Loading -> ZSpinner()
             is Loadable.Failed -> Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                 ZBodyStrong("We couldn't load your card")
-                ZCaption("${billing.message} You can still pay — we'll charge the card on file.")
+                ZCaption("${billing.message} You can still pay, and we'll charge the card on file.")
                 ZButton("Retry", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { scope.launch { model.retry() } }
             }
             is Loadable.Loaded -> {
@@ -151,7 +151,7 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
                         val card = context.savedCard
                         val expired = card?.isExpired() == true
                         SavedCardLine(card)
-                        if (expired) ZCaption("This card has expired — use a different card before you pay.", color = colors.danger)
+                        if (expired) ZCaption("This card has expired. Use a different card before you pay.", color = colors.danger)
 
                         model.error?.let { ZCaption(it, color = colors.danger) }
 
@@ -164,7 +164,7 @@ fun PaymentCardSection(model: PaymentCardModel, declined: String? = null, modifi
                         ) { scope.launch { if (model.changeCard()) onSaved() } }
 
                         if (context.publishableKey?.startsWith("pk_test_") == true) {
-                            ZCaption("Test mode — use card 4242 4242 4242 4242, any future expiry and CVC.", tone = ZTextTone.FAINT)
+                            ZCaption("Test mode: use card 4242 4242 4242 4242, any future expiry and CVC.", tone = ZTextTone.FAINT)
                         }
                     }
                 }

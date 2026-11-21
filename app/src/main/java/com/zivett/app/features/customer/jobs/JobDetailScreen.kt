@@ -234,7 +234,7 @@ private fun QuotesCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
     if (open.isEmpty()) return
     ZCard {
         ZHeadline("Your quotes from ZiVETT (${open.size})")
-        ZCaption("Each option is from a pro we've verified — identity, licence and insurance checked. Contact details are shared as soon as you accept.")
+        ZCaption("Each option is from a pro we've verified: identity, licence and insurance checked. Contact details are shared as soon as you accept.")
         open.forEachIndexed { i, quote ->
             val company = quote.company
             val showReviews: (() -> Unit)? = if (company?.id != null) ({ onSheet(JobSheet.Reviews(company.id, company.name)) }) else null
@@ -242,7 +242,7 @@ private fun QuotesCard(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
         }
         // "Accept — $150" reads like a checkout button; say plainly that
         // accepting isn't paying (Damon's review #40).
-        ZCaption("You won't be charged when you accept — you pay once the ${if (area.kind == JobArea.Kind.BUSINESS) "work" else "job"} is done and you close it.")
+        ZCaption("You won't be charged when you accept. You pay once the ${if (area.kind == JobArea.Kind.BUSINESS) "work" else "job"} is done and you close it.")
     }
 }
 
@@ -270,8 +270,8 @@ private fun PriceCard(job: Job) {
                 // Progress the booker can feel: the notified-pro count
                 // when there is one. Zero supply stays generic.
                 val matched = job.matchedPros
-                if (matched != null && matched > 0) ZCaption("$matched verified pro${if (matched == 1) "" else "s"} in your area ${if (matched == 1) "has" else "have"} been notified. We hand-check every quote — you'll hear from us the moment yours are ready.")
-                else ZCaption("We're collecting quotes from verified pros and hand-checking each one — you'll hear from us the moment yours are ready.")
+                if (matched != null && matched > 0) ZCaption("$matched verified pro${if (matched == 1) "" else "s"} in your area ${if (matched == 1) "has" else "have"} been notified. We hand-check every quote, and you'll hear from us the moment yours are ready.")
+                else ZCaption("We're collecting quotes from verified pros and hand-checking each one. You'll hear from us the moment yours are ready.")
             }
         }
     }
@@ -342,7 +342,7 @@ private fun DetailsCard(job: Job, model: JobDetailModel, onAddPhotos: () -> Unit
         job.intakeAnswers?.takeIf { it.isNotEmpty() }?.let { IntakeChips(it) }
         job.issue?.let { ZBody(it) }
         ZMono("Photos", modifier = Modifier.padding(top = 4.dp))
-        if (issuePhotos.isEmpty()) ZCaption("This job has no photos yet — pros quote faster (and more accurately) when they can see the problem.")
+        if (issuePhotos.isEmpty()) ZCaption("This job has no photos yet. Pros quote faster (and more accurately) when they can see the problem.")
         PhotoGrid(issuePhotos, onDelete = { photo -> scope.launch { model.deletePhoto(photo) } })
         if (canAdd) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -364,7 +364,7 @@ private fun EvidenceCard(job: Job) {
     if (before.isEmpty() && after.isEmpty()) return
     ZCard {
         ZHeadline("Work evidence")
-        ZCaption("Before/after photos from your pro — part of this job's permanent record.")
+        ZCaption("Before/after photos from your pro, part of this job's permanent record.")
         if (before.isNotEmpty()) { ZMono("Before"); PhotoGrid(before) }
         if (after.isNotEmpty()) { ZMono("After"); PhotoGrid(after) }
     }
@@ -376,8 +376,8 @@ private fun InvoiceCard(job: Job, model: JobDetailModel, area: JobArea, onSheet:
     val invoice = job.invoice ?: return
     if (model.justClosed) {
         ZCard {
-            ZHeadline("${job.code ?: "Job"} is closed — thanks for confirming")
-            ZCaption("${Money.format(invoice.amountDueCents)} went to ${job.company?.name ?: "your pro"}. Your workmanship warranty starts now — if anything's off, report it from this page.")
+            ZHeadline("${job.code ?: "Job"} is closed. Thanks for confirming")
+            ZCaption("${Money.format(invoice.amountDueCents)} went to ${job.company?.name ?: "your pro"}. Your workmanship warranty starts now. If anything's off, report it from this page.")
         }
         return
     }
@@ -396,7 +396,7 @@ private fun InvoiceCard(job: Job, model: JobDetailModel, area: JobArea, onSheet:
         if (!invoice.isPaid && job.status != JobStatus.CANCELLED && openCase != null) {
             ZBanner(JobPresentation.paymentPausedCopy(openCase), tone = ZTone.WARNING)
         } else if (!invoice.isPaid && job.status != JobStatus.CANCELLED) {
-            ZActionBand("Pay & close — ${Money.format(invoice.amountDueCents)}", loading = model.busy) { onSheet(JobSheet.Pay) }
+            ZActionBand("Pay & close · ${Money.format(invoice.amountDueCents)}", loading = model.busy) { onSheet(JobSheet.Pay) }
             job.autoCloseAt?.let { ZCaption("Payment releases automatically on ${Dates.shortTime(it)} unless you report an issue first.") }
         }
     }
@@ -502,8 +502,8 @@ fun QuoteRow(index: Int, quote: Quote, showReviews: (() -> Unit)?, accept: () ->
             if (showReviews != null && quote.company?.rating != null) ZTextAction(JobPresentation.proLine(quote.company), onClick = showReviews) else ZCaption(JobPresentation.proLine(quote.company))
             com.zivett.app.features.shared.QuoteBreakdown(quote)
             if (quote.expired == true) ZCaption("This quote has expired, so it can't be accepted. Contact ZiVETT support and we'll get you a fresh price.", color = colors.danger)
-            else if (!top) ZButton("Accept — ${Money.format(quote.amountCents)}", style = ZButtonStyle.OUTLINE, compact = true, onClick = accept)
+            else if (!top) ZButton("Accept · ${Money.format(quote.amountCents)}", style = ZButtonStyle.OUTLINE, compact = true, onClick = accept)
         }
-        if (top && quote.expired != true) ZActionBand("Accept this quote — ${Money.format(quote.amountCents)}", flushBottom = true, radius = ZRadius.tile, onClick = accept)
+        if (top && quote.expired != true) ZActionBand("Accept this quote · ${Money.format(quote.amountCents)}", flushBottom = true, radius = ZRadius.tile, onClick = accept)
     }
 }

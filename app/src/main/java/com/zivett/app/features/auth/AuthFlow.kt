@@ -123,7 +123,7 @@ fun WelcomeScreen(nav: NavHostController) {
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
                         BrandWordmark(color = Color.White)
                         Text("Repairs, booked.", style = ZType.display.copy(fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp), color = Color.White)
-                        Text("Verified local pros for your home or properties — quoted, scheduled, and tracked in one place.", style = ZType.body, color = Color.White.copy(alpha = 0.72f))
+                        Text("Verified local pros for your home or properties, quoted, scheduled, and tracked in one place.", style = ZType.body, color = Color.White.copy(alpha = 0.72f))
                     }
                     Box(Modifier.padding(bottom = ZSpacing.xl)) { Tagline() }
                 }

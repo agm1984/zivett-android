@@ -89,7 +89,7 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
         try {
             val updated = client.send(area.updateProfile(UpdateProfileBody(firstName.trim(), lastName.trim(), email, phone.ifEmpty { null })))
             state = Loadable.Loaded(updated)
-            notice = if (updated.profile.emailVerified) "Profile saved." else "Profile saved — check your inbox to verify the new email."
+            notice = if (updated.profile.emailVerified) "Profile saved." else "Profile saved. Check your inbox to verify the new email."
             runCatching { session.refreshUser() }
         } catch (apiError: ApiError) {
             if (apiError is ApiError.Validation) fieldErrors = apiError.errors.firstMessages else error = apiError.userMessage
@@ -127,7 +127,7 @@ class ProfileModel(private val client: ApiClient, private val area: ProfileArea 
             client.send(AuthEndpoints.verifyPhone(phoneCode))
             state.value?.let { state = Loadable.Loaded(it.copy(profile = it.profile.copy(phoneVerified = true))) }
             phoneCodeSent = false; phoneCode = ""
-            notice = "Phone verified — SMS updates are now available."
+            notice = "Phone verified. SMS updates are now available."
             runCatching { session.refreshUser() }
         } catch (apiError: ApiError) {
             error = apiError.first("code") ?: apiError.userMessage
@@ -207,7 +207,7 @@ fun ProfileScreen(area: ProfileArea, onBack: (() -> Unit)?, actions: @Composable
                                 ZPhotoAvatar(profile.profile.photoUrl, profile.profile.name.take(1), 52.dp)
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     ZBodyStrong("Profile photo")
-                                    ZCaption(if (profile.profile.photoUrl == null) "Required to take jobs — bookers see who's coming." else "Bookers see this photo on jobs assigned to you.")
+                                    ZCaption(if (profile.profile.photoUrl == null) "Required to take jobs. Bookers see who's coming." else "Bookers see this photo on jobs assigned to you.")
                                 }
                                 ZLinkButton(if (profile.profile.photoUrl == null) "Add" else "Change", enabled = !model.photoBusy) { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                             }
