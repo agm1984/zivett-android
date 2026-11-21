@@ -242,7 +242,7 @@ private fun SubmittedContent(setup: CompanySetup) {
     }
 }
 
-/// The 4-row draft checklist shared by the dashboard and setup review.
+/// The 3-row draft checklist shared by the dashboard and setup review.
 @Composable
 fun SetupChecklist(setup: CompanySetup) {
     val colors = ZTheme.colors
@@ -260,7 +260,7 @@ fun SetupChecklist(setup: CompanySetup) {
         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
             row("Business profile", setup.steps.profile.complete, "Name, address and phone are in.", setup.steps.profile.missing)
             row("Services & rates", setup.steps.details.complete, "Trades, rates, radius and availability are in.", setup.steps.details.missing)
-            val docs = "${setup.steps.credentials.uploaded ?: 0} of ${setup.steps.credentials.total ?: 4} documents uploaded"
+            val docs = CredentialExpiry.credentialsDetail(setup.steps.credentials)
             row("Credentials", setup.steps.credentials.complete, docs, null, detail = docs)
         }
     }

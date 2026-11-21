@@ -95,21 +95,27 @@ class CompanySetupModel(private val client: ApiClient) {
         /// attention" line. Empty = complete, submit unlocks.
         fun missingSummary(steps: CompanySetup.Steps): List<String> {
             val missing = mutableListOf<String>()
-            if (steps.plan?.complete == false) missing += "choose a plan"
             missing += steps.profile.missing ?: (if (steps.profile.complete) emptyList() else listOf("business profile"))
             missing += steps.details.missing ?: (if (steps.details.complete) emptyList() else listOf("services & rates"))
             if (!steps.credentials.complete) {
                 val uploaded = steps.credentials.uploaded ?: 0
                 val total = steps.credentials.total ?: 4
-                missing += "${total - uploaded} of $total required documents"
+                val credentials = mutableListOf<String>()
+                if (uploaded < total) credentials += "${total - uploaded} of $total required documents"
+                // The server's list: an uploaded required document still
+                // waiting on its expiry date ("Insurance expiry date").
+                credentials += CredentialExpiry.neededItems(steps.credentials.missingExpiry.orEmpty())
+                missing += credentials.ifEmpty { listOf("credentials") }
             }
+            // The plan is the wizard's last step (2026-11-18).
+            if (steps.plan?.complete == false) missing += "choose a plan"
             return missing
         }
     }
 }
 
-/// The company setup flow: plan → profile → services & rates →
-/// credentials → review & submit. Each step is a screen it links out to;
+/// The company setup flow: profile → services & rates → credentials →
+/// plan → review & submit (the web wizard's order since 2026-11-18). Each step is a screen it links out to;
 /// this page is the checklist + submit, like the web's review step. The
 /// plan is sold through Google Play (`features/plans`).
 @Composable
@@ -137,16 +143,18 @@ fun CompanySetupScreen(onBack: (() -> Unit)?) {
                             ZPageTitle("Set up your business", "This is your application to become a Verified Pro. Finish the steps and submit, and our team takes it from there.")
                             SetupChecklist(response.setup)
                             ZCard(padding = 0.dp) {
-                                val plan = response.setup.steps.plan
-                                ZNavRow("Plan", plan?.let { if (it.complete) "${it.planName ?: "Chosen"} · view or change" else "Choose your membership" } ?: "Your membership", onClick = { nav.navigate(PlanRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.StarOutline) }
-                                ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Business profile", "Name, address, phone: what customers see", onClick = { nav.navigate(OrgProfileRoute(Areas.COMPANY, model.profileMissingRoute())); model.profileVisited = true }) { ZIconTile(Icons.Outlined.Business) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("Services & rates", "Trades, hourly rates, radius, availability", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.Build) }
                                 ZDivider(Modifier.padding(start = 60.dp))
-                                ZNavRow("Credentials", "Photo ID, insurance, registration, licence/certification", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.UploadFile) }
+                                val missingExpiry = response.setup.steps.credentials.missingExpiry.orEmpty()
+                                ZNavRow("Credentials", CredentialExpiry.stillNeededLine(missingExpiry) ?: "Photo ID, insurance, registration, licence/certification", onClick = { nav.navigate(PassportRoute) }) { ZIconTile(Icons.Outlined.UploadFile) }
                                 ZDivider(Modifier.padding(start = 60.dp))
                                 ZNavRow("What each document needs", "What a good upload shows, per document", onClick = { nav.navigate(CredentialGuideRoute) }) { ZIconTile(Icons.Outlined.Checklist) }
+                                ZDivider(Modifier.padding(start = 60.dp))
+                                // Last, like the web wizard (2026-11-18).
+                                val plan = response.setup.steps.plan
+                                ZNavRow("Plan", plan?.let { if (it.complete) "${it.planName ?: "Chosen"} · view or change" else "Choose your membership" } ?: "Your membership", onClick = { nav.navigate(PlanRoute(Areas.COMPANY)) }) { ZIconTile(Icons.Outlined.StarOutline) }
                             }
                             // Submit is gated on completeness, like the web review step.
                             val missing = CompanySetupModel.missingSummary(response.setup.steps)
