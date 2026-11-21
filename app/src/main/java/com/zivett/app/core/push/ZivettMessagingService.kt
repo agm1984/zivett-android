@@ -34,6 +34,7 @@ class ZivettMessagingService : FirebaseMessagingService() {
             if (target != null) {
                 putExtra(PushRouting.EXTRA_ROUTE_NAME, data["route_name"])
                 PushRouting.paramKey(target)?.let { putExtra(PushRouting.EXTRA_ROUTE_ID, it) }
+                if ((target as? PushTarget.Job)?.review == true) putExtra(PushRouting.EXTRA_REVIEW, true)
             }
         }
         val pending = PendingIntent.getActivity(this, message.messageId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,19 +91,31 @@ sealed interface JobSheet {
     object Claim : JobSheet
     object ReviewSheetKey : JobSheet
     object Pay : JobSheet
+    object QuickReviewKey : JobSheet
     data class Reviews(val id: Int, val name: String) : JobSheet
 }
 
+/// `promptReview` = opened from the review reminder (push or bell row
+/// carrying `review`): once the job loads, offer `QuickReviewSheet` if
+/// it's closed and unrated — at most once per visit.
 @Composable
-fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
+fun JobDetailScreen(jobId: Int, area: JobArea, promptReview: Boolean = false, onBack: () -> Unit) {
     val environment = LocalAppEnvironment.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val model = remember(jobId) { JobDetailModel(jobId, environment.client, area, context) }
     var sheet by remember { mutableStateOf<JobSheet?>(null) }
     var reportAfterPay by remember { mutableStateOf(false) }
+    var reviewPrompted by rememberSaveable(jobId) { mutableStateOf(!promptReview) }
 
     LaunchedEffect(model) { model.load() }
+    val loadedJob = model.job
+    LaunchedEffect(loadedJob) {
+        val job = loadedJob ?: return@LaunchedEffect
+        if (reviewPrompted) return@LaunchedEffect
+        reviewPrompted = true
+        if (sheet == null && QuickReview.qualifies(job)) sheet = JobSheet.QuickReviewKey
+    }
     LiveJobEffect(jobId) { model.refresh() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { uris ->
@@ -137,6 +150,7 @@ fun JobDetailScreen(jobId: Int, area: JobArea, onBack: () -> Unit) {
         JobSheet.Report -> ReportProblemSheet(model, onDismiss = ::dismissSheet)
         JobSheet.Claim -> WarrantyClaimSheet(model, onDismiss = ::dismissSheet)
         JobSheet.ReviewSheetKey -> ReviewSheet(model, onDismiss = ::dismissSheet)
+        JobSheet.QuickReviewKey -> model.job?.let { job -> QuickReviewSheet(job, model, onDismiss = ::dismissSheet) }
         JobSheet.Pay -> model.job?.let { job -> job.invoice?.let { invoice -> PayAndCloseSheet(job, invoice, model, onReport = { reportAfterPay = true }, onDismiss = ::dismissSheet) } }
         is JobSheet.Reviews -> CompanyReviewsSheet(current.id, current.name, onDismiss = ::dismissSheet)
         null -> Unit

@@ -513,12 +513,13 @@ fun ZSelectableRow(selected: Boolean, onClick: () -> Unit, enabled: Boolean = tr
     }
 }
 
-/// Inline star picker/display.
+/// Inline star picker/display. `starSize` overrides the default (14dp
+/// display, 30dp picker) — the quick rating sheet's big stars.
 @Composable
-fun ZStars(rating: Int, onSelect: ((Int) -> Unit)? = null) {
+fun ZStars(rating: Int, starSize: Dp? = null, onSelect: ((Int) -> Unit)? = null) {
     val colors = ZTheme.colors
-    val size = if (onSelect == null) 14.dp else 30.dp
-    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.semantics { contentDescription = "$rating of 5 stars" }) {
+    val size = starSize ?: if (onSelect == null) 14.dp else 30.dp
+    Row(horizontalArrangement = Arrangement.spacedBy(if (starSize != null) 6.dp else 2.dp), modifier = Modifier.semantics { contentDescription = "$rating of 5 stars" }) {
         for (star in 1..5) {
             val filled = star <= rating
             Icon(

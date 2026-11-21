@@ -154,7 +154,7 @@ fun CompanyShell(approved: Boolean) {
 
     RoleShell(
         tabs, NotificationArea.COMPANY,
-        onPushJob = { nav, id -> nav.navigate(CompanyJobRoute(id)) },
+        onPushJob = { nav, id, _ -> nav.navigate(CompanyJobRoute(id)) },
         onStripeReturn = onStripeReturn,
         onPushTarget = { nav, target -> if (approved) openCompanyTarget(nav, target, myDayIsTab = fieldTech) },
         navBadges = navBadges,
