@@ -87,7 +87,7 @@ import com.zivett.app.core.network.ApiClient
 import com.zivett.app.core.network.ApiError
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.reloaded
-import com.zivett.app.design.ZAvatar
+import com.zivett.app.design.ZPhotoAvatar
 import com.zivett.app.design.ZAvatarShape
 import com.zivett.app.design.ZBadge
 import com.zivett.app.design.ZBanner
@@ -213,7 +213,7 @@ fun PassportScreen(onBack: (() -> Unit)?) {
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                         ZHeroPanel {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                ZAvatar(CompanySummary(null, response.passport.name).initials, ZAvatarShape.COMPANY, 48.dp, onDark = true)
+                                ZPhotoAvatar(response.passport.logoUrl, CompanySummary(null, response.passport.name).initials, 48.dp, ZAvatarShape.COMPANY, onDark = true)
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text(response.passport.name, style = ZType.headline, color = Color.White)

@@ -155,7 +155,16 @@ data class AvailabilityResponse(
 @Serializable
 data class PassportResponse(val passport: Passport, val editable: CompanyDetails? = null) {
     @Serializable
-    data class Passport(val name: String, val number: String? = null, val approved: Boolean = false, val documents: Documents, val credentials: List<Credential> = emptyList()) {
+    data class Passport(
+        val name: String,
+        val number: String? = null,
+        val approved: Boolean = false,
+        val documents: Documents,
+        val credentials: List<Credential> = emptyList(),
+        /// The company's logo; null until one is uploaded (and from servers that
+        /// predate it), when the header shows initials instead.
+        val logoUrl: String? = null,
+    ) {
         @Serializable data class Documents(val uploaded: Int = 0, val total: Int = 4)
         @Serializable
         data class Credential(
