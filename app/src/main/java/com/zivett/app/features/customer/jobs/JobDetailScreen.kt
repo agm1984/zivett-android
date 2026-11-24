@@ -257,9 +257,10 @@ private fun PriceCard(job: Job) {
         val label = JobPresentation.priceLabel(job)
         when {
             accepted != null -> {
-                ZMonoLarge(Money.format(accepted.amountCents))
-                ZCaption("Quoted price, agreed with your pro", tone = ZTextTone.SOFT)
-                com.zivett.app.features.shared.QuoteBreakdown(accepted)
+                val changeLines = com.zivett.app.features.shared.ChangeOrderLogic.approvedLines(job)
+                ZMonoLarge(Money.format(com.zivett.app.features.shared.ChangeOrderLogic.priceNow(job) ?: accepted.amountCents))
+                ZCaption(if (changeLines.isEmpty()) "Quoted price, agreed with your pro" else "Quoted price plus the changes you approved", tone = ZTextTone.SOFT)
+                com.zivett.app.features.shared.QuoteBreakdown(accepted, changeLines = changeLines)
             }
             label != null && job.quotesReleasedAt != null -> {
                 ZMonoLarge(label)
@@ -452,21 +453,20 @@ private fun ChangeOrders(job: Job, model: JobDetailModel) {
     val orders = job.changeOrders?.takeIf { it.isNotEmpty() } ?: return
     ZCard {
         ZHeadline("Change orders")
-        for (order in orders) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    ZBodyStrong(order.label ?: "Scope change")
-                    ZCaption(Money.format(order.amountCents), tone = ZTextTone.SOFT)
-                }
+        // Changes waiting on the booker first, then newest first.
+        val sorted = orders.sortedWith(compareByDescending<com.zivett.app.core.models.ChangeOrder> { it.isProposed }.thenByDescending { it.id })
+        sorted.forEachIndexed { index, order ->
+            if (index > 0) com.zivett.app.design.ZDivider()
+            com.zivett.app.features.shared.ChangeOrderSummary(order, com.zivett.app.features.shared.ChangeOrderAudience.BOOKER) {
                 if (order.isProposed) {
-                    ZButton("Decline", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { scope.launch { model.decideChangeOrder(order, approve = false) } }
-                    ZButton("Approve", style = ZButtonStyle.SUCCESS, compact = true, fullWidth = false) { scope.launch { model.decideChangeOrder(order, approve = true) } }
-                } else {
-                    ZBadge(order.status, if (order.status == "approved") ZTone.SUCCESS else ZTone.DANGER)
+                    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+                        ZButton("Decline", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.decideChangeOrder(order, approve = false) } }
+                        ZButton("Approve", style = ZButtonStyle.SUCCESS, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.decideChangeOrder(order, approve = true) } }
+                    }
                 }
             }
         }
-        ZCaption("Approved changes bill with the final invoice; declined ones never do.")
+        ZCaption("Approved changes bill with the final invoice. Declined ones never do.")
     }
 }
 

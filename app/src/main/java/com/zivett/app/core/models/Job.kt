@@ -168,15 +168,28 @@ data class JobPhoto(
 
 /// `ChangeOrderResource`.
 @Serializable
+/// Itemized since 2026-11-11: `line_items` are the quote's row shape
+/// (amounts server-computed, credits negative); null on an older one-line
+/// change, which reads as label + amount. Every newer field defaults so an
+/// older server still decodes.
 data class ChangeOrder(
     val id: Int,
     val label: String? = null,
+    /// Why, in the pro's words; the booker reads it before approving.
+    val note: String? = null,
+    val lineItems: List<QuoteLine>? = null,
     val amountCents: Int,
+    /// Material lines bill at cost, outside commission.
+    val materials: Boolean = false,
+    /// Applied without asking the booker (a credit, or small enough).
+    val autoApproved: Boolean = false,
     val status: String,
     val decidedAt: Instant? = null,
     val createdAt: Instant? = null,
 ) {
     val isProposed: Boolean get() = status == "proposed"
+    val isApproved: Boolean get() = status == "approved"
+    val isCredit: Boolean get() = amountCents < 0
 }
 
 /// `ReviewResource`.
@@ -256,6 +269,9 @@ data class Job(
     /// notified. Absent = zero supply, which stays generic in copy.
     val matchedPros: Int? = null,
     val changeOrders: List<ChangeOrder>? = null,
+    /// Assigned company only: how much more a change can add and still
+    /// apply without the booker's say. Absent = nothing auto-applies.
+    val changeOrderAutoLeftCents: Int? = null,
     val createdAt: Instant? = null,
     /// Opportunities feed only: company pin → job pin.
     val distanceKm: Double? = null,
