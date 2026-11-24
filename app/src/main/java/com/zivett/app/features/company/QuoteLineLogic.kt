@@ -14,6 +14,10 @@ enum class QuoteLineKind(val value: String, val label: String) {
     FEE("fee", "Fee"),
     DISCOUNT("discount", "Discount");
 
+    /// Change orders name a discount line "Credit": work taken off the job
+    /// (the web's `CHANGE_ORDER_LINE_TYPES`).
+    fun label(changeOrder: Boolean): String = if (changeOrder && this == DISCOUNT) "Credit" else label
+
     companion object { fun of(value: String) = entries.firstOrNull { it.value == value } }
 }
 

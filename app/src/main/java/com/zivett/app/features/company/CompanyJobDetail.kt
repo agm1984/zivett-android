@@ -55,6 +55,7 @@ import com.zivett.app.core.Money
 import com.zivett.app.core.media.PhotoImport
 import com.zivett.app.core.models.AssignmentResult
 import com.zivett.app.core.models.AssignmentRoster
+import com.zivett.app.core.models.ChangeOrderBody
 import com.zivett.app.core.models.CompanyEndpoints
 import com.zivett.app.core.models.Dispute
 import com.zivett.app.core.models.Job
@@ -68,6 +69,9 @@ import com.zivett.app.core.network.ApiRequest
 import com.zivett.app.core.network.userMessage
 import com.zivett.app.core.reloaded
 import com.zivett.app.design.ZBadge
+import com.zivett.app.features.shared.ChangeOrderAudience
+import com.zivett.app.features.shared.ChangeOrderLogic
+import com.zivett.app.features.shared.ChangeOrderSummary
 import com.zivett.app.design.ZBanner
 import com.zivett.app.design.ZBody
 import com.zivett.app.design.ZBodyStrong
@@ -196,15 +200,25 @@ class CompanyJobDetailModel(val jobId: Int, private val client: ApiClient) {
         job?.let { state = Loadable.Loaded(it.copy(photos = it.photos?.filter { p -> p.id != photo.id })) }
     }
 
-    suspend fun proposeChangeOrder(label: String, amountCents: Int, materials: Boolean = false): Boolean {
+    /// Sends an itemized change. Null on success (the change is grafted in and
+    /// toasted by what the server decided), else the words to show in the form.
+    suspend fun proposeChangeOrder(body: ChangeOrderBody): String? {
+        if (busy) return null
         busy = true
         try {
-            val order = client.send(CompanyEndpoints.changeOrder(jobId, label, amountCents, materials)).changeOrder
+            val order = client.send(CompanyEndpoints.changeOrder(jobId, body)).changeOrder
             job?.let { state = Loadable.Loaded(it.copy(changeOrders = (it.changeOrders ?: emptyList()) + order)) }
-            toast = "Change order sent to the booker for approval"
-            return true
-        } catch (e: ApiError) { toast = e.first("label") ?: e.first("amount_cents") ?: e.userMessage } catch (_: Exception) { toast = "Could not propose that change. Please try again." } finally { busy = false }
-        return false
+            toast = ChangeOrderLogic.sentMessage(order)
+            // The allowance left (and anything else the server moved) comes back on a quiet refetch.
+            runCatching { load() }
+            return null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: ApiError) {
+            return (e as? ApiError.Validation)?.let { ChangeOrderLogic.errorMessage(it.errors.errors) } ?: e.userMessage
+        } catch (_: Exception) {
+            return "Could not propose that change. Please try again."
+        } finally { busy = false }
     }
 
     /// Grafts the new case into the job so its card shows straight away
@@ -532,8 +546,9 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                         } else if (accepted != null) {
                             ZCard {
                                 ZMono("Agreed price")
-                                ZMonoLarge(Money.format(accepted.amountCents))
-                                ZCaption("Your accepted quote. Scope or price changes go through a change order.")
+                                // The quote plus approved changes, as the web's card.
+                                ZMonoLarge(Money.format(accepted.amountCents + ChangeOrderLogic.approvedCents(job)))
+                                ZCaption(ChangeOrderLogic.agreedDetail(accepted.amountCents, ChangeOrderLogic.approvedCents(job)))
                                 // Legacy escape hatch: pre-auto-invoice jobs can sit Completed-but-uninvoiced.
                                 if (job.status == JobStatus.COMPLETED) ZButton("Send invoice", compact = true, loading = model.busy, fullWidth = false) { scope.launch { model.sendInvoice() } }
                             }
@@ -545,16 +560,13 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                         if (orders.isNotEmpty() || changeOrdersOpen) {
                             ZCard {
                                 ZHeadline("Change orders")
-                                for (order in orders) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
-                                        ZBody(order.label ?: "Scope change", modifier = Modifier.weight(1f))
-                                        ZBadge(order.status, if (order.status == "approved") ZTone.SUCCESS else if (order.status == "declined") ZTone.DANGER else ZTone.WARNING)
-                                        ZMonoBody(Money.format(order.amountCents), weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                    }
+                                orders.sortedByDescending { it.id }.forEachIndexed { index, order ->
+                                    if (index > 0) ZDivider()
+                                    ChangeOrderSummary(order, ChangeOrderAudience.COMPANY)
                                 }
                                 if (changeOrdersOpen) {
                                     ZButton("Propose a change", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { sheet = CompanyJobSheet.ChangeOrder }
-                                    ZCaption("The booker approves in-app before it bills. Use a negative amount to descope.")
+                                    ZCaption("Add labour, materials or a fee, or a credit for work taken off. Small changes and credits apply straight away; the rest wait for the booker.")
                                 }
                             }
                         }
@@ -605,22 +617,89 @@ private fun EvidenceSection(title: String, kind: String, job: Job, model: Compan
     }
 }
 
+/// The pro's change form (web `ChangeOrderModal.vue`): what's changing, why,
+/// line items built like the quote's (a discount reads "Credit"), and a summary
+/// that says what it does to the price and whether it applies now or waits.
 @Composable
 private fun ChangeOrderSheet(model: CompanyJobDetailModel, onDismiss: () -> Unit) {
+    val job = model.job ?: return
     val scope = rememberCoroutineScope()
+    val colors = ZTheme.colors
+    val rateCents = job.acceptedQuote?.hourlyRateCents
     var label by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var descope by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf("") }
+    var lines by remember { mutableStateOf(listOf(ChangeOrderLogic.starterLine(rateCents))) }
     var materials by remember { mutableStateOf(false) }
-    val cents = Money.parseCents(amount) ?: 0
-    val amountCents = if (descope) -cents else cents
-    ZSheet(onDismiss = onDismiss, title = "Propose a change") {
-        ZTextField("Change description", label, { label = it }, placeholder = "Replace shut-off valve", capitalization = KeyboardCapitalization.Sentences)
-        ZTextField("Amount ($)", amount, { amount = it }, placeholder = "0.00", keyboardType = KeyboardType.Decimal)
-        ZCheckbox(descope, { descope = it }, text = "This reduces the price (descope)")
-        ZCheckbox(materials, { materials = it }, text = "Pass-through materials at cost (no commission taken)")
-        ZCaption("The booker approves in-app before it bills.")
-        ZButton("Propose", loading = model.busy, enabled = label.isNotEmpty() && amountCents != 0) { scope.launch { if (model.proposeChangeOrder(label, amountCents, materials)) onDismiss() } }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val totalCents = QuoteLineLogic.total(lines)
+    val hasMaterials = ChangeOrderLogic.hasMaterials(lines)
+    val atCost = materials && hasMaterials
+    val priceNow = ChangeOrderLogic.priceNow(job)
+    val appliesNow = ChangeOrderLogic.appliesNow(totalCents, atCost, job.changeOrderAutoLeftCents)
+    val problem = ChangeOrderLogic.problem(label, lines, priceNow)
+
+    ZSheet(onDismiss = onDismiss, title = "Propose a change", dismissable = !model.busy) {
+        ZTextField("What's changing", label, { if (it.length <= 120) label = it; error = null }, placeholder = "Replace the corroded shut-off valve", capitalization = KeyboardCapitalization.Sentences)
+        ZTextArea("Why (optional)", note, { if (it.length <= 1000) note = it; error = null }, placeholder = "Once the wall was open, the valve behind it was seized and leaking.", minLines = 3)
+        ZCaption("The booker reads this before they approve. Say what you found.", tone = ZTextTone.FAINT)
+
+        ZHeadline("Line items")
+        ZCaption("Add labour hours, materials or a fee, the same way you built your quote. Use a Credit line for work you're taking off the job.")
+        lines.forEach { line ->
+            androidx.compose.runtime.key(line.id) {
+                QuoteLineEditor(
+                    line,
+                    change = { updated -> lines = lines.map { if (it.id == line.id) updated else it }; error = null },
+                    remove = { lines = lines.filterNot { it.id == line.id }; error = null },
+                    changeOrder = true,
+                    pickKind = { current, kind -> ChangeOrderLogic.withKind(current, kind, rateCents) },
+                )
+            }
+        }
+        if (lines.size < 40) ZButton("+ Add line item", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { lines = lines + QuoteLineDraft() }
+
+        if (hasMaterials) {
+            ZCheckbox(materials, { materials = it }) {
+                Column {
+                    ZCaption("Bill the materials at cost, with no commission", tone = ZTextTone.INK)
+                    ZCaption("The booker approves every change with materials at cost, whatever its size.")
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(ZRadius.card)).background(colors.surfaceSunken).padding(ZSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row {
+                ZBodyStrong(if (totalCents < 0) "Takes off" else "Adds", modifier = Modifier.weight(1f))
+                ZBodyStrong(Money.format(kotlin.math.abs(totalCents)), color = if (totalCents < 0) colors.success else null)
+            }
+            if (priceNow != null) {
+                Row {
+                    ZCaption("Agreed price", tone = ZTextTone.SOFT, modifier = Modifier.weight(1f))
+                    ZCaption("${Money.format(priceNow)} → ${Money.format(priceNow + totalCents)}", tone = ZTextTone.SOFT)
+                }
+            }
+            if (totalCents != 0) ZCaption(ChangeOrderLogic.outcomeLine(totalCents, appliesNow))
+        }
+
+        error?.let { ZBanner(it, tone = ZTone.DANGER) }
+        ZButton(problem ?: ChangeOrderLogic.buttonLabel(appliesNow), loading = model.busy, enabled = problem == null) {
+            scope.launch {
+                val failure = model.proposeChangeOrder(
+                    ChangeOrderBody(
+                        label = label.trim(),
+                        note = note.trim().ifEmpty { null },
+                        lineItems = QuoteLineLogic.body(lines),
+                        materials = atCost,
+                    ),
+                )
+                if (failure == null) onDismiss() else error = failure
+            }
+        }
+        ZTextAction("Cancel", enabled = !model.busy, onClick = onDismiss)
     }
 }
 

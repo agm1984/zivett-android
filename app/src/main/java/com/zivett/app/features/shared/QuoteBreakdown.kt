@@ -25,8 +25,9 @@ import com.zivett.app.features.customer.jobs.hoursLabel
 
 /// How a sent quote reads, on every screen.
 object QuotePresentation {
-    fun detail(line: QuoteLine): String? {
-        val type = QuoteLineKind.of(line.type)?.label ?: line.type
+    /// `changeOrder` names a discount line "Credit".
+    fun detail(line: QuoteLine, changeOrder: Boolean = false): String? {
+        val type = QuoteLineKind.of(line.type)?.label(changeOrder) ?: line.type
         val parts = listOfNotNull(
             type.takeUnless { line.description.equals(it, ignoreCase = true) },
             "${QuoteLineLogic.quantityText(line.quantity)} × ${Money.format(line.unitCents)}".takeUnless { line.quantity == 1.0 },
@@ -61,29 +62,34 @@ object QuotePresentation {
 /// One quote in full, the web's `QuoteBreakdown.vue`: every line, the total and
 /// the terms. Commission never reaches a booker, so it isn't here.
 @Composable
-fun QuoteBreakdown(quote: Quote, modifier: Modifier = Modifier) {
+fun QuoteBreakdown(
+    quote: Quote, modifier: Modifier = Modifier,
+    /// Approved change lines on an accepted job (`ChangeOrderLogic.approvedLines`):
+    /// they join the bill and the total reads "Total with changes".
+    changeLines: List<ChangeLine> = emptyList(),
+) {
     val colors = ZTheme.colors
     val lines = quote.lineItems.orEmpty()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (lines.isEmpty()) {
+        if (lines.isEmpty() && changeLines.isEmpty()) {
             QuotePresentation.legacy(quote)?.let { ZCaption(it) }
         } else {
+            if (lines.isEmpty()) {
+                // An older quote's one line, so the changes below add up from it.
+                BreakdownRow("Quoted work", QuotePresentation.legacy(quote), quote.amountCents)
+                ZDivider()
+            }
             for (line in lines) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(line.description, style = ZType.body, color = colors.ink)
-                        QuotePresentation.detail(line)?.let { ZCaption(it) }
-                    }
-                    Text(
-                        (if (line.amountCents < 0) "−" else "") + Money.format(kotlin.math.abs(line.amountCents)),
-                        style = ZType.body, color = if (line.amountCents < 0) colors.success else colors.ink,
-                    )
-                }
+                BreakdownRow(line.description, QuotePresentation.detail(line), line.amountCents)
+                ZDivider()
+            }
+            for (line in changeLines) {
+                BreakdownRow(line.description, line.detail, line.amountCents)
                 ZDivider()
             }
             Row {
-                ZBodyStrong("Quote total", modifier = Modifier.weight(1f))
-                ZBodyStrong(Money.format(quote.amountCents))
+                ZBodyStrong(if (changeLines.isEmpty()) "Quote total" else "Total with changes", modifier = Modifier.weight(1f))
+                ZBodyStrong(Money.format(quote.amountCents + changeLines.sumOf { it.amountCents }))
             }
         }
         QuotePricingKind.of(quote.pricingType)?.let { Term("Price type", it.label) }
@@ -92,6 +98,21 @@ fun QuoteBreakdown(quote: Quote, modifier: Modifier = Modifier) {
         quote.validUntil?.let { Term("Valid until", it + if (quote.expired == true) " (expired)" else "") }
         quote.exclusions?.takeIf { it.isNotEmpty() }?.let { Term("Not included", it) }
         quote.message?.takeIf { it.isNotEmpty() }?.let { Term("Note", it) }
+    }
+}
+
+@Composable
+private fun BreakdownRow(description: String, detail: String?, amountCents: Int) {
+    val colors = ZTheme.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(description, style = ZType.body, color = colors.ink)
+            detail?.let { ZCaption(it) }
+        }
+        Text(
+            (if (amountCents < 0) "−" else "") + Money.format(kotlin.math.abs(amountCents)),
+            style = ZType.body, color = if (amountCents < 0) colors.success else colors.ink,
+        )
     }
 }
 
