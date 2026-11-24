@@ -72,6 +72,12 @@ class ChangeOrderLogicTest {
         assertNull(ChangeOrderLogic.priceNow(Fixtures.job()))
     }
 
+    @Test fun theAgreedPriceCardSaysWhatTheChangesAdd() {
+        assertEquals("\$500.00 quote + $30.00 in approved changes.", ChangeOrderLogic.agreedDetail(50000, 3000))
+        assertEquals("\$500.00 quote − $25.00 in approved changes.", ChangeOrderLogic.agreedDetail(50000, -2500))
+        assertEquals("Your accepted quote. Scope or price changes go through a change order.", ChangeOrderLogic.agreedDetail(50000, 0))
+    }
+
     @Test fun appliesNowFollowsTheServersRule() {
         assertTrue("a credit always applies", ChangeOrderLogic.appliesNow(-500, materialsAtCost = true, autoLeftCents = 0))
         assertFalse("materials at cost always wait", ChangeOrderLogic.appliesNow(500, materialsAtCost = true, autoLeftCents = 2500))

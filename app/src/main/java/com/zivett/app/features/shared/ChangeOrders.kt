@@ -62,6 +62,12 @@ object ChangeOrderLogic {
     /// The agreed price right now (accepted quote + approved changes), or null without one.
     fun priceNow(job: Job): Int? = job.acceptedQuote?.let { it.amountCents + approvedCents(job) }
 
+    /// The line under the pro's Agreed price figure, worded as the web's
+    /// company job page: "$500.00 quote + $30.00 in approved changes."
+    fun agreedDetail(quoteCents: Int, changesCents: Int): String =
+        if (changesCents == 0) "Your accepted quote. Scope or price changes go through a change order."
+        else "${Money.format(quoteCents)} quote ${if (changesCents > 0) "+" else "−"} ${Money.format(kotlin.math.abs(changesCents))} in approved changes."
+
     /// Mirrors `ChangeOrders::propose`: credits apply at once, materials at cost
     /// always wait, and small additions apply while the job's allowance lasts.
     fun appliesNow(totalCents: Int, materialsAtCost: Boolean, autoLeftCents: Int?): Boolean {

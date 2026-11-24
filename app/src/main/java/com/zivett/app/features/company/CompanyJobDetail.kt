@@ -546,8 +546,9 @@ fun CompanyJobDetailScreen(jobId: Int, openStart: Boolean = false, advanceOnOpen
                         } else if (accepted != null) {
                             ZCard {
                                 ZMono("Agreed price")
-                                ZMonoLarge(Money.format(accepted.amountCents))
-                                ZCaption("Your accepted quote. Scope or price changes go through a change order.")
+                                // The quote plus approved changes, as the web's card.
+                                ZMonoLarge(Money.format(accepted.amountCents + ChangeOrderLogic.approvedCents(job)))
+                                ZCaption(ChangeOrderLogic.agreedDetail(accepted.amountCents, ChangeOrderLogic.approvedCents(job)))
                                 // Legacy escape hatch: pre-auto-invoice jobs can sit Completed-but-uninvoiced.
                                 if (job.status == JobStatus.COMPLETED) ZButton("Send invoice", compact = true, loading = model.busy, fullWidth = false) { scope.launch { model.sendInvoice() } }
                             }
