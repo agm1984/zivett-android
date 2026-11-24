@@ -564,8 +564,15 @@ private fun QuotePage(onDismiss: () -> Unit, title: String, content: @Composable
     }
 }
 
+/// One editable line, shared by the quote composer and the change order form.
+/// `changeOrder` names a discount "Credit"; `pickKind` lets a caller fill
+/// more than the kind when it changes (a change order's labour rate).
 @Composable
-private fun QuoteLineEditor(line: QuoteLineDraft, change: (QuoteLineDraft) -> Unit, remove: () -> Unit) {
+internal fun QuoteLineEditor(
+    line: QuoteLineDraft, change: (QuoteLineDraft) -> Unit, remove: () -> Unit,
+    changeOrder: Boolean = false,
+    pickKind: (QuoteLineDraft, QuoteLineKind) -> QuoteLineDraft = { current, kind -> current.copy(kind = kind) },
+) {
     val colors = ZTheme.colors
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card)
     var menuOpen by remember { mutableStateOf(false) }
@@ -574,10 +581,10 @@ private fun QuoteLineEditor(line: QuoteLineDraft, change: (QuoteLineDraft) -> Un
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box {
-            ZTextAction("${line.kind.label} ▾") { menuOpen = true }
+            ZTextAction("${line.kind.label(changeOrder)} ▾") { menuOpen = true }
             androidx.compose.material3.DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 QuoteLineKind.entries.forEach { kind ->
-                    androidx.compose.material3.DropdownMenuItem(text = { Text(kind.label) }, onClick = { change(line.copy(kind = kind)); menuOpen = false })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(kind.label(changeOrder)) }, onClick = { change(pickKind(line, kind)); menuOpen = false })
                 }
             }
         }

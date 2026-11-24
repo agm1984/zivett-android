@@ -265,6 +265,17 @@ data class QuoteBody(
 @Serializable
 data class QuoteLineBody(val type: String, val description: String, val quantity: Double, val unitCents: Int)
 
+/// `POST /api/company/jobs/{job}/change-orders`. `materials` = bill the
+/// Material lines at cost, outside commission (only sent true when the
+/// change has a positive material line). A null note is omitted.
+@Serializable
+data class ChangeOrderBody(
+    val label: String,
+    val note: String? = null,
+    val lineItems: List<QuoteLineBody>,
+    val materials: Boolean,
+)
+
 @Serializable data class ProfilePhotoResponse(val photoUrl: String? = null)
 
 /// `GET/POST /api/company/jobs/{job}/assignment` — the dispatcher's
@@ -385,9 +396,10 @@ object CompanyEndpoints {
     fun withdraw(jobId: Int) = ApiRequest.post<WithdrawnResponse>("api/company/jobs/$jobId/withdraw")
     fun reportLocation(jobId: Int, lat: Double, lng: Double) = ApiRequest.empty(Method.POST, "api/company/jobs/$jobId/location", mapOf("lat" to lat, "lng" to lng))
     fun invoiceJob(jobId: Int) = ApiRequest.post<InvoiceResponse>("api/company/jobs/$jobId/invoice")
-    fun changeOrder(jobId: Int, label: String, amountCents: Int, materials: Boolean = false) =
-        // `materials` = pass-through at cost: excluded from the commission base (Commission::stamp).
-        ApiRequest.jsonElement<ChangeOrderResponse>(Method.POST, "api/company/jobs/$jobId/change-orders", buildJsonObject { put("label", label); put("amount_cents", amountCents); put("materials", materials) })
+    /// Itemized change order: the server computes every line's amount and
+    /// the total, and decides whether it applies now or waits for the booker.
+    fun changeOrder(jobId: Int, body: ChangeOrderBody) =
+        ApiRequest.post<ChangeOrderResponse, ChangeOrderBody>("api/company/jobs/$jobId/change-orders", body)
     fun report(jobId: Int, kind: String, body: String) = ApiRequest.post<DisputeResponse, Map<String, String>>("api/company/jobs/$jobId/report", mapOf("kind" to kind, "body" to body))
     fun conversation(jobId: Int) = ApiRequest.get<ConversationResponse>("api/company/jobs/$jobId/conversation")
     fun sendMessage(jobId: Int, body: String) = ApiRequest.post<MessageResponse, Map<String, String>>("api/company/jobs/$jobId/conversation/messages", mapOf("body" to body))
