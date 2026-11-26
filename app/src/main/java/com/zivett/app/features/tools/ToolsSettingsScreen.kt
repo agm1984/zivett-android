@@ -160,7 +160,13 @@ private fun PaymentCard(settings: ToolsSettings, model: ToolsSettingsModel, isAd
     ZCard {
         ZHeadline("How customers pay you")
         ZCaption("Printed on your invoices.", tone = ZTextTone.SOFT)
-        if (isAdmin) {
+        val hasMethods = settings.paymentMethods.let { it != null && it !is kotlinx.serialization.json.JsonNull && !(it is kotlinx.serialization.json.JsonArray && it.isEmpty()) && !(it is kotlinx.serialization.json.JsonObject && it.isEmpty()) }
+        if (isAdmin && hasMethods) {
+            // Set up as payment methods on the web: saving plain text here
+            // would replace them, so the app only shows what prints.
+            ZBody(settings.paymentInstructions ?: "Not set")
+            ZCaption("Change these on the Invoices page at zivett.com.", tone = ZTextTone.SOFT)
+        } else if (isAdmin) {
             ZTextArea("", text, { text = it.take(1000) }, placeholder = "e-Transfer to pay@yourbusiness.ca, or cheque to 1 Wharf St.", error = model.errors["payment_instructions"], minLines = 3)
             if (text != settings.paymentInstructions.orEmpty()) ZButton("Save", style = ZButtonStyle.OUTLINE, loading = model.saving == "payment") {
                 scope.launch { model.save("payment", buildJsonObject { put("payment_instructions", text.trim().ifBlank { null }?.let { JsonPrimitive(it) } ?: JsonNull) }) }

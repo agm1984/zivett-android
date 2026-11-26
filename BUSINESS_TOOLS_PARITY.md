@@ -64,6 +64,8 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 
 ## Decisions (append as you go)
 
+- 2026-11-25 (review): when the company set up structured payment methods on the web, "How customers pay you" is read-only in the app (a plain-text save would wipe them, as iOS decided). The free-text editor stays for companies without them.
+
 - 2026-11-25: imports and CSV/accountant exports stay web-only (files on a
   phone are awkward); PDFs open in the share sheet.
 

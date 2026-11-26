@@ -206,6 +206,9 @@ object ToolsEndpoints {
 data class ToolsSettings(
     val gstNumber: String? = null,
     val paymentInstructions: String? = null,
+    /// The structured methods set on the web (e-Transfer, cheque…). Only
+    /// read to know they exist: a plain-text save would wipe them.
+    val paymentMethods: kotlinx.serialization.json.JsonElement? = null,
     val invoiceNumbering: InvoiceNumbering = InvoiceNumbering(),
     /// "#1f6f5c" or null (charcoal).
     val brandColor: String? = null,
