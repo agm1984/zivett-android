@@ -19,6 +19,12 @@ object Money {
         return text.replace("CA$", "$")
     }
 
+    /// A count, en-CA grouped ("1,000").
+    fun count(value: Int): String = NumberFormat.getIntegerInstance(Locale.CANADA).format(value)
+
+    /// Whole dollars ("$3,150") for rate lines and round figures.
+    fun wholeDollars(cents: Int): String = "$" + count(Math.round(cents / 100.0).toInt())
+
     /// A typed dollar amount → cents, or null when it isn't a number.
     /// The decimal keyboard follows the PHONE's locale, so a fr-CA user
     /// types "5,50" — which `toBigDecimalOrNull` reads as nothing, and a

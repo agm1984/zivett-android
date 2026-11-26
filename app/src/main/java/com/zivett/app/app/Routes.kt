@@ -108,3 +108,31 @@ object Areas {
         com.zivett.app.core.models.JobArea.Kind.COMPANY -> com.zivett.app.core.models.NotificationArea.COMPANY
     }
 }
+
+// Business tools (the company's own work). Tabs on the business side.
+@Serializable object ToolsOverviewTab
+@Serializable object ToolsCustomersTab
+@Serializable object ToolsJobsTab
+@Serializable object ToolsInvoicesTab
+/// The Overview pushed (from More, on the application-in-review lifecycle).
+@Serializable object ToolsRequestsRoute
+@Serializable object ToolsOverviewRoute
+@Serializable data class ToolsCustomerRoute(val customerId: Int)
+/// `filter`: a quote status (draft | sent | accepted | declined | expired).
+@Serializable data class ToolsQuotesRoute(val filter: String? = null)
+@Serializable data class ToolsQuoteRoute(val quoteId: Int)
+/// New when `quoteId` is null; `customerId` presets who it's for.
+@Serializable data class ToolsQuoteEditorRoute(val quoteId: Int? = null, val customerId: Int? = null)
+@Serializable data class ToolsJobRoute(val jobId: Int)
+@Serializable data class ToolsJobEditorRoute(val jobId: Int? = null, val customerId: Int? = null, val quoteId: Int? = null, val date: String? = null)
+@Serializable data class ToolsInvoiceRoute(val invoiceId: Int)
+@Serializable data class ToolsInvoiceEditorRoute(val invoiceId: Int? = null, val customerId: Int? = null, val jobId: Int? = null, val quoteId: Int? = null)
+@Serializable object ToolsBillVisitsRoute
+@Serializable object ToolsExpensesRoute
+@Serializable object ToolsTimesheetsRoute
+@Serializable object ToolsPayrollRoute
+@Serializable object ToolsReportsRoute
+@Serializable object ToolsCampaignsRoute
+/// New when `campaignId` is null.
+@Serializable data class ToolsCampaignRoute(val campaignId: Int? = null)
+@Serializable object ToolsSettingsRoute

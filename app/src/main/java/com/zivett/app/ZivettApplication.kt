@@ -17,6 +17,7 @@ class ZivettApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         PendingReferral.attach(this)
+        com.zivett.app.core.CompanySpace.attach(this)
         PushRegistration.attach(this)
         // OpenStreetMap's tile policy wants a real user agent (the same
         // tiles the web's Leaflet maps use).

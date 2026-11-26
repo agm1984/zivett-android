@@ -67,6 +67,10 @@ fun PlanPickerScreen(area: String, onBack: () -> Unit) {
         ZToastBox(model.toast, { model.toast = null }) {
             ZScreen(onRefresh = { model.load() }) {
                 PlanPickerContent(model)
+                // The Business tools switch (company org admins).
+                if (area == "company" && (model.state as? com.zivett.app.core.Loadable.Loaded)?.loaded?.subscription?.canManage == true) {
+                    com.zivett.app.features.tools.BusinessToolsPlanCard { model.toast = it }
+                }
                 Spacer(Modifier.padding(ZSpacing.lg))
             }
         }

@@ -89,7 +89,16 @@ data class User(
     /// Company members: a field tech (true) vs office staff. Field techs
     /// who aren't org admins open on My day. Defaults on (older server).
     val takesJobs: Boolean = true,
+    /// The section keys this person's access role opens
+    /// (`Permissions::decorate`). Null on an older server: every section.
+    val permissions: List<String>? = null,
+    /// The team clock + Payroll are switched on platform-wide for this
+    /// person (`TeamShifts::enabled`). Null on an older server: assume on
+    /// when the org runs Business tools.
+    val payroll: Boolean? = null,
 ) {
+    /// Holds a sidebar section (web `auth.can`). Unknown (older server) = yes.
+    fun canOpen(section: String): Boolean = permissions?.contains(section) ?: true
     val isEmailVerified: Boolean get() = emailVerifiedAt != null
     val isPhoneVerified: Boolean get() = phoneVerifiedAt != null
 
