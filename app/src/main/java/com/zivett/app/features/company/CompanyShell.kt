@@ -170,15 +170,19 @@ private fun CompanyShellBody(approved: Boolean, tools: Boolean, toolsOnly: Boole
     // into More so the bar stays at five.
     val fieldTech = environment.session.user?.let { Access.opensOnMyDay(it) } == true
     val more = shellTab(CompanyMoreTab, "More", Icons.Outlined.MoreHoriz)
+    fun opens(section: String) = environment.session.user?.canOpen(section) != false
     val tabs = when {
         approved && side == CompanySpace.Side.BUSINESS -> businessTabs() + more
-        approved -> listOf(
+        // A restricted member's access role drops the sections it lacks
+        // (web `navFor`); My day is personal and always shows.
+        approved -> listOfNotNull(
             if (fieldTech) shellTab(CompanyMyDayTab, "My day", Icons.Outlined.Today)
-            else shellTab(CompanyDashboardTab, "Dashboard", Icons.Filled.Home),
+            else if (opens("dashboard")) shellTab(CompanyDashboardTab, "Dashboard", Icons.Filled.Home)
+            else shellTab(CompanyMyDayTab, "My day", Icons.Outlined.Today),
             // New feed jobs since this member last looked (`GET /api/nav-badges`).
-            shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome) { navBadges.count(NavBadgesModel.OPPORTUNITIES) },
-            shellTab(CompanyQuotesTab, "Quotes", Icons.Outlined.Description),
-            shellTab(CompanyJobsTab, "Jobs", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.JOBS) },
+            if (opens("opportunities")) shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome) { navBadges.count(NavBadgesModel.OPPORTUNITIES) } else null,
+            if (opens("quotes")) shellTab(CompanyQuotesTab, "Quotes", Icons.Outlined.Description) else null,
+            if (opens("jobs")) shellTab(CompanyJobsTab, "Jobs", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.JOBS) } else null,
             more,
         )
         // Business tools only: the Overview is home; the marketplace setup

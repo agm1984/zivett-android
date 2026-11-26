@@ -90,11 +90,15 @@ fun BusinessShell() {
     // No Messages tab here — the inbox opens from the top of Requests, so
     // its unread thread count (`GET /api/nav-badges`) badges that tab.
     val navBadges = rememberNavBadges()
-    val tabs = listOf(
-        shellTab(BusinessOverviewTab, "Overview", Icons.Filled.Home),
-        shellTab(BusinessRequestsTab, "Requests", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.MESSAGES) },
-        shellTab(BusinessBookTab, "Book", Icons.Outlined.AddCircle),
-        shellTab(BusinessPropertiesTab, "Properties", Icons.Outlined.Apartment),
+    // A restricted member's access role (`permissions`) drops the tabs it
+    // lacks, as the web's sidebar does; the server still 403s the rest.
+    val user = environment.session.user
+    fun opens(section: String) = user?.canOpen(section) != false
+    val tabs = listOfNotNull(
+        if (opens("overview")) shellTab(BusinessOverviewTab, "Overview", Icons.Filled.Home) else null,
+        if (opens("requests")) shellTab(BusinessRequestsTab, "Requests", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.MESSAGES) } else null,
+        if (opens("requests")) shellTab(BusinessBookTab, "Book", Icons.Outlined.AddCircle) else null,
+        if (opens("properties")) shellTab(BusinessPropertiesTab, "Properties", Icons.Outlined.Apartment) else null,
         shellTab(BusinessAccountTab, "Account", Icons.Outlined.Person),
     )
 
@@ -158,8 +162,10 @@ fun BusinessAccountScreen() {
             ZCard(padding = 0.dp) {
                 AccountLink("My account", "Name, email, phone", Icons.Outlined.Person) { nav.navigate(ProfileRoute(Areas.BUSINESS)) }
                 ZDivider(Modifier.padding(start = 60.dp))
-                AccountLink("Business profile", "What pros see about ${user.organization?.name ?: "your business"}", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.BUSINESS)) }
-                ZDivider(Modifier.padding(start = 60.dp))
+                if (user.canOpen("profile") && user.organizationRole == OrganizationRole.ADMIN) {
+                    AccountLink("Business profile", "What pros see about ${user.organization?.name ?: "your business"}", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.BUSINESS)) }
+                    ZDivider(Modifier.padding(start = 60.dp))
+                }
                 AccountLink("Plan", "Your membership and what it includes", Icons.Outlined.StarOutline) { nav.navigate(PlanRoute(Areas.BUSINESS)) }
                 // Org-admin concerns — members don't get the rows (UX only; the server enforces).
                 if (user.organizationRole == OrganizationRole.ADMIN) {
@@ -169,10 +175,10 @@ fun BusinessAccountScreen() {
                 ZDivider(Modifier.padding(start = 60.dp))
                 AccountLink("Notifications", "Email and SMS preferences", Icons.Outlined.NotificationsActive) { nav.navigate(NotificationPrefsRoute(Areas.BUSINESS)) }
             }
-            ZCard(padding = 0.dp) {
-                AccountLink("Invoices", "Consolidated monthly statements", Icons.Outlined.Description) { nav.navigate(InvoicesRoute(Areas.BUSINESS)) }
-                ZDivider(Modifier.padding(start = 60.dp))
-                AccountLink("Warranties", "Covered work and claims", Icons.Outlined.VerifiedUser) { nav.navigate(WarrantiesRoute(Areas.BUSINESS)) }
+            if (user.canOpen("invoices") || user.canOpen("warranties")) ZCard(padding = 0.dp) {
+                if (user.canOpen("invoices")) AccountLink("Invoices", "Consolidated monthly statements", Icons.Outlined.Description) { nav.navigate(InvoicesRoute(Areas.BUSINESS)) }
+                if (user.canOpen("invoices") && user.canOpen("warranties")) ZDivider(Modifier.padding(start = 60.dp))
+                if (user.canOpen("warranties")) AccountLink("Warranties", "Covered work and claims", Icons.Outlined.VerifiedUser) { nav.navigate(WarrantiesRoute(Areas.BUSINESS)) }
             }
             ZButton("Log out", style = ZButtonStyle.OUTLINE, loading = loggingOut) { loggingOut = true; scope.launch { environment.session.logout() } }
             AdvertisingPrivacySection()
