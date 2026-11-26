@@ -32,4 +32,10 @@ class GapsTest {
         assertEquals(false, steps.contains(BookingWizardEngine.Step.Details))
         assertEquals(true, BookingWizardEngine.steps(form.copy(propertyPreset = false), emptyList()).contains(BookingWizardEngine.Step.Where))
     }
+
+    @Test fun jobsListCarriesUnreadThreads() {
+        val jobs = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.JobsResponse>("""{"jobs": [], "unread_job_ids": [7, 9]}""")
+        assertEquals(listOf(7, 9), jobs.unreadJobIds)
+        assertEquals(emptyList<Int>(), com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.JobsResponse>("""{"jobs": []}""").unreadJobIds)
+    }
 }

@@ -178,7 +178,7 @@ private fun CompanyShellBody(approved: Boolean, tools: Boolean, toolsOnly: Boole
             // New feed jobs since this member last looked (`GET /api/nav-badges`).
             shellTab(CompanyOpportunitiesTab, "Opportunities", Icons.Outlined.AutoAwesome) { navBadges.count(NavBadgesModel.OPPORTUNITIES) },
             shellTab(CompanyQuotesTab, "Quotes", Icons.Outlined.Description),
-            shellTab(CompanyJobsTab, "Jobs", Icons.Outlined.Work),
+            shellTab(CompanyJobsTab, "Jobs", Icons.Outlined.Work) { navBadges.count(NavBadgesModel.JOBS) },
             more,
         )
         // Business tools only: the Overview is home; the marketplace setup

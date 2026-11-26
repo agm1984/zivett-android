@@ -704,7 +704,9 @@ data class BookingOptions(
 
 // MARK: - Wrapped list/detail responses
 
-@Serializable data class JobsResponse(val jobs: List<Job> = emptyList())
+/// `unread_job_ids`: the company Jobs list's jobs whose thread holds an
+/// unread booker message ("New message" tags; absent elsewhere).
+@Serializable data class JobsResponse(val jobs: List<Job> = emptyList(), val unreadJobIds: List<Int> = emptyList())
 @Serializable data class JobResponse(val job: Job)
 @Serializable data class InvoicesResponse(val invoices: List<Invoice> = emptyList())
 @Serializable data class InvoiceResponse(val invoice: Invoice)

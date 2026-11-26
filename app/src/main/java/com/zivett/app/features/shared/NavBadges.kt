@@ -90,6 +90,8 @@ class NavBadgesModel(private val client: ApiClient, private val scope: Coroutine
         /// without the section) simply never shows a dot.
         const val MESSAGES = "messages"
         const val OPPORTUNITIES = "opportunities"
+        /// Company Jobs: jobs whose thread holds an unread booker message.
+        const val JOBS = "jobs"
     }
 }
 
