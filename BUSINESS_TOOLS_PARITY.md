@@ -1,0 +1,70 @@
+# Business tools + November parity: the overnight build (started 2026-11-25)
+
+The user asked (2026-11-25, going to bed): bring both apps to parity with the
+web for Pro companies, business users and homeowners, including Business
+tools. No questions possible: take the most obvious answer to every small
+issue and write it down under "Decisions" below.
+
+This file is the TRACKER. An identical copy lives in
+`zivett-android/BUSINESS_TOOLS_PARITY.md`; each app ticks its own column.
+Branch in both repos: `business-tools-parity` (off main). Commit atomically,
+never merge. Web source of truth: `../ratedpro-web` (UAT branch state),
+plan doc `docs/plans/business-tools.md`, nav `resources/js/lib/nav.js`,
+pages `resources/js/pages/company/business/*.vue`, stores
+`resources/js/stores/companyPro*.js` / `companyCustomers.js` /
+`companyBusinessTools.js` / `companyTimesheets.js` / `companyPayroll.js`,
+routes `routes/api.php` (`/api/company/business/*`, all bearer-ready).
+
+Status: [ ] todo · [~] in progress · [x] done · [-] deliberately not ported
+
+## Menu decision (both apps)
+
+The web shows ONE side at a time ("Marketplace" | "Your business",
+`lib/companySpace.js`). The apps mirror it: a two-way switch at the top of
+More swaps the whole tab bar, remembered on the device.
+- Marketplace tabs (unchanged): Dashboard (or My day for field techs) ·
+  Opportunities · Quotes · Jobs · More.
+- Business tabs: Overview · Customers · Jobs (own) · Invoices · More.
+  More (business side) lists: Requests, Quotes (own), My day, My hours,
+  Calendar, Expenses, Time on jobs / Payroll, Reports, Campaigns (org
+  admins), Team (org admins), Business tools settings, Business profile,
+  Plan, account rows.
+- Tools-only company (not submitted, `setup_completed_at` set, tools on):
+  business tabs only, plus "Find work on ZiVETT" in More opening the
+  marketplace setup.
+- Submitted-not-approved + tools: Application · Overview · Customers ·
+  Jobs · More (tools rows in More).
+- Sections follow `permissions` (`business_tools`, `payroll` flag);
+  a member without `business_tools` gets no business side.
+
+## Slices
+
+| # | Slice | iOS | Android |
+|---|---|---|---|
+| S0 | Shell: space switch, tools-only + submitted lifecycles, permissions gating, Business tools switch card on the Plan screen (`GET/PATCH /api/company/business-tools`) | [ ] | [ ] |
+| S1 | Overview (`GET /business`) + Requests (list, added, dismiss, request-form link card) | [ ] | [ ] |
+| S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [ ] |
+| S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [ ] |
+| S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [ ] |
+| S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [ ] |
+| S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [ ] |
+| S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [ ] |
+| S8 | Settings: business tools settings (invoicing/numbering, payment instructions, email branding, reminders), line presets | [ ] | [ ] |
+| G1 | Booker job page: `free_cancel_until` line ("Free to cancel until …") | [ ] | [ ] |
+| G2 | Emergency fee itemized in accept/coupon preview; pro quote screen says it's added on top; business setup says "verified pros" | [ ] | [ ] |
+| G3 | Team: resend invitation, send password reset email, remove from team; crew picker shows inactive leavers ("Tap to take them off") | [ ] | [ ] |
+| G4 | Business: Messages inbox (`/business/conversations`); request from a property card skips the property step | [ ] | [ ] |
+| G5 | Company org live channel (`private-organization.{id}`, `organization.changed`) refetches own-work screens | [ ] | [ ] |
+| G6 | Plan cards: `registration_fee_waived` + `_label` ("waived for a limited time"), Founding Pro badge | [ ] | [ ] |
+| G7 | Company Jobs tab badge (`jobs` nav badge) + "New message" tags (`unread_job_ids`) | [ ] | [ ] |
+| G8 | Homeowner marketing opt-in: unticked box at signup + booking Review, "Offers and news" switch in notification settings | [ ] | [ ] |
+| G9 | Restricted members: hide tabs/rows whose section `permissions` lacks (CLAUDE.md: "the apps don't hide tabs yet") | [ ] | [ ] |
+
+Each agent VERIFIES a G item first (it may already be done) and marks it.
+
+## Decisions (append as you go)
+
+- 2026-11-25: imports and CSV/accountant exports stay web-only (files on a
+  phone are awkward); PDFs open in the share sheet.
+
+## Log (append: date, slice, app, commit range, what's untested)
