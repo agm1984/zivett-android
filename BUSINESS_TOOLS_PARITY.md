@@ -45,7 +45,7 @@ More swaps the whole tab bar, remembered on the device.
 | S1 | Overview (`GET /business`) + Requests (list, added, dismiss, request-form link card) | [ ] | [x] |
 | S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [x] |
 | S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [x] |
-| S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [ ] |
+| S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [x] |
 | S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [ ] |
 | S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [ ] |
 | S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [ ] |
@@ -81,6 +81,10 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 (Android): "Print" on quotes/invoices is the PDF in the share
   sheet (it lists printers); no separate print action.
 
+- 2026-11-25 (Android): an own job opened from My day, the calendar or a
+  push shows the office's full page to anyone holding `business_tools`,
+  and the crew's route sheet to everyone else (the web's two pages).
+
 ## Server asks
 
 (none yet)
@@ -96,3 +100,7 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   actions, email sheet, approval link, deposit, duplicate, PDF share, delete
   draft) and editor (customer/address, lines + presets, terms, taxes). Not
   run on a device.
+- 2026-11-25 S4 Android: own jobs tab, office job page (status, crew
+  picker, changes, notes, photos, time, costs, money, series stop / crew
+  to all visits, invoices) and editor (incl. repeating). Not run on a device;
+  photo upload untested against a real server.
