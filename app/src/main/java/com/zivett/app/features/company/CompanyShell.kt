@@ -34,6 +34,10 @@ import com.zivett.app.app.ToolsOverviewRoute
 import com.zivett.app.app.ToolsRequestsRoute
 import com.zivett.app.design.ZSegmented
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.BarChart
 import com.zivett.app.core.CompanySpace
 import com.zivett.app.features.tools.ToolsNav
 import com.zivett.app.features.tools.ToolsOverviewScreen
@@ -343,6 +347,14 @@ fun CompanyMoreScreen(side: CompanySpace.Side = CompanySpace.Side.MARKETPLACE, s
                     { AccountLink("My day", "The jobs you're on, in the order you'll do them", Icons.Outlined.Today) { nav.navigate(MyDayRoute) } },
                     if (Access.hasPayroll(user)) ({ AccountLink("My hours", "Your pay period on the clock, and fixing a day", Icons.Outlined.Schedule) { nav.navigate(MyHoursRoute) } }) else null,
                     if (user.canOpen("calendar")) ({ AccountLink("Calendar", "Your own jobs and your ZiVETT jobs", Icons.Outlined.CalendarMonth) { nav.navigate(CompanyCalendarRoute) } }) else null,
+                )
+                // The books (web "Books" group): what it cost, who worked, how it went.
+                rows(
+                    { AccountLink("Expenses", "What the business spent, with receipt photos", Icons.Outlined.ReceiptLong) { nav.navigate(com.zivett.app.app.ToolsExpensesRoute) } },
+                    if (isAdmin) (if (Access.hasPayroll(user)) ({ AccountLink("Payroll", "Paid hours from the team clock, by pay period", Icons.Outlined.Payments) { nav.navigate(com.zivett.app.app.ToolsPayrollRoute) } })
+                        else ({ AccountLink("Time on jobs", "Who worked how long on your own jobs", Icons.Outlined.Timer) { nav.navigate(com.zivett.app.app.ToolsTimesheetsRoute) } })) else null,
+                    if (isAdmin && Access.hasPayroll(user)) ({ AccountLink("Time on jobs", "Who worked how long on your own jobs", Icons.Outlined.Timer) { nav.navigate(com.zivett.app.app.ToolsTimesheetsRoute) } }) else null,
+                    { AccountLink("Reports", "Invoiced, collected and what's left, by month", Icons.Outlined.BarChart) { nav.navigate(com.zivett.app.app.ToolsReportsRoute) } },
                 )
                 rows(
                     if (!approved && !toolsOnly && user.canOpen("passport")) ({ AccountLink("Verified Pro Passport", "Credentials, rates, radius, availability", Icons.Outlined.Verified) { nav.navigate(PassportRoute) } }) else null,
