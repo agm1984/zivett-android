@@ -41,9 +41,9 @@ More swaps the whole tab bar, remembered on the device.
 
 | # | Slice | iOS | Android |
 |---|---|---|---|
-| S0 | Shell: space switch, tools-only + submitted lifecycles, permissions gating, Business tools switch card on the Plan screen (`GET/PATCH /api/company/business-tools`) | [ ] | [ ] |
-| S1 | Overview (`GET /business`) + Requests (list, added, dismiss, request-form link card) | [ ] | [ ] |
-| S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [ ] |
+| S0 | Shell: space switch, tools-only + submitted lifecycles, permissions gating, Business tools switch card on the Plan screen (`GET/PATCH /api/company/business-tools`) | [ ] | [x] |
+| S1 | Overview (`GET /business`) + Requests (list, added, dismiss, request-form link card) | [ ] | [x] |
+| S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [x] |
 | S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [ ] |
 | S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [ ] |
 | S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [ ] |
@@ -67,4 +67,25 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25: imports and CSV/accountant exports stay web-only (files on a
   phone are awkward); PDFs open in the share sheet.
 
+- 2026-11-25 (Android): switching sides rebuilds the tab bar and lands on
+  its first tab (Overview / Dashboard), the way the web's switch goes home.
+- 2026-11-25 (Android): limit and reminder upgrade prompts name the plan
+  ("The Pro plan holds more customers") and open the Plan screen; the app
+  never shows the web's price (store prices differ, no web purchase talk).
+- 2026-11-25 (Android): Requests is a row in More on the business side
+  (the bar holds Overview · Customers · Jobs · Invoices · More).
+- 2026-11-25 (Android): the Overview's figures, not a header menu, open
+  the filtered lists; New quote / job / invoice / Add customer are buttons
+  under the title.
+
+## Server asks
+
+(none yet)
+
 ## Log (append: date, slice, app, commit range, what's untested)
+
+- 2026-11-25 S0-S2 Android cc54675..3158598: shell + space switch + Plan
+  card, Overview + Requests, Customers (list, detail, form, addresses,
+  consent, exception request). Unit-tested decoding and rules; nothing run
+  on a device yet. The Overview's New quote / job / invoice buttons and
+  the customer page's quote / job / invoice links land with S3-S5.
