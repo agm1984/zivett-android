@@ -138,6 +138,7 @@ fun CompanyShell(approved: Boolean) {
 private fun businessTabs(): List<com.zivett.app.features.shared.ShellTab> = listOf(
     shellTab(ToolsOverviewTab, "Overview", Icons.Filled.Home),
     shellTab(com.zivett.app.app.ToolsCustomersTab, "Customers", Icons.Outlined.Group),
+    shellTab(com.zivett.app.app.ToolsJobsTab, "Jobs", Icons.Outlined.Work),
 )
 
 @Composable
@@ -204,13 +205,18 @@ private fun CompanyShellBody(approved: Boolean, tools: Boolean, toolsOnly: Boole
         composable<CompanyMyDayTab> { BellScreen("My day") { MyDayScreen() } }
         composable<MyDayRoute> { BellScreen("My day", onBack = { nav.popBackStack() }) { MyDayScreen() } }
         composable<MyHoursRoute> { MyHoursScreen { nav.popBackStack() } }
-        composable<OwnJobRoute> { entry -> OwnJobScreen(entry.toRoute<OwnJobRoute>().jobId) { nav.popBackStack() } }
+        // Holding Business tools: the office's full page; otherwise the crew's route sheet.
+        composable<OwnJobRoute> { entry ->
+            val id = entry.toRoute<OwnJobRoute>().jobId
+            if (tools) com.zivett.app.features.tools.ProJobScreen(id, ToolsNav(nav)) else OwnJobScreen(id) { nav.popBackStack() }
+        }
         composable<CompanyDashboardRoute> { BellScreen("Dashboard", onBack = { nav.popBackStack() }) { CompanyDashboardScreen() } }
         composable<CompanyOpportunitiesTab> { BellScreen("Opportunities") { OpportunitiesScreen() } }
         composable<CompanyQuotesTab> { BellScreen("Quotes") { CompanyQuotesScreen() } }
         composable<CompanyJobsTab> { BellScreen("Jobs") { CompanyActiveJobsScreen() } }
         composable<CompanyMoreTab> { CompanyMoreScreen(side, approved && tools, toolsOnly) }
         composable<ToolsOverviewTab> { BellScreen("Overview") { ToolsOverviewScreen(ToolsNav(nav)) } }
+        composable<com.zivett.app.app.ToolsJobsTab> { BellScreen("Jobs") { com.zivett.app.features.tools.OwnJobsScreen(ToolsNav(nav)) } }
         composable<com.zivett.app.app.ToolsCustomersTab> { BellScreen("Customers") { com.zivett.app.features.tools.CustomersScreen(ToolsNav(nav)) } }
         toolsDestinations(nav)
         composable<CompanyPassportTab> { BellScreen("Passport") { PassportScreen(onBack = null) } }

@@ -17,6 +17,8 @@ fun NavGraphBuilder.toolsDestinations(nav: NavHostController) {
     composable<ToolsOverviewRoute> { Column { ZTopBar("Overview", onBack = { nav.popBackStack() }); ToolsOverviewScreen(tools) } }
     composable<ToolsRequestsRoute> { RequestsScreen(tools) }
     composable<ToolsCustomerRoute> { entry -> CustomerDetailScreen(entry.toRoute<ToolsCustomerRoute>().customerId, tools) }
+    composable<com.zivett.app.app.ToolsJobRoute> { entry -> ProJobScreen(entry.toRoute<com.zivett.app.app.ToolsJobRoute>().jobId, tools) }
+    composable<com.zivett.app.app.ToolsJobEditorRoute> { entry -> entry.toRoute<com.zivett.app.app.ToolsJobEditorRoute>().let { ProJobEditorScreen(it.jobId, it.customerId, it.quoteId, it.date, tools) } }
     composable<com.zivett.app.app.ToolsQuotesRoute> { entry -> OwnQuotesScreen(entry.toRoute<com.zivett.app.app.ToolsQuotesRoute>().filter, tools) }
     composable<com.zivett.app.app.ToolsQuoteRoute> { entry -> OwnQuoteScreen(entry.toRoute<com.zivett.app.app.ToolsQuoteRoute>().quoteId, tools) }
     composable<com.zivett.app.app.ToolsQuoteEditorRoute> { entry -> entry.toRoute<com.zivett.app.app.ToolsQuoteEditorRoute>().let { OwnQuoteEditorScreen(it.quoteId, it.customerId, tools) } }

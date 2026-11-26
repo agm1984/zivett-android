@@ -316,6 +316,10 @@ data class RosterMember(
     /// (2026-11-12) — never auto-picked, still pickable by hand ("Busy
     /// then"). Absent on an older server.
     val busy: List<BusyBooking> = emptyList(),
+    /// Deactivated or removed since being put on the crew (2026-11-15): shown
+    /// picked with "Tap to take them off", never assignable.
+    val inactive: Boolean = false,
+    val lead: Boolean = false,
 ) {
     /// Who "Auto-assign next" (and acceptance) may pick.
     val isAutoPickable: Boolean get() = autoPickable ?: (assignable && takesJobs)
