@@ -16,4 +16,11 @@ class GapsTest {
         )
         assertEquals("Free to cancel: your pro hasn't set off.", JobPresentation.cancelManageCopy(job.copy(stalled = true)))
     }
+
+    @Test fun teamEndpointsFollowTheArea() {
+        assertEquals("api/company/team/invitations/4/resend", com.zivett.app.core.models.TeamArea.company.resend(4).path)
+        assertEquals("api/business/team/members/7/password-reset", com.zivett.app.core.models.TeamArea.business.passwordReset(7).path)
+        val leaver = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.RosterMember>("""{"id": 3, "name": "Sam", "assignable": false, "inactive": true, "assigned": true}""")
+        assertEquals(true, leaver.inactive)
+    }
 }

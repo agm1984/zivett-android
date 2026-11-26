@@ -90,6 +90,19 @@ class TeamModel(private val client: ApiClient, val area: TeamArea) {
         return false
     }
 
+    suspend fun resend(invitation: Team.Invitation) {
+        busy = true
+        try { client.send(area.resend(invitation.id)); toast = "Invitation sent again to ${invitation.email}. The old link no longer works."; load() }
+        catch (e: CancellationException) { throw e } catch (e: Exception) { toast = e.userMessage } finally { busy = false }
+    }
+
+    suspend fun sendPasswordReset(member: Team.Member) {
+        busy = true
+        try { client.send(area.passwordReset(member.id)); toast = "Password reset email sent to ${member.email}." }
+        catch (e: CancellationException) { throw e } catch (e: ApiError.RateLimited) { toast = "One was just sent. Try again in a minute." }
+        catch (e: Exception) { toast = e.userMessage } finally { busy = false }
+    }
+
     suspend fun revoke(invitation: Team.Invitation) {
         runCatching { client.send(area.revoke(invitation.id)) }
         load()
@@ -214,6 +227,7 @@ fun TeamScreen(area: TeamArea, onBack: (() -> Unit)?) {
                                             invitation.invitedBy?.let { ZCaption("Invited by $it") }
                                         }
                                         ZBadge(invitation.status, if (invitation.status == "expired") ZTone.DANGER else ZTone.WARNING)
+                                        if (team.canManage) ZTextAction(if (invitation.status == "expired") "Resend" else "Send again", enabled = !model.busy) { scope.launch { model.resend(invitation) } }
                                         if (team.canManage) ZTextAction("Revoke", color = colors.danger) { scope.launch { model.revoke(invitation) } }
                                     }
                                 }
@@ -297,6 +311,13 @@ private fun EditMemberSheet(member: Team.Member, model: TeamModel, editingSelf: 
                     onDismiss()
                 }
             }
+        }
+        // A reset link to their own inbox: nobody sets or sees another person's password.
+        if (!editingSelf && member.status != "deactivated") {
+            ZDivider(Modifier.padding(vertical = ZSpacing.xs))
+            ZBodyStrong("Password")
+            ZCaption("Send ${member.firstName.ifBlank { "them" }} an email with a link to set a new password. Nobody else sees it.")
+            ZButton("Send password reset email", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false, enabled = !model.busy) { scope.launch { model.sendPasswordReset(member) } }
         }
         // Kept apart from Save: leaving the team is permanent from the
         // org's side, so it gets its own confirm.

@@ -123,7 +123,8 @@ fun CrewPickerSheet(
                     val slot = picked.indexOf(member.id)
                     ZSelectableRow(
                         selected = if (confirms) slot >= 0 else member.assigned,
-                        enabled = member.assignable && saving == null && (confirms || !member.assigned),
+                        // A leaver still on the crew shows picked; tapping only takes them off.
+                        enabled = saving == null && ((member.assignable && (confirms || !member.assigned)) || (confirms && member.inactive && slot >= 0)),
                         onClick = { if (confirms) selection = picked.togglingCrew(member.id, crewSize) else submit(listOf(member.id)) },
                     ) {
                         ZPhotoAvatar(member.photoUrl, member.name.take(1), 40.dp)
@@ -136,7 +137,11 @@ fun CrewPickerSheet(
                                 // Already on another job then: never auto-picked, still pickable.
                                 if (member.busy.isNotEmpty()) ZBadge("Busy then", ZTone.WARNING)
                             }
-                            ZCaption(if (member.needsPhoto) "Needs a profile photo before they can be assigned" else "${member.openJobs} open ${if (member.openJobs == 1) "job" else "jobs"}")
+                            ZCaption(when {
+                                member.inactive -> if (slot >= 0) "No longer on the team. Tap to take them off" else "No longer on the team"
+                                member.needsPhoto -> "Needs a profile photo before they can be assigned"
+                                else -> "${member.openJobs} open ${if (member.openJobs == 1) "job" else "jobs"}"
+                            })
                             CompanyPresentation.busyLine(member.busy)?.let { ZCaption(it, color = ZTheme.colors.warning, maxLines = 2) }
                         }
                         if (confirms && isCrew && slot == 0) ZBadge("Lead", ZTone.SUCCESS)
