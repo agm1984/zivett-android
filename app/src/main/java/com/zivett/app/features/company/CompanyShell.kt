@@ -329,6 +329,7 @@ fun CompanyMoreScreen(side: CompanySpace.Side = CompanySpace.Side.MARKETPLACE, s
                 rows(
                     if (!approved && !toolsOnly) ({ AccountLink("Overview", "Your own customers, quotes, jobs and invoices", Icons.Filled.Home) { nav.navigate(ToolsOverviewRoute) } }) else null,
                     { AccountLink("Requests", "People asking for work through your request form", Icons.Outlined.Inbox) { nav.navigate(ToolsRequestsRoute) } },
+                    { AccountLink("Quotes", "Quotes for your own customers", Icons.Outlined.Description) { nav.navigate(com.zivett.app.app.ToolsQuotesRoute()) } },
                 )
                 rows(
                     { AccountLink("My day", "The jobs you're on, in the order you'll do them", Icons.Outlined.Today) { nav.navigate(MyDayRoute) } },

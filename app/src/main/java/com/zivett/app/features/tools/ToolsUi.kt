@@ -155,3 +155,103 @@ fun ClickRow(onClick: () -> Unit, content: @Composable () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = ZSpacing.xs),
     ) { content() }
 }
+
+/// A document's PDF, fetched with the bearer token and handed to the share
+/// sheet (Files, Drive, Mail, print). Returns an error to show, or null.
+object ToolsPdf {
+    suspend fun share(context: android.content.Context, client: com.zivett.app.core.network.ApiClient, request: com.zivett.app.core.network.ApiRequest<ByteArray>, fileName: String): String? {
+        val bytes = try { client.send(request) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { return e.message }
+        val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+            java.io.File(dir, fileName.replace(Regex("[^A-Za-z0-9._-]"), "-")).apply { writeBytes(bytes) }
+        }
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val view = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        // Open it in a PDF viewer when there is one, with sharing beside it.
+        val chooser = android.content.Intent.createChooser(send, null).putExtra(android.content.Intent.EXTRA_INITIAL_INTENTS, arrayOf(view))
+        return runCatching { context.startActivity(chooser) }.exceptionOrNull()?.let { "Couldn't open the PDF." }
+    }
+}
+
+/// The document as both sides read it (web `ProDocumentSheet`): billed to,
+/// the lines, the taxes and the total, then terms and notes.
+@Composable
+fun DocumentSheetCard(document: com.zivett.app.core.models.ProDocument) {
+    com.zivett.app.design.ZCard {
+        document.billedTo?.let { to ->
+            com.zivett.app.design.ZLabel(if (document.isInvoice) "Billed to" else "For")
+            to.name?.let { ZBodyStrong(it) }
+            listOfNotNull(to.address, to.unit?.let { com.zivett.app.features.tools.CustomerDetailLogic.unit(it) }, to.phone, to.email).forEach { ZCaption(it) }
+        }
+        com.zivett.app.design.ZDivider()
+        for (line in document.lineItems) {
+            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
+                Column(Modifier.weight(1f)) {
+                    com.zivett.app.design.ZBody(line.description)
+                    ZCaption("${com.zivett.app.features.company.QuoteLineLogic.quantityText(line.quantity)} × ${Money.format(line.unitCents)}")
+                }
+                com.zivett.app.design.ZBody((if (line.amountCents < 0) "−" else "") + Money.format(kotlin.math.abs(line.amountCents)))
+            }
+        }
+        com.zivett.app.design.ZDivider()
+        TotalRow("Subtotal", document.subtotalCents)
+        if ((document.gstBps ?: 0) > 0) TotalRow("GST (${percent(document.gstBps ?: 0)})", document.gstCents)
+        if ((document.pstBps ?: 0) > 0) TotalRow("PST (${percent(document.pstBps ?: 0)})", document.pstCents)
+        TotalRow("Total", document.totalCents, strong = true)
+        if (document.isInvoice && document.paidCents > 0) {
+            TotalRow("Paid (${ToolsCopy.PRO_REPORTED.lowercase()})", -document.paidCents)
+            TotalRow("Balance", document.balanceCents, strong = true)
+        }
+        document.gstNumber?.takeIf { (document.gstBps ?: 0) > 0 }?.let { ZCaption("GST number $it") }
+        document.pricingType?.let { ZCaption(if (it == "estimate") "Estimate: the price may change with your approval." else "Fixed price for the work described.") }
+        document.exclusions?.takeIf { it.isNotBlank() }?.let { com.zivett.app.design.ZLabel("Not included"); com.zivett.app.design.ZBody(it) }
+        document.notes?.takeIf { it.isNotBlank() }?.let { com.zivett.app.design.ZLabel("Note"); com.zivett.app.design.ZBody(it) }
+        document.paymentInstructions?.takeIf { it.isNotBlank() && document.isInvoice }?.let { com.zivett.app.design.ZLabel("How to pay"); com.zivett.app.design.ZBody(it) }
+    }
+}
+
+@Composable
+private fun TotalRow(label: String, cents: Int, strong: Boolean = false) {
+    Row {
+        if (strong) ZBodyStrong(label, Modifier.weight(1f)) else ZCaption(label, Modifier.weight(1f))
+        val text = (if (cents < 0) "−" else "") + Money.format(kotlin.math.abs(cents))
+        if (strong) ZBodyStrong(text) else com.zivett.app.design.ZBody(text)
+    }
+}
+
+/// 500 bps → "5%", 750 → "7.5%".
+fun percent(bps: Int): String = if (bps % 100 == 0) "${bps / 100}%" else "${bps / 100.0}%".replace(".0%", "%")
+
+/// Every time a document was emailed (web `DocumentEmailsCard`).
+object DocumentEmailLogic {
+    fun label(email: com.zivett.app.core.models.DocumentEmail): String = when (email.kind) {
+        "quote" -> "Quote"
+        "invoice" -> "Invoice"
+        "answer" -> "Confirmation of their answer"
+        "follow_up" -> "Automatic follow-up"
+        "overdue" -> "Automatic overdue reminder"
+        "appointment" -> "Appointment reminder"
+        "receipt" -> email.paymentCents?.let { "Receipt for ${Money.format(it)}" } ?: "Receipt"
+        else -> "Email"
+    }
+}
+
+@Composable
+fun DocumentEmailsCard(emails: List<com.zivett.app.core.models.DocumentEmail>) {
+    if (emails.isEmpty()) return
+    com.zivett.app.design.ZCard {
+        com.zivett.app.design.ZHeadline("Emailed")
+        for (email in emails) {
+            Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                ZBodyStrong(DocumentEmailLogic.label(email), Modifier.weight(1f))
+                when { email.failed -> ZBadge("Not sent", ZTone.DANGER); email.reported -> ZBadge("Reported", ZTone.DANGER); email.bounced -> ZBadge("Bounced", ZTone.WARNING) }
+            }
+            ZCaption(listOfNotNull(email.recipient?.let { "To $it" }, ToolsFormat.day(email.sentAt), email.sentBy).joinToString(" · "))
+        }
+    }
+}

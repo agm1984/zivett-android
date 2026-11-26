@@ -68,3 +68,15 @@ class ToolsNav(val nav: NavHostController) {
     fun campaign(id: Int?) = nav.navigate(com.zivett.app.app.ToolsCampaignRoute(id))
 }
 
+
+/// The four ways to start work (web Overview's header actions): New quote
+/// leads, the rest outlined.
+@Composable
+fun ToolsQuickActions(nav: ToolsNav) {
+    ZButton("New quote") { nav.newQuote() }
+    Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.xs)) {
+        ZButton("New job", style = ZButtonStyle.OUTLINE, compact = true, modifier = Modifier.weight(1f)) { nav.newJob() }
+        ZButton("New invoice", style = ZButtonStyle.OUTLINE, compact = true, modifier = Modifier.weight(1f)) { nav.newInvoice() }
+        ZButton("Add customer", style = ZButtonStyle.OUTLINE, compact = true, modifier = Modifier.weight(1f)) { nav.addCustomer() }
+    }
+}

@@ -161,13 +161,14 @@ fun ToolsOverviewScreen(nav: ToolsNav) {
                 Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                     ZPageTitle("Your business", "Customers, quotes, jobs and invoices for the work you find yourself. ZiVETT takes 0% commission on it, and none of it is shared with the marketplace.")
 
+                    ToolsQuickActions(nav)
                     val stats = overview.stats
                     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
                         ZStatTile(Money.count(stats.customers), "Customers", Modifier.weight(1f)) { nav.customers() }
                         ZStatTile(Money.count(stats.activeJobs), "Active jobs", Modifier.weight(1f)) { nav.jobs("active") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm)) {
-                        ZStatTile(Money.count(stats.pendingQuotes), "Quotes waiting", Modifier.weight(1f)) { }
+                        ZStatTile(Money.count(stats.pendingQuotes), "Quotes waiting", Modifier.weight(1f)) { nav.quotes("sent") }
                         ZStatTile(Money.format(stats.outstandingCents), "Owed to you", Modifier.weight(1f)) { nav.invoices("open") }
                     }
                     ZStatTile(Money.format(stats.paidThisMonthCents), "Paid this month · ${ToolsCopy.PRO_REPORTED}") { nav.invoices("paid") }
