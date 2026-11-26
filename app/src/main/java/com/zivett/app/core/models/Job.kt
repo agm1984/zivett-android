@@ -152,6 +152,8 @@ data class Quote(
         val pstCents: Int? = null,
         val referralCreditCents: Int? = null,
         val totalCents: Int? = null,
+        /// An emergency's fee, billed on top of the quote (2026-11-24).
+        val emergencyFeeCents: Int? = null,
     )
 }
 

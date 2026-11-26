@@ -440,6 +440,8 @@ object CompanyEndpoints {
     /// The Monday–Sunday week around `day` (Y-m-d).
     fun weekCalendar(day: String) = ApiRequest.get<CompanyCalendar>("api/company/calendar", listOf("week" to day))
     /// `days` (1–14) from `start` (Y-m-d) — the List view's fortnight.
+    /// The quote page's context; the app reads only the emergency fee.
+    fun quoteContext(code: String) = ApiRequest.get<QuoteContextLite>("api/company/opportunities/$code/quote-context")
     fun rangeCalendar(start: String, days: Int) = ApiRequest.get<CompanyCalendar>("api/company/calendar", listOf("start" to start, "days" to days.coerceIn(1, 14).toString()))
     /// Admins for anyone; a member only for themselves (else 403).
     fun addTimeOff(userId: Int, date: String, window: String? = null) = ApiRequest.post<TimeOffResponse, TimeOffBody>("api/company/time-off", TimeOffBody(userId, date, window))
@@ -528,3 +530,8 @@ object CompanyEndpoints {
     /// "Remove from team" — 204; 422 naming the open jobs whose crew they're still on.
     fun removeMember(id: Int) = ApiRequest.empty(ApiRequest.Method.DELETE, "api/company/team/members/$id")
 }
+
+/// `GET api/company/opportunities/{code}/quote-context`, the part the app
+/// uses: an emergency visit's fee, billed on top of the quote.
+@Serializable
+data class QuoteContextLite(val emergencyFeeCents: Int = 0)
