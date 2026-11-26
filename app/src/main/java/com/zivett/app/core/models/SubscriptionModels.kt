@@ -51,6 +51,8 @@ data class SubscriptionResponse(
         val provider: String? = null,
         /// A PAID contract ZiVETT bills is running — locks the shelf.
         val webTermPaid: Boolean? = null,
+        /// Joined while the Founding Pros offer was open (company orgs).
+        val foundingPro: Boolean = false,
         val store: Store? = null,
     ) {
         @Serializable

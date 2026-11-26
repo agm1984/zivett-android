@@ -91,6 +91,7 @@ fun PlanPickerContent(model: PlanPickerModel, onContinue: (() -> Unit)? = null) 
     ZLoadable(model.state, retry = { scope.launch { model.load() } }) { response ->
         Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
             ZPageTitle("Choose your plan", subtitle(model.area))
+            if (response.subscription.foundingPro) com.zivett.app.design.ZBadge("Founding Pro", ZTone.SUCCESS)
             model.notice?.let { ZBanner(it, tone = ZTone.SUCCESS) }
 
             val canManage = response.subscription.canManage
