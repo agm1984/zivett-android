@@ -251,6 +251,28 @@ A job target's `review` flag (the review reminder's `route_params.review
 offers `QuickReviewSheet` when `QuickReview.qualifies` (closed, unrated);
 PARITY.md "Review reminder".
 
+## Business tools (2026-11-25)
+
+Tracker: `BUSINESS_TOOLS_PARITY.md`. A company with the `business_tools`
+section (`Access.hasBusinessTools`; `User.permissions`, null = all) gets a
+"Your business" side: `core/CompanySpace` (remembered on the device) picks
+the side, the switch sits atop More, and `CompanyShell` is keyed on it so a
+switch rebuilds the bar. Tools-only companies (`Access.toolsOnly`) get the
+business side only. Screens live in `features/tools/` and navigate through
+`ToolsNav` (routes `Tools*Route` in `Routes.kt`, registered by
+`toolsDestinations`); models in `core/models/Tools*`, `ProCustomer*`,
+`ProDocument*` (quotes + invoices share `ProDocument`), `ProJob*`,
+`Books*`, `Campaign*`. Shared pieces: `DocumentEditing.kt` (customer
+picker, the marketplace `QuoteLineEditor` rows, presets, tax totals),
+`ToolsUi.kt` (status badges, `ToolsPdf.share` for bearer-fetched PDFs,
+`DocumentSheetCard`). `OwnJobRoute` shows the office page (`ProJobScreen`)
+to `business_tools` holders, else the crew's `OwnJobScreen`. PHP's `[]`
+for an empty object: `PhpRatesSerializer` (counts) /
+`PhpStringMapSerializer`. Pickers: `ZDateField` / `ZTimeField`.
+`ZSegmented` / `ZFilterPills` for one-of-N and list filters. Imports,
+exports and Payroll's pay settings stay web-only; prices are never shown
+for plan upgrades (open the Plan screen).
+
 ## Layout
 
 ```

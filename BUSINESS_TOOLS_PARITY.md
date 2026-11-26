@@ -54,11 +54,11 @@ More swaps the whole tab bar, remembered on the device.
 | G2 | Emergency fee itemized in accept/coupon preview; pro quote screen says it's added on top; business setup says "verified pros" | [ ] | [x] |
 | G3 | Team: resend invitation, send password reset email, remove from team; crew picker shows inactive leavers ("Tap to take them off") | [ ] | [x] |
 | G4 | Business: Messages inbox (`/business/conversations`); request from a property card skips the property step | [ ] | [x] |
-| G5 | Company org live channel (`private-organization.{id}`, `organization.changed`) refetches own-work screens | [ ] | [ ] |
-| G6 | Plan cards: `registration_fee_waived` + `_label` ("waived for a limited time"), Founding Pro badge | [ ] | [ ] |
-| G7 | Company Jobs tab badge (`jobs` nav badge) + "New message" tags (`unread_job_ids`) | [ ] | [ ] |
-| G8 | Homeowner marketing opt-in: unticked box at signup + booking Review, "Offers and news" switch in notification settings | [ ] | [ ] |
-| G9 | Restricted members: hide tabs/rows whose section `permissions` lacks (CLAUDE.md: "the apps don't hide tabs yet") | [ ] | [ ] |
+| G5 | Company org live channel (`private-organization.{id}`, `organization.changed`) refetches own-work screens | [ ] | [x] |
+| G6 | Plan cards: `registration_fee_waived` + `_label` ("waived for a limited time"), Founding Pro badge | [ ] | [~] |
+| G7 | Company Jobs tab badge (`jobs` nav badge) + "New message" tags (`unread_job_ids`) | [ ] | [x] |
+| G8 | Homeowner marketing opt-in: unticked box at signup + booking Review, "Offers and news" switch in notification settings | [ ] | [x] |
+| G9 | Restricted members: hide tabs/rows whose section `permissions` lacks (CLAUDE.md: "the apps don't hide tabs yet") | [ ] | [x] |
 
 Each agent VERIFIES a G item first (it may already be done) and marks it.
 
@@ -108,9 +108,24 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 (Android): G4's Messages inbox already existed (opened from the
   top of Requests); only the property-preset skip was new.
 
+- 2026-11-25 (Android): G6 is half on purpose: the Founding Pro badge shows
+  on the Plan screen, but the registration fee and its "waived" label are
+  not shown, because plans bought through Google Play never carry a
+  registration fee (no registration row is written for store purchases).
+  Showing a struck-through fee would describe a charge the app can't make.
+- 2026-11-25 (Android): G5 rides the shell's `NavBadgesModel.received()`
+  (the same `liveEvents` counter notifications bump), so every screen that
+  already refetches on live events follows `organization.changed` too.
+- 2026-11-25 (Android): G9 hides company tabs Dashboard / Opportunities /
+  Quotes / Jobs and business tabs Overview / Requests + Book / Properties
+  and the Invoices / Warranties / Business profile rows by section; a
+  member without `dashboard` opens on My day.
+
 ## Server asks
 
-(none yet)
+(none: every screen works against today's API. Nice to have: the
+opportunity feed's job could carry `emergency_fee_cents` so the composer
+needn't fetch quote-context just for it.)
 
 ## Log (append: date, slice, app, commit range, what's untested)
 
@@ -142,3 +157,8 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 G1-G4 Android: free-cancel window line, emergency fee line +
   composer note + "verified pros", team resend / password reset + crew
   picker leavers, property-preset skip. Not run on a device.
+- 2026-11-25 G5-G9 Android: org live channel, Founding Pro badge (G6
+  partial, see Decisions), Jobs badge + New message tags, offers opt-in
+  (signup, booking Review, Notifications), restricted-member tab gating.
+  Not run on a device. Whole build: never exercised against a live server
+  or on a device; every slice is decode-tested against real-shaped JSON.
