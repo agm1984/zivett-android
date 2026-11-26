@@ -82,4 +82,36 @@ class OwnDocumentsTest {
         assertEquals("10", drafts.single().unit)
         assertTrue(DocumentLogic.incomplete(listOf(DocumentLogic.blankLine())))
     }
+
+    @Test fun invoiceActionsAndOwedLineFollowTheWeb() {
+        val quote = JsonCoding.json.decodeFromString<ProQuoteResponse>(quoteJson).quote
+        val invoice = quote.copy(kind = "invoice", status = "unpaid", emails = emptyList(), balanceCents = 1000)
+        assertEquals(listOf("record", "email"), com.zivett.app.features.tools.OwnInvoicesLogic.actions(invoice))
+        assertEquals(listOf("email_again", "record"), com.zivett.app.features.tools.OwnInvoicesLogic.actions(invoice.copy(emails = quote.emails)))
+        assertEquals(listOf("email_again"), com.zivett.app.features.tools.OwnInvoicesLogic.actions(invoice.copy(emails = quote.emails, balanceCents = 0, status = "paid")))
+        assertEquals(listOf("edit", "issue"), com.zivett.app.features.tools.OwnInvoicesLogic.actions(invoice.copy(status = "draft")))
+        assertEquals(emptyList<String>(), com.zivett.app.features.tools.OwnInvoicesLogic.actions(invoice.copy(status = "void")))
+
+        val list = JsonCoding.json.decodeFromString<ProInvoicesResponse>("""{"invoices": [], "counts": {"open": 3}, "outstanding_cents": 120000}""")
+        assertEquals("$1,200.00 owed to you across 3 unpaid invoices.", com.zivett.app.features.tools.OwnInvoicesLogic.owedLine(list))
+        assertEquals("Nobody owes you anything right now.", com.zivett.app.features.tools.OwnInvoicesLogic.owedLine(list.copy(counts = emptyMap())))
+    }
+
+    @Test fun invoicePaymentsAndBillVisitsDecode() {
+        val invoice = JsonCoding.json.decodeFromString<com.zivett.app.core.models.ProInvoiceResponse>("""
+        {"invoice": {"id": 11, "kind": "invoice", "number": "INV-0003", "status": "partially_paid", "customer": {"id": 9, "name": "Pat Lee"}, "total_cents": 36225,
+          "paid_cents": 10000, "balance_cents": 26225, "due_on": "2026-12-10", "line_items": [], "subtotal_cents": 34500,
+          "due_terms": "net_15", "is_deposit": false, "payment_instructions": "e-Transfer to pay@harbour.test", "voided_at": null, "void_reason": null,
+          "quote": {"id": 2, "number": "Q-7KD2"}, "replaces": null, "replaced_by": null,
+          "payments": [{"id": 1, "amount_cents": 10000, "paid_on": "2026-11-27", "method": "cash", "method_label": "Cash", "reference": null, "reported_by": "Ola", "removed_at": null, "remove_reason": null}]}}
+        """).invoice
+        assertEquals("Q-7KD2", invoice.quote?.number)
+        assertEquals("Cash", invoice.payments.single().methodLabel)
+        val visits = JsonCoding.json.decodeFromString<com.zivett.app.core.models.BillVisits>("""
+        {"from": "2026-10-01", "to": "2026-10-31", "customers": [{"customer": {"id": 9, "name": "Pat Lee", "email": null},
+          "visits": [{"id": 3, "code": "J-1", "title": "Mow", "date": "2026-10-04", "price_cents": null}], "total_cents": 0, "unpriced": 1}],
+         "can_charge_gst": false, "due_terms": ["receipt", "net_7", "net_15", "net_30", "date"], "email": {"blocked": null, "sent_today": 0, "daily_limit": 50}}
+        """)
+        assertEquals(1, visits.customers.single().unpriced)
+    }
 }

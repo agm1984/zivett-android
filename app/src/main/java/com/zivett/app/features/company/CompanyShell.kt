@@ -139,6 +139,7 @@ private fun businessTabs(): List<com.zivett.app.features.shared.ShellTab> = list
     shellTab(ToolsOverviewTab, "Overview", Icons.Filled.Home),
     shellTab(com.zivett.app.app.ToolsCustomersTab, "Customers", Icons.Outlined.Group),
     shellTab(com.zivett.app.app.ToolsJobsTab, "Jobs", Icons.Outlined.Work),
+    shellTab(com.zivett.app.app.ToolsInvoicesTab, "Invoices", Icons.Outlined.Description),
 )
 
 @Composable
@@ -216,6 +217,7 @@ private fun CompanyShellBody(approved: Boolean, tools: Boolean, toolsOnly: Boole
         composable<CompanyJobsTab> { BellScreen("Jobs") { CompanyActiveJobsScreen() } }
         composable<CompanyMoreTab> { CompanyMoreScreen(side, approved && tools, toolsOnly) }
         composable<ToolsOverviewTab> { BellScreen("Overview") { ToolsOverviewScreen(ToolsNav(nav)) } }
+        composable<com.zivett.app.app.ToolsInvoicesTab> { BellScreen("Invoices") { com.zivett.app.features.tools.OwnInvoicesScreen(ToolsNav(nav)) } }
         composable<com.zivett.app.app.ToolsJobsTab> { BellScreen("Jobs") { com.zivett.app.features.tools.OwnJobsScreen(ToolsNav(nav)) } }
         composable<com.zivett.app.app.ToolsCustomersTab> { BellScreen("Customers") { com.zivett.app.features.tools.CustomersScreen(ToolsNav(nav)) } }
         toolsDestinations(nav)

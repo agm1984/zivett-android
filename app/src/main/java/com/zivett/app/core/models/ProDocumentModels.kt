@@ -354,3 +354,52 @@ object ProInvoiceEndpoints {
     fun updatePayment(id: Int, paymentId: Int, body: PaymentBody) = ApiRequest.patch<ProInvoiceResponse, PaymentBody>("$BASE/$id/payments/$paymentId", body)
     fun removePayment(id: Int, paymentId: Int, reason: String) = ApiRequest.delete<ProInvoiceResponse, ReasonBody>("$BASE/$id/payments/$paymentId", ReasonBody(reason))
 }
+
+/// `GET api/company/business/invoices/bill-visits` — completed visits not
+/// billed yet, per customer, for a period (ProBilling).
+@Serializable
+data class BillVisits(
+    val from: String,
+    val to: String,
+    val customers: List<Row> = emptyList(),
+    val canChargeGst: Boolean = false,
+    val dueTerms: List<String> = emptyList(),
+    val email: Email? = null,
+) {
+    @Serializable
+    data class Row(val customer: Customer, val visits: List<Visit> = emptyList(), val totalCents: Int = 0, val unpriced: Int = 0)
+    @Serializable data class Customer(val id: Int, val name: String, val email: String? = null)
+    @Serializable data class Visit(val id: Int, val code: String? = null, val title: String = "", val date: String? = null, val priceCents: Int? = null)
+    @Serializable data class Email(val blocked: String? = null, val sentToday: Int = 0, val dailyLimit: Int = 0)
+}
+
+@Serializable
+data class BillVisitsBody(
+    val from: String,
+    val to: String,
+    val customerIds: List<Int>,
+    /// job id → cents for visits with no price yet.
+    val prices: Map<String, Int> = emptyMap(),
+    val chargeGst: Boolean = false,
+    val dueTerms: String = "receipt",
+    /// draft | issue | email
+    val action: String,
+)
+
+@Serializable
+data class BillVisitsResult(val result: Result) {
+    @Serializable
+    data class Result(val created: Int = 0, val issued: Int = 0, val emailed: Int = 0, val notEmailed: List<NotEmailed> = emptyList(), val invoiceIds: List<Int> = emptyList())
+    @Serializable data class NotEmailed(val customer: String, val reason: String)
+}
+
+object BillVisitsEndpoints {
+    fun load(from: String?, to: String?) = ApiRequest.get<BillVisits>("api/company/business/invoices/bill-visits", listOfNotNull(from?.let { "from" to it }, to?.let { "to" to it }))
+    fun run(body: BillVisitsBody) = ApiRequest.post<BillVisitsResult, BillVisitsBody>("api/company/business/invoices/bill-visits", body)
+}
+
+object InvoiceFormat {
+    val dueTerms = listOf("receipt" to "Due on receipt", "net_7" to "Net 7 (7 days)", "net_15" to "Net 15 (15 days)", "net_30" to "Net 30 (30 days)", "date" to "On a date")
+    val methods = listOf("etransfer" to "Interac e-Transfer", "cash" to "Cash", "cheque" to "Cheque", "card" to "Card (your terminal)", "other" to "Other")
+    val filters = listOf("all" to "All", "open" to "Unpaid", "overdue" to "Overdue", "paid" to "Paid", "draft" to "Draft", "void" to "Void")
+}
