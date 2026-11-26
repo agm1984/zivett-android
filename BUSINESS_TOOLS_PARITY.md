@@ -48,7 +48,7 @@ More swaps the whole tab bar, remembered on the device.
 | S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [x] |
 | S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [x] |
 | S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [x] |
-| S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [ ] |
+| S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [x] |
 | S8 | Settings: business tools settings (invoicing/numbering, payment instructions, email branding, reminders), line presets | [ ] | [ ] |
 | G1 | Booker job page: `free_cancel_until` line ("Free to cancel until …") | [ ] | [ ] |
 | G2 | Emergency fee itemized in accept/coupon preview; pro quote screen says it's added on top; business setup says "verified pros" | [ ] | [ ] |
@@ -92,6 +92,9 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 (Android): Reports' monthly chart is one navy bar per month
   (the web's one-hue rule), invoiced only.
 
+- 2026-11-25 (Android): the campaign preview renders the server's HTML in a
+  WebView with JavaScript off.
+
 ## Server asks
 
 (none yet)
@@ -118,3 +121,6 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 S6 Android: Expenses (receipt photo upload), Time on jobs,
   Payroll (approve/reopen, add/edit/delete shift), Reports. Not run on a
   device; receipt multipart upload untested against a real server.
+- 2026-11-25 S7 Android: campaigns list + editor (templates, audience
+  filters with live count, preview, test, send / schedule / unschedule,
+  results, delete draft). Not run on a device.
