@@ -26,6 +26,8 @@ fun NavGraphBuilder.toolsDestinations(nav: NavHostController) {
     composable<com.zivett.app.app.ToolsTimesheetsRoute> { TimesheetsScreen(tools) }
     composable<com.zivett.app.app.ToolsPayrollRoute> { PayrollScreen(tools) }
     composable<com.zivett.app.app.ToolsReportsRoute> { ReportsScreen(tools) }
+    composable<com.zivett.app.app.ToolsCampaignsRoute> { CampaignsScreen(tools) }
+    composable<com.zivett.app.app.ToolsCampaignRoute> { entry -> CampaignEditorScreen(entry.toRoute<com.zivett.app.app.ToolsCampaignRoute>().campaignId, tools) }
     composable<com.zivett.app.app.ToolsQuotesRoute> { entry -> OwnQuotesScreen(entry.toRoute<com.zivett.app.app.ToolsQuotesRoute>().filter, tools) }
     composable<com.zivett.app.app.ToolsQuoteRoute> { entry -> OwnQuoteScreen(entry.toRoute<com.zivett.app.app.ToolsQuoteRoute>().quoteId, tools) }
     composable<com.zivett.app.app.ToolsQuoteEditorRoute> { entry -> entry.toRoute<com.zivett.app.app.ToolsQuoteEditorRoute>().let { OwnQuoteEditorScreen(it.quoteId, it.customerId, tools) } }

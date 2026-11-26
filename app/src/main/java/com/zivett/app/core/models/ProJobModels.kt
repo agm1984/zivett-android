@@ -130,7 +130,7 @@ data class ProJobsResponse(
     val jobs: List<ProJobRow> = emptyList(),
     val total: Int = 0,
     val hasMore: Boolean = false,
-    val counts: Map<String, Int> = emptyMap(),
+    @Serializable(with = com.zivett.app.core.network.PhpRatesSerializer::class) val counts: Map<String, Int> = emptyMap(),
 )
 
 @Serializable data class ProJobContext(val categories: List<CategoryRef> = emptyList())

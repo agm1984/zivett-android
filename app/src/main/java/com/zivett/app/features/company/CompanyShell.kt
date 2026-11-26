@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Campaign
 import com.zivett.app.core.CompanySpace
 import com.zivett.app.features.tools.ToolsNav
 import com.zivett.app.features.tools.ToolsOverviewScreen
@@ -355,6 +356,8 @@ fun CompanyMoreScreen(side: CompanySpace.Side = CompanySpace.Side.MARKETPLACE, s
                         else ({ AccountLink("Time on jobs", "Who worked how long on your own jobs", Icons.Outlined.Timer) { nav.navigate(com.zivett.app.app.ToolsTimesheetsRoute) } })) else null,
                     if (isAdmin && Access.hasPayroll(user)) ({ AccountLink("Time on jobs", "Who worked how long on your own jobs", Icons.Outlined.Timer) { nav.navigate(com.zivett.app.app.ToolsTimesheetsRoute) } }) else null,
                     { AccountLink("Reports", "Invoiced, collected and what's left, by month", Icons.Outlined.BarChart) { nav.navigate(com.zivett.app.app.ToolsReportsRoute) } },
+                    // Promotional emails to the company's own customers: admins send them.
+                    if (isAdmin) ({ AccountLink("Campaigns", "Promotional emails to your own customers", Icons.Outlined.Campaign) { nav.navigate(com.zivett.app.app.ToolsCampaignsRoute) } }) else null,
                 )
                 rows(
                     if (!approved && !toolsOnly && user.canOpen("passport")) ({ AccountLink("Verified Pro Passport", "Credentials, rates, radius, availability", Icons.Outlined.Verified) { nav.navigate(PassportRoute) } }) else null,

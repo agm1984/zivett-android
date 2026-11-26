@@ -57,7 +57,7 @@ data class Timesheet(
     @Serializable
     data class Person(
         val user: CompanyCalendar.CrewTech? = null,
-        val byDay: Map<String, Int> = emptyMap(),
+        @Serializable(with = com.zivett.app.core.network.PhpRatesSerializer::class) val byDay: Map<String, Int> = emptyMap(),
         val totalMinutes: Int = 0,
         val entries: List<Entry> = emptyList(),
     )

@@ -186,7 +186,7 @@ data class ProQuotesResponse(
     val quotes: List<ProDocumentRow> = emptyList(),
     val total: Int = 0,
     val hasMore: Boolean = false,
-    val counts: Map<String, Int> = emptyMap(),
+    @Serializable(with = com.zivett.app.core.network.PhpRatesSerializer::class) val counts: Map<String, Int> = emptyMap(),
     /// Null = unlimited.
     val quotesLeftThisMonth: Int? = null,
     val quotesPerMonth: Int? = null,
@@ -285,7 +285,7 @@ data class ProInvoicesResponse(
     val invoices: List<ProDocumentRow> = emptyList(),
     val total: Int = 0,
     val hasMore: Boolean = false,
-    val counts: Map<String, Int> = emptyMap(),
+    @Serializable(with = com.zivett.app.core.network.PhpRatesSerializer::class) val counts: Map<String, Int> = emptyMap(),
     val outstandingCents: Int = 0,
     val numbering: InvoiceNumbering? = null,
 )
