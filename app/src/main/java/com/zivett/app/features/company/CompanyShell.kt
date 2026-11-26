@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.Settings
 import com.zivett.app.core.CompanySpace
 import com.zivett.app.features.tools.ToolsNav
 import com.zivett.app.features.tools.ToolsOverviewScreen
@@ -362,6 +363,7 @@ fun CompanyMoreScreen(side: CompanySpace.Side = CompanySpace.Side.MARKETPLACE, s
                 rows(
                     if (!approved && !toolsOnly && user.canOpen("passport")) ({ AccountLink("Verified Pro Passport", "Credentials, rates, radius, availability", Icons.Outlined.Verified) { nav.navigate(PassportRoute) } }) else null,
                     if (isAdmin) ({ AccountLink("Team", "Invite and manage teammates", Icons.Outlined.Group) { nav.navigate(TeamRoute(Areas.COMPANY)) } }) else null,
+                    { AccountLink("Business tools settings", "Invoice numbers, how to pay you, email colour, presets", Icons.Outlined.Settings) { nav.navigate(com.zivett.app.app.ToolsSettingsRoute) } },
                     if (user.canOpen("profile")) ({ AccountLink("Business profile", "Your name, logo and contact details", Icons.Outlined.Business) { nav.navigate(OrgProfileRoute(Areas.COMPANY)) } }) else null,
                     if (isAdmin) ({ AccountLink("Plan", "Your membership and what it includes", Icons.Outlined.StarOutline) { nav.navigate(PlanRoute(Areas.COMPANY)) } }) else null,
                     // Tools-only companies: the marketplace setup is one row away.

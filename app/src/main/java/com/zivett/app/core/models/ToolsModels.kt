@@ -200,3 +200,32 @@ object ToolsEndpoints {
     /// enable | new_link | disable (org admins).
     fun requestForm(action: String) = ApiRequest.post<RequestFormResponse, ActionBody>("api/company/business/requests/form", ActionBody(action))
 }
+
+/// `GET/PATCH api/company/business/settings`.
+@Serializable
+data class ToolsSettings(
+    val gstNumber: String? = null,
+    val paymentInstructions: String? = null,
+    val invoiceNumbering: InvoiceNumbering = InvoiceNumbering(),
+    /// "#1f6f5c" or null (charcoal).
+    val brandColor: String? = null,
+)
+
+@Serializable data class ToolsSettingsResponse(val settings: ToolsSettings)
+
+/// Only the keys sent change (explicit nulls clear GST / instructions / colour).
+@Serializable
+data class ToolsSettingsBody(
+    val gstNumber: String? = null,
+    val paymentInstructions: String? = null,
+    val invoiceNumbering: Numbering? = null,
+    val brandColor: String? = null,
+) {
+    @Serializable data class Numbering(val mode: String, val prefix: String? = null, val nextNumber: Int? = null)
+}
+
+object ToolsSettingsEndpoints {
+    fun show() = ApiRequest.get<ToolsSettingsResponse>("api/company/business/settings")
+    /// `body` is a hand-built object so only the edited keys go.
+    fun update(body: kotlinx.serialization.json.JsonObject) = ApiRequest.jsonElement<ToolsSettingsResponse>(Method.PATCH, "api/company/business/settings", body)
+}
