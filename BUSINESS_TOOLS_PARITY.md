@@ -47,7 +47,7 @@ More swaps the whole tab bar, remembered on the device.
 | S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [x] |
 | S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [x] |
 | S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [x] |
-| S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [ ] |
+| S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [x] |
 | S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [ ] |
 | S8 | Settings: business tools settings (invoicing/numbering, payment instructions, email branding, reminders), line presets | [ ] | [ ] |
 | G1 | Booker job page: `free_cancel_until` line ("Free to cancel until …") | [ ] | [ ] |
@@ -85,6 +85,13 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   push shows the office's full page to anyone holding `business_tools`,
   and the crew's route sheet to everyone else (the web's two pages).
 
+- 2026-11-25 (Android): Payroll's pay settings (presets, week start, pay
+  rates) stay on the web, like exports; the app shows the sheet and its
+  approve / reopen / shift edits, and says "Set rates on the web" when a
+  person with hours has no rate.
+- 2026-11-25 (Android): Reports' monthly chart is one navy bar per month
+  (the web's one-hue rule), invoiced only.
+
 ## Server asks
 
 (none yet)
@@ -108,3 +115,6 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   seeding a server draft, like the web), detail (issue, email, payments with
   receipts, change / remove with reason, void + corrected copy, PDF, delete
   draft) and Bill completed visits. Not run on a device.
+- 2026-11-25 S6 Android: Expenses (receipt photo upload), Time on jobs,
+  Payroll (approve/reopen, add/edit/delete shift), Reports. Not run on a
+  device; receipt multipart upload untested against a real server.
