@@ -155,6 +155,17 @@ private fun CompanyShellBody(approved: Boolean, tools: Boolean, toolsOnly: Boole
     val isAdmin = environment.session.user?.organizationRole == OrganizationRole.ADMIN
 
     val navBadges = rememberNavBadges()
+    // The company's own work is live (web `stores/organizationLive.js`): a
+    // teammate or customer changing an own job, quote, invoice, payment or
+    // request pings `organization.{id}`, and the screens that watch
+    // `liveEvents` refetch quietly. Active members only, server-side.
+    val organizationId = organization?.id
+    androidx.compose.runtime.DisposableEffect(organizationId, tools) {
+        val live = if (organizationId != null && tools) environment.realtime.subscribe(com.zivett.app.core.realtime.RealtimeEvents.organizationChannel(organizationId)) { event, _ ->
+            if (event == com.zivett.app.core.realtime.RealtimeEvents.organizationChanged) navBadges.received()
+        } else null
+        onDispose { live?.cancel() }
+    }
     // Field techs open on My day (web `roleHome`); their Dashboard moves
     // into More so the bar stays at five.
     val fieldTech = environment.session.user?.let { Access.opensOnMyDay(it) } == true
