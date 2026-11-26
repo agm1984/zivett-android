@@ -50,10 +50,10 @@ More swaps the whole tab bar, remembered on the device.
 | S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [x] |
 | S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [x] |
 | S8 | Settings: business tools settings (invoicing/numbering, payment instructions, email branding, reminders), line presets | [ ] | [x] |
-| G1 | Booker job page: `free_cancel_until` line ("Free to cancel until …") | [ ] | [ ] |
-| G2 | Emergency fee itemized in accept/coupon preview; pro quote screen says it's added on top; business setup says "verified pros" | [ ] | [ ] |
-| G3 | Team: resend invitation, send password reset email, remove from team; crew picker shows inactive leavers ("Tap to take them off") | [ ] | [ ] |
-| G4 | Business: Messages inbox (`/business/conversations`); request from a property card skips the property step | [ ] | [ ] |
+| G1 | Booker job page: `free_cancel_until` line ("Free to cancel until …") | [ ] | [x] |
+| G2 | Emergency fee itemized in accept/coupon preview; pro quote screen says it's added on top; business setup says "verified pros" | [ ] | [x] |
+| G3 | Team: resend invitation, send password reset email, remove from team; crew picker shows inactive leavers ("Tap to take them off") | [ ] | [x] |
+| G4 | Business: Messages inbox (`/business/conversations`); request from a property card skips the property step | [ ] | [x] |
 | G5 | Company org live channel (`private-organization.{id}`, `organization.changed`) refetches own-work screens | [ ] | [ ] |
 | G6 | Plan cards: `registration_fee_waived` + `_label` ("waived for a limited time"), Founding Pro badge | [ ] | [ ] |
 | G7 | Company Jobs tab badge (`jobs` nav badge) + "New message" tags (`unread_job_ids`) | [ ] | [ ] |
@@ -102,6 +102,12 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
 - 2026-11-25 (Android): reminders stay on the Overview (as on the web);
   Settings points there.
 
+- 2026-11-25 (Android): G2's pro-side note reads the fee from
+  `opportunities/{code}/quote-context` (the feed job doesn't carry it); the
+  app's accept sheet has no coupon field, so only the fee line was added.
+- 2026-11-25 (Android): G4's Messages inbox already existed (opened from the
+  top of Requests); only the property-preset skip was new.
+
 ## Server asks
 
 (none yet)
@@ -133,3 +139,6 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   results, delete draft). Not run on a device.
 - 2026-11-25 S8 Android: settings (payment text, numbering, GST, email
   colour, presets list/delete). Not run on a device.
+- 2026-11-25 G1-G4 Android: free-cancel window line, emergency fee line +
+  composer note + "verified pros", team resend / password reset + crew
+  picker leavers, property-preset skip. Not run on a device.
