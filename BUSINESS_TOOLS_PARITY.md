@@ -44,7 +44,7 @@ More swaps the whole tab bar, remembered on the device.
 | S0 | Shell: space switch, tools-only + submitted lifecycles, permissions gating, Business tools switch card on the Plan screen (`GET/PATCH /api/company/business-tools`) | [ ] | [x] |
 | S1 | Overview (`GET /business`) + Requests (list, added, dismiss, request-form link card) | [ ] | [x] |
 | S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [x] |
-| S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [ ] |
+| S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [x] |
 | S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [ ] |
 | S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [ ] |
 | S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [ ] |
@@ -78,6 +78,9 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   the filtered lists; New quote / job / invoice / Add customer are buttons
   under the title.
 
+- 2026-11-25 (Android): "Print" on quotes/invoices is the PDF in the share
+  sheet (it lists printers); no separate print action.
+
 ## Server asks
 
 (none yet)
@@ -89,3 +92,7 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   consent, exception request). Unit-tested decoding and rules; nothing run
   on a device yet. The Overview's New quote / job / invoice buttons and
   the customer page's quote / job / invoice links land with S3-S5.
+- 2026-11-25 S3 Android 7d28cbb..d79b665: own quotes list, detail (status
+  actions, email sheet, approval link, deposit, duplicate, PDF share, delete
+  draft) and editor (customer/address, lines + presets, terms, taxes). Not
+  run on a device.
