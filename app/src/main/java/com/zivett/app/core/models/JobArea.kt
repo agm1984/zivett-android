@@ -145,6 +145,11 @@ class ProfileArea(
     val uploadPhoto: ((ByteArray) -> ApiRequest<ProfilePhotoResponse>)? = null,
     val deletePhoto: (() -> ApiRequest<ProfilePhotoResponse>)? = null,
 ) {
+    /// Offers and news: on = a yes, off = an unsubscribe (bookers only).
+    fun setMarketing(on: Boolean) = ApiRequest.patch<CustomerProfile, PreferencesBody>(
+        "api/${if (kind == JobArea.Kind.BUSINESS) "business" else "customer"}/profile/notifications", PreferencesBody(marketing = on),
+    )
+
     companion object {
         val customer = ProfileArea(JobArea.Kind.CUSTOMER, { CustomerEndpoints.profile() }, { CustomerEndpoints.updateProfile(it) }, { email, sms -> CustomerEndpoints.updatePreferences(email, sms) })
         val business = ProfileArea(JobArea.Kind.BUSINESS, { BusinessEndpoints.profile() }, { BusinessEndpoints.updateProfile(it) }, { email, sms -> BusinessEndpoints.updatePreferences(email, sms) })

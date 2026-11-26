@@ -212,6 +212,10 @@ fun SignupScreen(nav: NavHostController, initialRole: UserRole?) {
 
         ZCheckbox(form.form.terms, { form.form = form.form.copy(terms = it) }) { TermsConsent() }
         form.fieldErrors["terms"]?.let { ZCaption(it, color = colors.danger) }
+        // Bookers only: ZiVETT's own offers and seasonal reminders.
+        if (form.form.role != com.zivett.app.core.models.UserRole.COMPANY) {
+            ZCheckbox(form.form.marketingOptIn, { form.form = form.form.copy(marketingOptIn = it) }, "Send me the occasional offer and seasonal reminder from ZiVETT. Unsubscribe any time.")
+        }
 
         ZButton("Create account", loading = form.submitting, enabled = form.canSubmit) {
             scope.launch { form.submit(environment.session) }

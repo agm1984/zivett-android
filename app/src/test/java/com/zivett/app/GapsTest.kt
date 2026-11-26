@@ -38,4 +38,14 @@ class GapsTest {
         assertEquals(listOf(7, 9), jobs.unreadJobIds)
         assertEquals(emptyList<Int>(), com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.JobsResponse>("""{"jobs": []}""").unreadJobIds)
     }
+
+    @Test fun offersOptInRidesTheBookingOnlyWhenTicked() {
+        val form = BookingWizardEngine.Form(categoryId = 1, mode = "quote", issue = "Leak")
+        assertEquals(null, BookingWizardEngine.payload(form, "2026-11-25").marketingOptIn)
+        assertEquals(true, BookingWizardEngine.payload(form.copy(marketingOptIn = true), "2026-11-25").marketingOptIn)
+        val profile = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.CustomerProfile>(
+            """{"profile": {"name": "Amara", "email": "a@x.test"}, "marketing": {"receives": true, "opted_in": true, "unsubscribed": false}}""",
+        )
+        assertEquals(true, profile.marketing?.receives)
+    }
 }

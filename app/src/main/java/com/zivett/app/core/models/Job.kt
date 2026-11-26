@@ -553,7 +553,12 @@ data class CustomerProfile(
     val profile: Profile,
     val notificationPreferences: List<Preference> = emptyList(),
     val smsEnabled: Boolean = false,
+    /// ZiVETT's promotional emails (bookers only; null for pros).
+    val marketing: Marketing? = null,
 ) {
+    @Serializable
+    data class Marketing(val receives: Boolean = false)
+
     @Serializable
     data class Profile(
         val firstName: String = "",
@@ -651,6 +656,8 @@ data class BookingOptions(
     val modes: List<Mode> = emptyList(),
     val pricing: List<PriceLine>? = null,
     val warrantyDays: Int? = null,
+    /// Already said yes to ZiVETT's offers: the Review screen's box hides.
+    val marketingOptedIn: Boolean = false,
     val trustFeeBps: Int? = null,
     val gstBps: Int? = null,
     val pstBps: Int? = null,

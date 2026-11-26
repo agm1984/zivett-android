@@ -53,6 +53,8 @@ data class RegistrationForm(
     val terms: Boolean = false,
     val referralCode: String? = null,
     val deviceName: String = "",
+    /// Bookers only: a yes to ZiVETT's offers (unticked by default).
+    val marketingOptIn: Boolean = false,
 )
 
 /// The endpoints the auth feature owns. Static factories keep call sites

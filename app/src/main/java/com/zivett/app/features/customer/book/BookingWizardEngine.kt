@@ -63,6 +63,8 @@ object BookingWizardEngine {
         /// in, so its screens are skipped (web `propertyPreset`); Review's
         /// Edit brings them back.
         val propertyPreset: Boolean = false,
+        /// Unticked unless they tick it (CASL).
+        val marketingOptIn: Boolean = false,
         val selectedWindows: Set<String> = emptySet(),
         val urgency: String? = null,
     )
@@ -156,6 +158,7 @@ object BookingWizardEngine {
             customerAddressId = if (business) null else form.savedAddressId,
             propertyId = if (business) form.propertyId else null,
             tenant = if (business && form.tenant.isNotEmpty()) form.tenant else null,
+            marketingOptIn = if (form.marketingOptIn) true else null,
         )
     }
 
