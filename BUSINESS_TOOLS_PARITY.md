@@ -46,7 +46,7 @@ More swaps the whole tab bar, remembered on the device.
 | S2 | Customers: list/search, detail (addresses, history, campaigns card), add/edit, archive/delete, marketing consent, ZiVETT-customer block + exception request. Import/export web-only | [ ] | [x] |
 | S3 | Own quotes: list, detail, editor (line items + presets), send, answer, share link, duplicate, delete, PDF (share sheet), email | [ ] | [x] |
 | S4 | Own jobs: list, editor (incl. repeating series), detail for admins (status, crew, record: notes/photos/time/costs/changes, money card, series stop/crew). Extend existing OwnJobView | [ ] | [x] |
-| S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [ ] |
+| S5 | Own invoices: list, editor, detail (issue, void, record/edit/delete payment, receipt email, PDF, email), Bill visits | [ ] | [x] |
 | S6 | Books: Expenses (receipt photo), Time on jobs, Payroll (when on: period sheet, approve/reopen, shift edits), Reports | [ ] | [ ] |
 | S7 | Campaigns (org admins): list, editor, audience filters + count, preview, test, send, schedule/unschedule, results | [ ] | [ ] |
 | S8 | Settings: business tools settings (invoicing/numbering, payment instructions, email branding, reminders), line presets | [ ] | [ ] |
@@ -104,3 +104,7 @@ Each agent VERIFIES a G item first (it may already be done) and marks it.
   picker, changes, notes, photos, time, costs, money, series stop / crew
   to all visits, invoices) and editor (incl. repeating). Not run on a device;
   photo upload untested against a real server.
+- 2026-11-25 S5 Android: own invoices tab, editor (incl. from quote / job
+  seeding a server draft, like the web), detail (issue, email, payments with
+  receipts, change / remove with reason, void + corrected copy, PDF, delete
+  draft) and Bill completed visits. Not run on a device.
