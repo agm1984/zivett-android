@@ -116,7 +116,7 @@ class BookingWizardModel(
         serverDraft = runCatching { client.send(BookingDraftEndpoints.show(form.area)) }.getOrNull()?.draft
         form = form.copy(photoCount = serverDraft?.photos?.size ?: 0)
         presetCategorySlug?.let { slug -> loaded.categories.firstOrNull { it.slug == slug }?.let { selectCategory(it); stepIndex = 1 } }
-        presetPropertyId?.let { id -> if ((loaded.properties ?: emptyList()).any { it.id == id }) form = form.copy(propertyId = id) }
+        presetPropertyId?.let { id -> if ((loaded.properties ?: emptyList()).any { it.id == id }) form = form.copy(propertyId = id, propertyPreset = true) }
         if (form.area == BookingWizardEngine.Area.CUSTOMER && form.savedAddressId == null) {
             ((loaded.addresses ?: emptyList()).firstOrNull { it.isDefault } ?: loaded.addresses?.firstOrNull())?.let { useSavedPlace(it) }
         }
@@ -170,7 +170,11 @@ class BookingWizardModel(
     fun next() { if (canContinue && stepIndex < steps.size - 1) stepIndex += 1 }
     fun back() { stepIndex = maxOf(0, stepIndex - 1) }
     fun skip() { if (step.isOptional) stepIndex = minOf(steps.size - 1, stepIndex + 1) }
-    fun jump(target: BookingWizardEngine.Step) { steps.indexOf(target).takeIf { it >= 0 }?.let { stepIndex = it } }
+    fun jump(target: BookingWizardEngine.Step) {
+        // A skipped property screen comes back when Review's Edit asks for it.
+        if ((target == BookingWizardEngine.Step.Where || target == BookingWizardEngine.Step.Details) && form.propertyPreset) form = form.copy(propertyPreset = false)
+        steps.indexOf(target).takeIf { it >= 0 }?.let { stepIndex = it }
+    }
 
     fun toggleWindow(key: String) {
         form = form.copy(selectedWindows = if (key in form.selectedWindows) form.selectedWindows - key else form.selectedWindows + key)
@@ -385,6 +389,7 @@ class BookingWizardModel(
                 fieldErrors = error.errors.firstMessages
                 error.errors.errors.keys.sorted().firstOrNull()?.let { first ->
                     if (first == "mode") form = form.copy(modePreset = false)
+                    if (first in setOf("property_id", "unit", "tenant", "access_notes")) form = form.copy(propertyPreset = false)
                     jump(BookingWizardEngine.step(first, questions, area))
                 }
                 generalError = if (fieldErrors.isEmpty()) error.errors.message else null

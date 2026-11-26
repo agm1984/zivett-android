@@ -59,6 +59,10 @@ object BookingWizardEngine {
         val accessNotes: String = "",
         val mode: String? = null,
         val modePreset: Boolean = false,
+        /// A Properties card's "Request job" picked the property on the way
+        /// in, so its screens are skipped (web `propertyPreset`); Review's
+        /// Edit brings them back.
+        val propertyPreset: Boolean = false,
         val selectedWindows: Set<String> = emptySet(),
         val urgency: String? = null,
     )
@@ -74,11 +78,13 @@ object BookingWizardEngine {
     fun steps(form: Form, questions: List<BookingOptions.Question>): List<Step> {
         val steps = mutableListOf<Step>(Step.Category)
         steps += questions.map { Step.Question(it.id) }
-        steps += listOf(Step.Issue, Step.Photos, Step.Where)
+        steps += listOf(Step.Issue, Step.Photos)
+        val presetProperty = form.area == Area.BUSINESS && form.propertyPreset && form.propertyId != null
+        if (!presetProperty) steps += Step.Where
         // Business bookers keep their unit / tenant / access screen; a
         // homeowner's access notes sit at the bottom of Where behind a
         // toggle (they lost their own screen 2026-10-12, web 5c8a020).
-        if (form.area == Area.BUSINESS) steps += Step.Details
+        if (form.area == Area.BUSINESS && !presetProperty) steps += Step.Details
         if (!form.modePreset) steps += Step.Mode
         when (form.mode) {
             "scheduled" -> steps += Step.Schedule

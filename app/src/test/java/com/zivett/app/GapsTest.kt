@@ -1,6 +1,7 @@
 package com.zivett.app
 
 import com.zivett.app.core.models.JobStatus
+import com.zivett.app.features.customer.book.BookingWizardEngine
 import com.zivett.app.features.customer.jobs.JobPresentation
 import java.time.Instant
 import org.junit.Assert.assertEquals
@@ -22,5 +23,13 @@ class GapsTest {
         assertEquals("api/business/team/members/7/password-reset", com.zivett.app.core.models.TeamArea.business.passwordReset(7).path)
         val leaver = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.RosterMember>("""{"id": 3, "name": "Sam", "assignable": false, "inactive": true, "assigned": true}""")
         assertEquals(true, leaver.inactive)
+    }
+
+    @Test fun aPresetPropertySkipsTheWhereScreens() {
+        val form = BookingWizardEngine.Form(area = BookingWizardEngine.Area.BUSINESS, propertyId = 4, propertyPreset = true)
+        val steps = BookingWizardEngine.steps(form, emptyList())
+        assertEquals(false, steps.contains(BookingWizardEngine.Step.Where))
+        assertEquals(false, steps.contains(BookingWizardEngine.Step.Details))
+        assertEquals(true, BookingWizardEngine.steps(form.copy(propertyPreset = false), emptyList()).contains(BookingWizardEngine.Step.Where))
     }
 }
