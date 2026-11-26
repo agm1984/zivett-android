@@ -257,6 +257,12 @@ data class Job(
     val closedAt: Instant? = null,
     val autoCloseAt: Instant? = null,
     val cancellationFeeCents: Int? = null,
+    /// The free cancel window after acceptance (`Cancellation::freeUntil`):
+    /// "Free to cancel until ...". Null once it's over or never applied.
+    val freeCancelUntil: Instant? = null,
+    /// Accepted and the pro never set off (the progress SLA's escalation):
+    /// cancelling is free. Absent on an older server.
+    val stalled: Boolean = false,
     val unit: String? = null,
     val company: CompanySummary? = null,
     val review: Review? = null,
