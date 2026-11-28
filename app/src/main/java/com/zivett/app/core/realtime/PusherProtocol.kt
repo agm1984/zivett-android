@@ -74,10 +74,14 @@ object RealtimeEvents {
     const val messageSent = "message.sent"
     const val locationUpdated = "location.updated"
     const val jobUpdated = "job.updated"
+    /// The company's own work changed (`OrganizationChanged::ping`, `{kind, id}`):
+    /// own jobs, quotes, invoices, payments and requests.
+    const val organizationChanged = "organization.changed"
 
     /// The bare channel names (the client adds `private-`).
     fun jobChannel(jobId: Int) = "job.$jobId"
     fun jobLocationChannel(jobId: Int) = "job.$jobId.location"
+    fun organizationChannel(organizationId: Int) = "organization.$organizationId"
 
     /// The bell-row shape a broadcast carries (no read/created_at — the
     /// row is new by definition).

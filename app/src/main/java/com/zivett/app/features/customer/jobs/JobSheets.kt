@@ -174,7 +174,8 @@ fun AcceptQuoteSheet(job: Job, quote: Quote, model: JobDetailModel, onDismiss: (
 
                 quote.authorizationPreview?.let { preview ->
                     ZCard {
-                        MoneyRow("Quote", preview.subtotalCents ?: quote.amountCents)
+                        MoneyRow("Quote", quote.amountCents)
+                        preview.emergencyFeeCents?.takeIf { it > 0 }?.let { MoneyRow("Emergency fee", it) }
                         preview.feeCents?.let { MoneyRow("Trust & support fee", it) }
                         preview.gstCents?.let { MoneyRow("GST${preview.gstBps?.let { b -> " (${JobPresentation.percent(b)})" } ?: ""}", it) }
                         preview.pstCents?.takeIf { it > 0 }?.let { MoneyRow("PST", it) }

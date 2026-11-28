@@ -399,6 +399,20 @@ fun QuoteComposerSheet(
         }
         error?.let { ZBanner(it, tone = ZTone.DANGER) }
 
+        // An emergency visit's fee rides on top of the quote (EmergencyFee):
+        // the quote context names it, so the pro leaves it out of the price.
+        if (job.mode == "instant") {
+            val client = LocalAppEnvironment.current.client
+            var emergencyFee by remember { mutableStateOf<Int?>(null) }
+            androidx.compose.runtime.LaunchedEffect(job.code) {
+                val code = job.code ?: return@LaunchedEffect
+                emergencyFee = runCatching { client.send(com.zivett.app.core.models.CompanyEndpoints.quoteContext(code)).emergencyFeeCents }.getOrNull()
+            }
+            emergencyFee?.takeIf { it > 0 }?.let { fee ->
+                ZBanner("This is an emergency visit. ZiVETT adds the ${Money.format(fee)} emergency fee to your invoice on top of this quote, so leave it out of your price.", tone = ZTone.INFO)
+            }
+        }
+
         if (!payoutsReady) {
             Column(modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(ZRadius.card)).background(colors.warningSoft).padding(ZSpacing.sm), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 ZBodyStrong("One step before you can quote: set up payouts.")

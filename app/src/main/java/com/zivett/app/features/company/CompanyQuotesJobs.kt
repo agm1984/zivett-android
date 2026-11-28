@@ -281,7 +281,10 @@ class CompanyJobsModel(private val client: ApiClient) {
     /// The Completed tab: billed history is the invoices list (the web's `?tab=completed`).
     var invoices by mutableStateOf<Loadable<List<Invoice>>>(Loadable.Loading)
 
-    suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.jobs()).jobs } }
+    /// Jobs whose thread holds an unread booker message.
+    var unread by mutableStateOf<Set<Int>>(emptySet())
+
+    suspend fun load() { state = state.reloaded { client.send(CompanyEndpoints.jobs()).also { unread = it.unreadJobIds.toSet() }.jobs } }
     suspend fun loadInvoices() { invoices = invoices.reloaded { client.send(CompanyEndpoints.invoices()).invoices } }
 
     /// Refusals (`not_started`, `not_on_crew`, `crew_incomplete`) carry a
@@ -329,6 +332,8 @@ fun CompanyActiveJobsScreen() {
     var starting by remember { mutableStateOf<Job?>(null) }
     val myId = environment.session.user?.id
     LaunchedEffect(model) { model.load() }
+    val live = com.zivett.app.features.shared.LocalNavBadges.current?.liveEvents ?: 0
+    LaunchedEffect(live) { if (live > 0) model.load() }
     LaunchedEffect(completed) { if (completed && model.invoices.value == null) model.loadInvoices() }
 
     ZToastBox(model.toast, { model.toast = null }) {
@@ -353,7 +358,11 @@ fun CompanyActiveJobsScreen() {
                         if (jobs.isEmpty()) ZEmptyState(Icons.Outlined.Work, "No active jobs", "Quote an opportunity and it will land here once accepted, ready to progress through to completion.")
                         for (job in ordered) {
                             ZCard(onClick = { nav.navigate(CompanyJobRoute(job.id)) }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) { ZBodyStrong(job.title, maxLines = 1, modifier = Modifier.weight(1f)); JobStatusBadge(job.status) }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    ZBodyStrong(job.title, maxLines = 1, modifier = Modifier.weight(1f))
+                                    if (job.id in model.unread) ZBadge("New message", ZTone.INFO)
+                                    JobStatusBadge(job.status)
+                                }
                                 ZCaption(listOfNotNull(job.code, job.address).joinToString(" · "), maxLines = 1)
                                 // Who's on it — "you" is the row a tech scans for.
                                 when {

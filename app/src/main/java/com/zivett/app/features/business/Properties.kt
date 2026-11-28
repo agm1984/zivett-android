@@ -121,7 +121,7 @@ fun PropertiesScreen(onBack: (() -> Unit)?) {
                 ZLoadable(model.state, retry = { scope.launch { model.load() } }) { properties ->
                     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.md)) {
                         ZPageTitle("Properties", "Requests are booked against a property so history stays organized.")
-                        if (properties.isEmpty()) ZEmptyState(Icons.Outlined.Apartment, "No properties yet", "Add your first property to start booking requests against it.")
+                        if (properties.isEmpty()) ZEmptyState(Icons.Outlined.Apartment, "No properties yet", "Add your first property to start routing repair requests through ZiVETT's verified pros.")
                         for (property in properties) {
                             ZCard {
                                 Row(horizontalArrangement = Arrangement.spacedBy(ZSpacing.sm), verticalAlignment = Alignment.Top) {

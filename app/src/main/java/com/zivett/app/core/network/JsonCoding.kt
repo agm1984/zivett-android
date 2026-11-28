@@ -103,3 +103,18 @@ object PhpRatesSerializer : KSerializer<Map<String, Int>> {
 
     override fun serialize(encoder: Encoder, value: Map<String, Int>) = delegate.serialize(encoder, value)
 }
+
+/// A string → string map that PHP writes as `[]` when empty (the campaign
+/// editor's `problems`).
+object PhpStringMapSerializer : KSerializer<Map<String, String>> {
+    private val delegate = MapSerializer(String.serializer(), String.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): Map<String, String> {
+        val input = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        return (element as? JsonObject)?.entries?.mapNotNull { (key, value) -> (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { key to it } }?.toMap() ?: emptyMap()
+    }
+
+    override fun serialize(encoder: Encoder, value: Map<String, String>) = delegate.serialize(encoder, value)
+}

@@ -152,6 +152,8 @@ data class Quote(
         val pstCents: Int? = null,
         val referralCreditCents: Int? = null,
         val totalCents: Int? = null,
+        /// An emergency's fee, billed on top of the quote (2026-11-24).
+        val emergencyFeeCents: Int? = null,
     )
 }
 
@@ -257,6 +259,12 @@ data class Job(
     val closedAt: Instant? = null,
     val autoCloseAt: Instant? = null,
     val cancellationFeeCents: Int? = null,
+    /// The free cancel window after acceptance (`Cancellation::freeUntil`):
+    /// "Free to cancel until ...". Null once it's over or never applied.
+    val freeCancelUntil: Instant? = null,
+    /// Accepted and the pro never set off (the progress SLA's escalation):
+    /// cancelling is free. Absent on an older server.
+    val stalled: Boolean = false,
     val unit: String? = null,
     val company: CompanySummary? = null,
     val review: Review? = null,
@@ -545,7 +553,12 @@ data class CustomerProfile(
     val profile: Profile,
     val notificationPreferences: List<Preference> = emptyList(),
     val smsEnabled: Boolean = false,
+    /// ZiVETT's promotional emails (bookers only; null for pros).
+    val marketing: Marketing? = null,
 ) {
+    @Serializable
+    data class Marketing(val receives: Boolean = false)
+
     @Serializable
     data class Profile(
         val firstName: String = "",
@@ -643,6 +656,8 @@ data class BookingOptions(
     val modes: List<Mode> = emptyList(),
     val pricing: List<PriceLine>? = null,
     val warrantyDays: Int? = null,
+    /// Already said yes to ZiVETT's offers: the Review screen's box hides.
+    val marketingOptedIn: Boolean = false,
     val trustFeeBps: Int? = null,
     val gstBps: Int? = null,
     val pstBps: Int? = null,
@@ -696,7 +711,9 @@ data class BookingOptions(
 
 // MARK: - Wrapped list/detail responses
 
-@Serializable data class JobsResponse(val jobs: List<Job> = emptyList())
+/// `unread_job_ids`: the company Jobs list's jobs whose thread holds an
+/// unread booker message ("New message" tags; absent elsewhere).
+@Serializable data class JobsResponse(val jobs: List<Job> = emptyList(), val unreadJobIds: List<Int> = emptyList())
 @Serializable data class JobResponse(val job: Job)
 @Serializable data class InvoicesResponse(val invoices: List<Invoice> = emptyList())
 @Serializable data class InvoiceResponse(val invoice: Invoice)

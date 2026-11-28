@@ -136,7 +136,7 @@ fun BusinessSetupScreen(onDismiss: () -> Unit) {
                             Icon(Icons.Filled.Verified, contentDescription = null, tint = ZTheme.colors.brandGold, modifier = Modifier.padding(top = ZSpacing.xl).size(40.dp))
                             ZMono("Setup complete")
                             ZDisplay("You're all set. Welcome to ZiVETT")
-                            ZBody("Your team can now book vetted pros for any property, compare quotes, and keep every repair's paper trail in one place.", tone = ZTextTone.SOFT)
+                            ZBody("Your team can now book verified pros for any property, compare quotes, and keep every repair's paper trail in one place.", tone = ZTextTone.SOFT)
                             ZButton("Book your first request", onClick = onDismiss)
                             ZButton("Go to your overview", style = ZButtonStyle.OUTLINE, onClick = onDismiss)
                         }

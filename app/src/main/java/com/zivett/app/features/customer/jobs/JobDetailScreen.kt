@@ -474,7 +474,7 @@ private fun ChangeOrders(job: Job, model: JobDetailModel) {
 private fun ManageRow(job: Job, area: JobArea, onSheet: (JobSheet) -> Unit) {
     if (job.status == JobStatus.CANCELLED || !(job.isCancellable || job.company != null)) return
     Column(verticalArrangement = Arrangement.spacedBy(ZSpacing.sm), modifier = Modifier.padding(top = ZSpacing.sm)) {
-        ZCaption(JobPresentation.cancelManageCopy(job))
+        ZCaption(JobPresentation.cancelManageCopy(job, business = area.kind == JobArea.Kind.BUSINESS))
         com.zivett.app.design.ZFlowRow(spacing = ZSpacing.xs) {
             if (job.company != null) ZButton(if (JobPresentation.openCases(job).isNotEmpty()) "Report another problem" else "Report a problem", style = ZButtonStyle.OUTLINE, compact = true, fullWidth = false) { onSheet(JobSheet.Report) }
             if (job.status == JobStatus.WARRANTY_ACTIVE && (job.disputes ?: emptyList()).none { it.kind == "warranty_claim" && it.status !in setOf("resolved", "declined") }) {

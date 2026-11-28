@@ -77,6 +77,25 @@ object Access {
         user.role == UserRole.COMPANY && user.organization?.isApproved == true &&
             user.organizationRole != OrganizationRole.ADMIN && user.takesJobs
 
+    /// The company's own customers, quotes, jobs and invoices (web
+    /// `navFor`): the `business_tools` section when the server lists
+    /// permissions, else the org's switch.
+    fun hasBusinessTools(user: User): Boolean {
+        if (user.role != UserRole.COMPANY) return false
+        val organization = user.organization ?: return false
+        return user.permissions?.contains("business_tools") ?: organization.hasBusinessTools
+    }
+
+    /// Business tools only (`BusinessTools::toolsOnly`): never applied to
+    /// the marketplace, finished the tools setup. The Overview is home.
+    fun toolsOnly(user: User): Boolean {
+        val organization = user.organization ?: return false
+        return hasBusinessTools(user) && !organization.isApproved && organization.submittedAt == null && organization.setupCompletedAt != null
+    }
+
+    /// The team clock, My hours and Payroll (the session's `payroll` flag).
+    fun hasPayroll(user: User): Boolean = hasBusinessTools(user) && (user.payroll ?: true)
+
     private fun isLive(destination: Destination): Boolean = when (destination) {
         Destination.Customer, Destination.Business, is Destination.Company -> true
         else -> false

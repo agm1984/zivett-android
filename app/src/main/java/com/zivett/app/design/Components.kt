@@ -33,6 +33,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Button
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -856,3 +858,44 @@ fun HSpace(width: Dp) = Spacer(Modifier.width(width))
 
 @Suppress("unused")
 private val keepSurface: @Composable () -> Unit = { Surface {} ; LocalContentColor.current; MaterialTheme.colorScheme }
+
+/// One-of-N switch (Material segmented buttons): the company space switch,
+/// list status filters.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> ZSegmented(options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
+    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
+        options.forEachIndexed { index, (value, label) ->
+            SegmentedButton(
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, options.size),
+            ) { Text(label, maxLines = 1, style = ZType.label) }
+        }
+    }
+}
+
+/// Filter pills in a scrolling row (web list toolbars: "All · Draft · Sent"),
+/// each with an optional count.
+@Composable
+fun <T> ZFilterPills(options: List<Triple<T, String, Int?>>, selected: T, onSelect: (T) -> Unit) {
+    val colors = ZTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        for ((value, label, count) in options) {
+            val on = value == selected
+            Text(
+                if (count != null) "$label ${com.zivett.app.core.Money.count(count)}" else label,
+                style = ZType.label,
+                color = if (on) Color.White else colors.inkSoft,
+                modifier = Modifier.clip(CircleShape)
+                    .background(if (on) colors.navy else colors.surface)
+                    .border(1.dp, if (on) colors.navy else colors.borderStrong, CircleShape)
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+    }
+}

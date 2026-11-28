@@ -257,13 +257,16 @@ object JobPresentation {
 
     // Cancel copy (`JobDetailView.vue` manage row + modal)
 
-    fun cancelManageCopy(job: Job): String {
+    fun cancelManageCopy(job: Job, business: Boolean = false, freeUntilText: (java.time.Instant) -> String = { com.zivett.app.features.company.Dates.shortTime(it) }): String {
         if (!job.isCancellable) {
             openCases(job).firstOrNull()?.let { return "${caseName(it)} is ${disputeStatusMeta(it.status).label.lowercase()}. Payment and closing are paused until it's resolved." }
             return "Something wrong? Reporting a problem brings support in, and any pending payment is paused until it's resolved."
         }
+        if (job.stalled) return "Free to cancel: your pro hasn't set off."
         val fee = job.cancellationFeeCents
-        if (fee != null && fee > 0) return "Cancelling now has a ${Money.format(fee)} cancellation fee. Your pro has already committed to this job."
+        val until = job.freeCancelUntil
+        if ((fee ?: 0) == 0 && until != null) return "Free to cancel until ${freeUntilText(until)}. After that, or once your pro starts the ${if (business) "request" else "job"}, a cancellation fee applies."
+        if (fee != null && fee > 0) return "Cancelling now has a ${Money.format(fee)} cancellation fee because your pro has already committed to this ${if (business) "request" else "job"}."
         return "Free to cancel right now. Once a pro is committed, a cancellation fee applies."
     }
 

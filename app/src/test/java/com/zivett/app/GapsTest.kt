@@ -1,0 +1,51 @@
+package com.zivett.app
+
+import com.zivett.app.core.models.JobStatus
+import com.zivett.app.features.customer.book.BookingWizardEngine
+import com.zivett.app.features.customer.jobs.JobPresentation
+import java.time.Instant
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+/// The November gaps (tracker G1-G9).
+class GapsTest {
+    @Test fun freeCancelWindowIsWorded() {
+        val job = Fixtures.job(status = JobStatus.ACCEPTED, company = Fixtures.ravensworth).copy(cancellationFeeCents = 0, freeCancelUntil = Instant.parse("2026-11-26T20:00:00Z"))
+        assertEquals(
+            "Free to cancel until NOV26. After that, or once your pro starts the request, a cancellation fee applies.",
+            JobPresentation.cancelManageCopy(job, business = true) { "NOV26" },
+        )
+        assertEquals("Free to cancel: your pro hasn't set off.", JobPresentation.cancelManageCopy(job.copy(stalled = true)))
+    }
+
+    @Test fun teamEndpointsFollowTheArea() {
+        assertEquals("api/company/team/invitations/4/resend", com.zivett.app.core.models.TeamArea.company.resend(4).path)
+        assertEquals("api/business/team/members/7/password-reset", com.zivett.app.core.models.TeamArea.business.passwordReset(7).path)
+        val leaver = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.RosterMember>("""{"id": 3, "name": "Sam", "assignable": false, "inactive": true, "assigned": true}""")
+        assertEquals(true, leaver.inactive)
+    }
+
+    @Test fun aPresetPropertySkipsTheWhereScreens() {
+        val form = BookingWizardEngine.Form(area = BookingWizardEngine.Area.BUSINESS, propertyId = 4, propertyPreset = true)
+        val steps = BookingWizardEngine.steps(form, emptyList())
+        assertEquals(false, steps.contains(BookingWizardEngine.Step.Where))
+        assertEquals(false, steps.contains(BookingWizardEngine.Step.Details))
+        assertEquals(true, BookingWizardEngine.steps(form.copy(propertyPreset = false), emptyList()).contains(BookingWizardEngine.Step.Where))
+    }
+
+    @Test fun jobsListCarriesUnreadThreads() {
+        val jobs = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.JobsResponse>("""{"jobs": [], "unread_job_ids": [7, 9]}""")
+        assertEquals(listOf(7, 9), jobs.unreadJobIds)
+        assertEquals(emptyList<Int>(), com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.JobsResponse>("""{"jobs": []}""").unreadJobIds)
+    }
+
+    @Test fun offersOptInRidesTheBookingOnlyWhenTicked() {
+        val form = BookingWizardEngine.Form(categoryId = 1, mode = "quote", issue = "Leak")
+        assertEquals(null, BookingWizardEngine.payload(form, "2026-11-25").marketingOptIn)
+        assertEquals(true, BookingWizardEngine.payload(form.copy(marketingOptIn = true), "2026-11-25").marketingOptIn)
+        val profile = com.zivett.app.core.network.JsonCoding.json.decodeFromString<com.zivett.app.core.models.CustomerProfile>(
+            """{"profile": {"name": "Amara", "email": "a@x.test"}, "marketing": {"receives": true, "opted_in": true, "unsubscribed": false}}""",
+        )
+        assertEquals(true, profile.marketing?.receives)
+    }
+}

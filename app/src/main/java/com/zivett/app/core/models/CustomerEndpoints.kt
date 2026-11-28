@@ -153,6 +153,8 @@ data class BookJobBody(
     /// Business bookings.
     val propertyId: Int? = null,
     val tenant: String? = null,
+    /// Ticked "Send me the occasional offer" on Review (sent only when true).
+    val marketingOptIn: Boolean? = null,
 ) {
     data class IntakeAnswerBody(val questionId: Int, val answers: List<String>)
 
@@ -183,7 +185,7 @@ data class BookJobBody(
 
 /// Always the split pair — the server ignores a single `name`.
 @Serializable data class UpdateProfileBody(val firstName: String? = null, val lastName: String? = null, val email: String? = null, val phone: String? = null)
-@Serializable data class PreferencesBody(val email: Map<String, Boolean>? = null, val sms: Boolean? = null)
+@Serializable data class PreferencesBody(val email: Map<String, Boolean>? = null, val sms: Boolean? = null, val marketing: Boolean? = null)
 
 @Serializable
 data class AddressBody(

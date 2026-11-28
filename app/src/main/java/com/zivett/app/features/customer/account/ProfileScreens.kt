@@ -264,6 +264,12 @@ class NotificationPreferencesModel(private val client: ApiClient, private val ar
         push(null, on)
     }
 
+    suspend fun setMarketing(on: Boolean) {
+        val profile = state.value ?: return
+        state = Loadable.Loaded(profile.copy(marketing = CustomerProfile.Marketing(on)))
+        try { state = Loadable.Loaded(client.send(area.setMarketing(on))) } catch (e: Exception) { error = e.userMessage; load() }
+    }
+
     private suspend fun push(email: Map<String, Boolean>?, sms: Boolean?) {
         try {
             state = Loadable.Loaded(client.send(area.updatePreferences(email, sms)))
@@ -305,6 +311,17 @@ fun NotificationPreferencesScreen(area: ProfileArea, onBack: () -> Unit) {
                                 if (profile.profile.phoneVerified) "Time-sensitive updates to ${profile.profile.phone ?: "your phone"}." else "Verify your phone number first.",
                                 profile.smsEnabled, { on -> scope.launch { model.setSms(on) } }, enabled = profile.profile.phoneVerified,
                             )
+                        }
+                        // ZiVETT's promotional emails (bookers only): a yes, or an unsubscribe.
+                        profile.marketing?.let { marketing ->
+                            ZSectionHeader("Offers and news")
+                            ZCard {
+                                ZToggleRow(
+                                    "Promotional emails from ZiVETT",
+                                    "The occasional seasonal reminder, offer and news. Never from a particular pro, and you can stop them any time.",
+                                    marketing.receives, { on -> scope.launch { model.setMarketing(on) } },
+                                )
+                            }
                         }
                         Spacer(Modifier.padding(ZSpacing.lg))
                     }

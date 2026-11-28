@@ -145,6 +145,11 @@ class ProfileArea(
     val uploadPhoto: ((ByteArray) -> ApiRequest<ProfilePhotoResponse>)? = null,
     val deletePhoto: (() -> ApiRequest<ProfilePhotoResponse>)? = null,
 ) {
+    /// Offers and news: on = a yes, off = an unsubscribe (bookers only).
+    fun setMarketing(on: Boolean) = ApiRequest.patch<CustomerProfile, PreferencesBody>(
+        "api/${if (kind == JobArea.Kind.BUSINESS) "business" else "customer"}/profile/notifications", PreferencesBody(marketing = on),
+    )
+
     companion object {
         val customer = ProfileArea(JobArea.Kind.CUSTOMER, { CustomerEndpoints.profile() }, { CustomerEndpoints.updateProfile(it) }, { email, sms -> CustomerEndpoints.updatePreferences(email, sms) })
         val business = ProfileArea(JobArea.Kind.BUSINESS, { BusinessEndpoints.profile() }, { BusinessEndpoints.updateProfile(it) }, { email, sms -> BusinessEndpoints.updatePreferences(email, sms) })
@@ -177,6 +182,14 @@ class TeamArea(
     /// Company-only: teammate photos are the assigned-tech trust signal.
     val uploadMemberPhoto: ((Int, ByteArray) -> ApiRequest<ProfilePhotoResponse>)? = null,
 ) {
+    private val prefix: String get() = if (kind == JobArea.Kind.COMPANY) "company" else "business"
+
+    /// Mints a fresh link and 7-day expiry for an unaccepted invitation (the old link dies).
+    fun resend(invitationId: Int) = ApiRequest.empty(ApiRequest.Method.POST, "api/$prefix/team/invitations/$invitationId/resend")
+
+    /// Mails the teammate's OWN inbox a reset link (one a minute, 429 otherwise).
+    fun passwordReset(memberId: Int) = ApiRequest.empty(ApiRequest.Method.POST, "api/$prefix/team/members/$memberId/password-reset")
+
     companion object {
         val business = TeamArea(JobArea.Kind.BUSINESS, { BusinessEndpoints.team() }, { BusinessEndpoints.invite(it) }, { BusinessEndpoints.revoke(it) }, { id, body -> BusinessEndpoints.updateMember(id, body) }, { BusinessEndpoints.removeMember(it) })
         val company = TeamArea(

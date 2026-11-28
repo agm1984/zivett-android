@@ -498,6 +498,10 @@ private fun ReviewStep(model: BookingWizardModel, options: BookingOptions) {
         val phrase = JobPresentation.warrantyPhrase(options.warrantyDays)
         ZCaption("• ${phrase.replaceFirstChar { it.uppercase() }} on every paid job.\n• Cancel free any time before a pro is committed.\n• Any scope change is approved by you in-app before it bills.")
     }
+    // A yes to ZiVETT's own offers: unticked, hidden once they've said yes.
+    if (!options.marketingOptedIn) {
+        com.zivett.app.design.ZCheckbox(form.marketingOptIn, { model.form = model.form.copy(marketingOptIn = it) }, "Send me the occasional offer and seasonal reminder from ZiVETT. Never from a particular pro. Unsubscribe any time.")
+    }
     ZCaption("By submitting, you agree to ZiVETT's Terms of Service and Privacy Policy.", tone = ZTextTone.FAINT)
 }
 
